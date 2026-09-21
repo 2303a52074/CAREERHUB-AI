@@ -1,0 +1,11 @@
+{
+  "name": "CareerHub Ai",
+  "description": "CareerHub AI - AI-powered career and placement assistant guiding students through career discovery, assessments, resume analysis, interview preparation, job matching, and career roadmaps.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Coding Problems Arena — CareerHub AI</title>
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .arena-container {
+            max-width: 1100px;
+            margin: 40px auto;
+            padding: 0 24px;
+        }
+
+        .arena-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding-bottom: 24px;
+            border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+            margin-bottom: 36px;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .problem-card {
+            background: rgba(14, 25, 48, 0.75);
+            border: 1px solid rgba(56, 189, 248, 0.16);
+            border-radius: 18px;
+            padding: 22px 28px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(12px);
+        }
+
+        .problem-card:hover {
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: translateX(6px);
+            box-shadow: 0 10px 30px rgba(0, 210, 255, 0.12);
+            background: rgba(18, 33, 64, 0.85);
+        }
+
+        .problem-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .problem-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: rgba(0, 210, 255, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #00d2ff;
+            font-size: 16px;
+        }
+
+        .problem-title {
+            font-size: 16px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .problem-tags {
+            display: flex;
+            gap: 8px;
+            margin-top: 4px;
+        }
+
+        .tag-pill {
+            font-size: 11px;
+            color: #8da4c4;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2px 8px;
+            border-radius: 6px;
+        }
+
+        .difficulty-badge {
+            font-size: 12px;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 999px;
+            letter-spacing: 0.03em;
+        }
+
+        .difficulty-badge.easy {
+            background: rgba(16, 185, 129, 0.12);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .difficulty-badge.medium {
+            background: rgba(245, 158, 11, 0.12);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .difficulty-badge.hard {
+            background: rgba(239, 68, 68, 0.12);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="ambient-glow"></div>
+
+    <div class="arena-container">
+        <div class="arena-header">
+            <a href="index.html" class="brand-logo-container">
+                <img src="assets/logo.png" alt="CareerHub AI" class="brand-logo-img">
+                <div class="brand-logo-text">
+                    <div class="brand-title">CareerHub <span>AI</span></div>
+                    <div class="brand-subtitle">Coding Challenges Arena</div>
+                </div>
+            </a>
+
+            <div style="display: flex; gap: 12px;">
+                <button class="btn btn-outline" onclick="location.href='index.html'">
+                    <i class="fas fa-home"></i> Home
+                </button>
+                <button class="btn btn-primary" onclick="location.href='dashboard.html'">
+                    <i class="fas fa-rocket"></i> Placement Cockpit
+                </button>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 28px;">
+            <h1 style="font-size: 28px; margin-bottom: 8px;">Curated Placement Coding Problems</h1>
+            <p style="color: #8da4c4; font-size: 14px;">Select a problem to launch the interactive code editor in the Placement Cockpit.</p>
+        </div>
+
+        <div class="problem-card" onclick="openProblem('Two Sum')">
+            <div class="problem-info">
+                <div class="problem-icon"><i class="fas fa-code"></i></div>
+                <div>
+                    <div class="problem-title">Two Sum</div>
+                    <div class="problem-tags">
+                        <span class="tag-pill">Arrays</span>
+                        <span class="tag-pill">Hash Table</span>
+                        <span class="tag-pill">Amazon • Google</span>
+                    </div>
+                </div>
+            </div>
+            <span class="difficulty-badge easy">Easy</span>
+        </div>
+
+        <div class="problem-card" onclick="openProblem('Palindrome')">
+            <div class="problem-info">
+                <div class="problem-icon"><i class="fas fa-font"></i></div>
+                <div>
+                    <div class="problem-title">Palindrome Check</div>
+                    <div class="problem-tags">
+                        <span class="tag-pill">Two Pointers</span>
+                        <span class="tag-pill">Strings</span>
+                        <span class="tag-pill">Microsoft • TCS</span>
+                    </div>
+                </div>
+            </div>
+            <span class="difficulty-badge medium">Medium</span>
+        </div>
+
+        <div class="problem-card" onclick="openProblem('Fibonacci')">
+            <div class="problem-info">
+                <div class="problem-icon"><i class="fas fa-calculator"></i></div>
+                <div>
+                    <div class="problem-title">Fibonacci Series (Dynamic Programming)</div>
+                    <div class="problem-tags">
+                        <span class="tag-pill">Dynamic Programming</span>
+                        <span class="tag-pill">Recursion</span>
+                        <span class="tag-pill">Deloitte • Infosys</span>
+                    </div>
+                </div>
+            </div>
+            <span class="difficulty-badge hard">Hard</span>
+        </div>
+
+        <div class="problem-card" onclick="openProblem('Valid Parentheses')">
+            <div class="problem-info">
+                <div class="problem-icon"><i class="fas fa-layer-group"></i></div>
+                <div>
+                    <div class="problem-title">Valid Parentheses</div>
+                    <div class="problem-tags">
+                        <span class="tag-pill">Stack</span>
+                        <span class="tag-pill">Strings</span>
+                        <span class="tag-pill">IBM • Accenture</span>
+                    </div>
+                </div>
+            </div>
+            <span class="difficulty-badge easy">Easy</span>
+        </div>
+
+        <div class="problem-card" onclick="openProblem('Reverse Linked List')">
+            <div class="problem-info">
+                <div class="problem-icon"><i class="fas fa-link"></i></div>
+                <div>
+                    <div class="problem-title">Reverse Linked List</div>
+                    <div class="problem-tags">
+                        <span class="tag-pill">Linked List</span>
+                        <span class="tag-pill">Pointers</span>
+                        <span class="tag-pill">Google • Microsoft</span>
+                    </div>
+                </div>
+            </div>
+            <span class="difficulty-badge medium">Medium</span>
+        </div>
+    </div>
+
+    <script>
+        function openProblem(name) {
+            localStorage.setItem("problem", name);
+            window.location.href = "dashboard.html";
+        }
+    </script>
+</body>
+</html>
