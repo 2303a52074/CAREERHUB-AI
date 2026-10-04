@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Resume Analyzer & ATS</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .resume-split {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .upload-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+    }
+    .drop-zone {
+      border: 2px dashed rgba(56, 189, 248, 0.35);
+      border-radius: var(--radius-md);
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+      background: rgba(6, 11, 23, 0.4);
+      cursor: pointer;
+      margin-bottom: 1.5rem;
+      transition: var(--transition-smooth);
+    }
+    .drop-zone:hover {
+      border-color: #00d2ff;
+      background: rgba(0, 210, 255, 0.04);
+    }
+    .resume-textarea {
+      width: 100%;
+      height: 140px;
+      padding: 1rem;
+      background: rgba(6, 11, 23, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.85rem;
+      resize: vertical;
+      outline: none;
+      margin-bottom: 1.25rem;
+    }
+    .report-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      display: none;
+    }
+    .ats-circle {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 4px solid #00d2ff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle, rgba(0, 210, 255, 0.15) 0%, transparent 70%);
+      box-shadow: 0 0 25px rgba(0, 210, 255, 0.3);
+    }
+    .pill-tag {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      display: inline-block;
+      margin: 0.2rem;
+    }
+    .pill-match { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .pill-miss { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    @media (max-width: 900px) {
+      .resume-split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page-title="Resume Analyzer" data-page-subtitle="ATS Compatibility Screening & Technical Skill Extraction">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <div class="resume-split">
+          <!-- Left: Upload or Paste -->
+          <div class="upload-card">
+            <h2 style="font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:0.5rem;">Upload Resume PDF</h2>
+            <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Evaluate your resume with real PDF text extraction and placement ATS scoring.
+            </p>
+
+            <div style="margin-bottom:1.25rem;">
+              <label style="display:block;font-size:0.8rem;font-weight:600;color:var(--text-muted);margin-bottom:0.4rem;text-transform:uppercase;">
+                Target Role
+              </label>
+              <select id="resumeTargetRole" style="width:100%;padding:0.65rem 0.85rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+                <option value="Full Stack Developer">Full Stack Developer</option>
+                <option value="Frontend Engineer">Frontend Engineer</option>
+                <option value="Backend Engineer">Backend Engineer</option>
+                <option value="SDE-1">SDE-1</option>
+              </select>
+            </div>
+
+            <!-- PDF Dropzone -->
+            <div class="drop-zone" id="dropZone">
+              <input type="file" id="resumeFileInput" accept=".pdf" style="display:none;">
+              <div style="font-size:2.2rem;margin-bottom:0.5rem;">📄</div>
+              <div style="font-weight:600;color:#fff;font-size:0.95rem;margin-bottom:0.25rem;" id="fileNameDisplay">
+                Drop your Resume PDF here or click to browse
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">PDF up to 10MB supported</div>
+            </div>
+
+            <button id="btnUploadPdf" class="btn-action btn-next" style="width:100%;padding:0.75rem;font-size:0.9rem;margin-bottom:1.5rem;">
+              Analyze Uploaded PDF →
+            </button>
+
+            <!-- Text Paste Alternative -->
+            <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:1.25rem;">
+              <div style="flex:1;height:1px;background:var(--border-subtle);"></div>
+              <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Or Paste Plain Text</span>
+              <div style="flex:1;height:1px;background:var(--border-subtle);"></div>
+            </div>
+
+            <textarea id="resumeTextarea" class="resume-textarea" placeholder="Paste your resume content or project bullet points here..."></textarea>
+            <button id="btnAnalyzeText" class="btn-action btn-prev" style="width:100%;padding:0.75rem;font-size:0.85rem;">
+              Analyze Pasted Text
+            </button>
+          </div>
+
+          <!-- Right: ATS Evaluation Report -->
+          <div class="report-card" id="reportCard">
+            <div style="display:flex;align-items:center;gap:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-subtle);margin-bottom:1.5rem;">
+              <div class="ats-circle">
+                <span style="font-size:2.2rem;font-weight:800;color:#fff;line-height:1;" id="reportScore">--</span>
+                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">ATS SCORE</span>
+              </div>
+              <div>
+                <h3 style="font-size:1.35rem;font-weight:700;color:#fff;margin-bottom:0.25rem;" id="reportVerdict">
+                  ATS Screening Report
+                </h3>
+                <p style="font-size:0.82rem;color:var(--text-secondary);" id="reportSummary">
+                  Summary analysis of technical keywords, project metrics, and formatting.
+                </p>
+              </div>
+            </div>
+
+            <!-- Matched vs Missing Skills -->
+            <div style="margin-bottom:1.5rem;">
+              <h4 style="font-size:0.85rem;font-weight:700;color:#34d399;margin-bottom:0.5rem;">
+                ✓ Detected Skills & Keywords
+              </h4>
+              <div id="detectedSkillsBox"></div>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <h4 style="font-size:0.85rem;font-weight:700;color:#f87171;margin-bottom:0.5rem;">
+                ⚠️ Missing Keywords for Target Role
+              </h4>
+              <div id="missingSkillsBox"></div>
+            </div>
+
+            <!-- Actionable Recommendations -->
+            <div>
+              <h4 style="font-size:0.85rem;font-weight:700;color:var(--text-accent);margin-bottom:0.5rem;">
+                🚀 ATS Optimization Recommendations
+              </h4>
+              <ul id="recommendationsList" style="list-style:none;font-size:0.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem;">
+              </ul>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let selectedFile = null;
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('resumeFileInput');
+
+    dropZone.addEventListener('click', () => fileInput.click());
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        selectedFile = e.target.files[0];
+        document.getElementById('fileNameDisplay').innerText = `Selected: ${selectedFile.name}`;
+      }
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = '#00d2ff';
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+      dropZone.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.style.borderColor = 'rgba(56, 189, 248, 0.35)';
+      if (e.dataTransfer.files.length > 0) {
+        selectedFile = e.dataTransfer.files[0];
+        document.getElementById('fileNameDisplay').innerText = `Selected: ${selectedFile.name}`;
+      }
+    });
+
+    // Upload PDF
+    document.getElementById('btnUploadPdf').addEventListener('click', async () => {
+      if (!selectedFile) {
+        window.showToast('Please select a PDF resume file first.', 'error');
+        return;
+      }
+
+      window.showToast('Uploading and parsing PDF with ATS engine...', 'info');
+      const formData = new FormData();
+      formData.append('resume', selectedFile);
+      formData.append('targetRole', document.getElementById('resumeTargetRole').value);
+
+      try {
+        const res = await fetch('/api/resume/upload', {
+          method: 'POST',
+          headers: { ...headers },
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.showToast('Resume parsed successfully!', 'success');
+          renderReport(data);
+        } else {
+          window.showToast('Failed to analyze PDF file.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        window.showToast('Network error uploading resume.', 'error');
+      }
+    });
+
+    // Analyze Text
+    document.getElementById('btnAnalyzeText').addEventListener('click', async () => {
+      const text = document.getElementById('resumeTextarea').value.trim();
+      if (!text) {
+        window.showToast('Please paste resume text before analyzing.', 'error');
+        return;
+      }
+
+      window.showToast('Analyzing resume text with ATS engine...', 'info');
+      try {
+        const res = await fetch('/api/resume/analyze-text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            resumeText: text,
+            targetRole: document.getElementById('resumeTargetRole').value
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.showToast('Resume text analyzed successfully!', 'success');
+          renderReport(data);
+        } else {
+          window.showToast('Failed to analyze resume text.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        window.showToast('Network error analyzing resume.', 'error');
+      }
+    });
+
+    function renderReport(data) {
+      document.getElementById('reportCard').style.display = 'block';
+      const score = data.score || 85;
+      document.getElementById('reportScore').innerText = score;
+      document.getElementById('reportVerdict').innerText = score >= 80 ? 'Strong ATS Compatibility' : 'ATS Optimizations Required';
+      document.getElementById('reportSummary').innerText = data.summary || 'Resume analyzed against target role hiring parameters.';
+
+      // Detected
+      const det = data.matchedSkills || data.detectedSkills || [];
+      document.getElementById('detectedSkillsBox').innerHTML = det.map(s => `
+        <span class="pill-tag pill-match">${s}</span>
+      `).join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">None detected</span>';
+
+      // Missing
+      const mis = data.missingSkills || [];
+      document.getElementById('missingSkillsBox').innerHTML = mis.map(s => `
+        <span class="pill-tag pill-miss">${s}</span>
+      `).join('') || '<span style="color:#34d399;font-size:0.8rem;">No critical missing skills!</span>';
+
+      // Recommendations
+      const recs = data.recommendations || [
+        'Quantify achievements with metrics (e.g. "reduced latency by 35%")',
+        'Highlight core tech stack in each project header',
+        'Add target role keywords to resume professional summary'
+      ];
+      document.getElementById('recommendationsList').innerHTML = recs.map(r => `
+        <li>● ${r}</li>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

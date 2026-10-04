@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Opportunities Board</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .jobs-layout {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+    .jobs-filter-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      gap: 1rem;
+    }
+    .job-list-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .job-item-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+      transition: var(--transition-smooth);
+    }
+    .job-item-card:hover {
+      border-color: var(--border-hover);
+      box-shadow: var(--shadow-card);
+    }
+    .job-main-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+    .company-title-box h3 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .company-name-text {
+      font-size: 0.85rem;
+      color: var(--text-cyan);
+      font-weight: 600;
+    }
+    .job-tags-row {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    @media (max-width: 800px) {
+      .jobs-filter-panel { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page-title="Opportunities Board" data-page-subtitle="Comprehensive Directory of Software Engineering Openings & Hackathons">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <div class="jobs-layout">
+          <!-- Filters -->
+          <div class="jobs-filter-panel">
+            <div>
+              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Search Opportunities</label>
+              <input type="text" id="jobsSearchInput" class="input-skill" placeholder="Search title, company, skills..." style="width:100%;">
+            </div>
+            <div>
+              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Type</label>
+              <select id="typeFilter" style="width:100%;padding:0.7rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+                <option value="all">All Types</option>
+                <option value="job">Full-Time Jobs</option>
+                <option value="internship">Internships</option>
+                <option value="hackathon">Hackathons</option>
+              </select>
+            </div>
+            <div>
+              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Location</label>
+              <select id="locationFilter" style="width:100%;padding:0.7rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+                <option value="all">All Locations</option>
+                <option value="remote">Remote</option>
+                <option value="bengaluru">Bengaluru</option>
+                <option value="hyderabad">Hyderabad</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Opportunities List -->
+          <div class="job-list-container" id="jobsListContainer">
+            <div style="padding:3rem;text-align:center;color:var(--text-muted);">Loading opportunities directory...</div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let allJobs = [];
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadJobs() {
+      try {
+        const res = await fetch('/api/career/opportunities', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          allJobs = data.opportunities || [];
+          renderJobs();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderJobs() {
+      const q = document.getElementById('jobsSearchInput').value.toLowerCase().trim();
+      const type = document.getElementById('typeFilter').value;
+      const loc = document.getElementById('locationFilter').value;
+
+      let filtered = allJobs;
+
+      if (type !== 'all') {
+        filtered = filtered.filter(j => (j.type || '').toLowerCase() === type);
+      }
+
+      if (loc !== 'all') {
+        filtered = filtered.filter(j => (j.location || '').toLowerCase().includes(loc));
+      }
+
+      if (q) {
+        filtered = filtered.filter(j =>
+          (j.title || '').toLowerCase().includes(q) ||
+          (j.organization || '').toLowerCase().includes(q) ||
+          (j.requiredSkills || []).some(s => s.toLowerCase().includes(q))
+        );
+      }
+
+      const container = document.getElementById('jobsListContainer');
+      if (filtered.length === 0) {
+        container.innerHTML = '<div style="padding:3rem;text-align:center;color:var(--text-muted);">No matching opportunities found.</div>';
+        return;
+      }
+
+      container.innerHTML = filtered.map(job => `
+        <div class="job-item-card">
+          <div class="job-main-header">
+            <div class="company-title-box">
+              <div class="company-name-text">${job.organization}</div>
+              <h3>${job.title}</h3>
+            </div>
+            <span class="role-tag-pill" style="font-weight:700;color:#00d2ff;border-color:rgba(0,210,255,0.3);">
+              ${job.overallMatch || 85}% Alignment
+            </span>
+          </div>
+
+          <div class="job-tags-row">
+            <span class="role-tag-pill" style="font-size:0.75rem;">📍 ${job.location || 'Remote'}</span>
+            <span class="role-tag-pill" style="font-size:0.75rem;color:#34d399;border-color:rgba(16,185,129,0.3);">💰 ${job.salaryOrStipend || 'Competitive'}</span>
+            <span class="role-tag-pill" style="font-size:0.75rem;">👥 ${job.openings || 'Multiple'} Openings</span>
+            <span class="role-tag-pill" style="font-size:0.75rem;">⏳ Deadline: ${job.deadline || 'Rolling'}</span>
+          </div>
+
+          <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.5;margin-bottom:1rem;">
+            ${job.description}
+          </p>
+
+          <div style="font-size:0.78rem;color:var(--text-muted);background:rgba(0,0,0,0.2);padding:0.65rem 0.85rem;border-radius:6px;margin-bottom:1.25rem;">
+            <strong style="color:#fff;">Eligibility:</strong> ${job.eligibility || 'All engineering batches eligible.'}
+          </div>
+
+          <!-- Skills Required -->
+          <div style="margin-bottom:1.25rem;">
+            <strong style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Required Skills: </strong>
+            ${(job.requiredSkills || []).map(s => `<span class="pill-tag pill-match" style="background:rgba(56,189,248,0.12);color:#38bdf8;">${s}</span>`).join('')}
+          </div>
+
+          <!-- Controls -->
+          <div style="display:flex;gap:0.75rem;padding-top:1rem;border-top:1px solid var(--border-subtle);">
+            <a href="${job.applicationLink || '#'}" target="_blank" class="btn-action btn-next" style="text-decoration:none;font-size:0.85rem;padding:0.6rem 1.25rem;">
+              Direct Apply ↗
+            </a>
+            <button onclick="trackApplication('${job.organization}', '${job.title}', ${job.overallMatch || 85})" class="btn-action btn-prev" style="font-size:0.85rem;padding:0.6rem 1.25rem;">
+              + Save to Applications
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.trackApplication = async function (company, role, match) {
+      try {
+        window.showToast(`Tracking ${role} at ${company}...`, 'info');
+        const res = await fetch('/api/career/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            company,
+            jobRole: role,
+            status: 'Applied',
+            matchPercentage: match,
+            notes: 'Saved from Opportunities Board'
+          })
+        });
+
+        if (res.ok) {
+          window.showToast('Application tracked in pipeline!', 'success');
+        } else {
+          window.showToast('Failed to track application.', 'error');
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Error tracking application.', 'error');
+      }
+    };
+
+    document.getElementById('jobsSearchInput').addEventListener('input', renderJobs);
+    document.getElementById('typeFilter').addEventListener('change', renderJobs);
+    document.getElementById('locationFilter').addEventListener('change', renderJobs);
+
+    document.addEventListener('DOMContentLoaded', loadJobs);
+  </script>
+</body>
+</html>

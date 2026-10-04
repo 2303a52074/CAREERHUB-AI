@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Job Description Analyzer</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .analyzer-split {
+      display: grid;
+      grid-template-columns: 1fr 1.25fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .input-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+    }
+    .jd-textarea {
+      width: 100%;
+      height: 240px;
+      padding: 1.25rem;
+      background: rgba(6, 11, 23, 0.75);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      margin-bottom: 1.25rem;
+    }
+    .results-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      display: none;
+    }
+    .match-gauge-box {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 1.5rem;
+    }
+    .pill-tag {
+      font-size: 0.72rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      display: inline-block;
+      margin: 0.2rem;
+    }
+    .pill-match { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .pill-miss { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    @media (max-width: 900px) {
+      .analyzer-split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page-title="Job Description Analyzer" data-page-subtitle="Extract Requirements & Compare Alignment With Your Profile">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <div class="analyzer-split">
+          <!-- Left: Input Form -->
+          <div class="input-card">
+            <h2 style="font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:0.4rem;">Paste Job Description</h2>
+            <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Extract required technical stack, calculate your profile alignment, and predict interview questions.
+            </p>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-bottom:1rem;">
+              <div>
+                <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.3rem;">JOB ROLE</label>
+                <input type="text" id="jdRole" class="input-skill" placeholder="e.g. SDE-1 / Full Stack" style="width:100%;">
+              </div>
+              <div>
+                <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.3rem;">COMPANY</label>
+                <input type="text" id="jdCompany" class="input-skill" placeholder="e.g. Google, Microsoft" style="width:100%;">
+              </div>
+            </div>
+
+            <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.4rem;">JOB DESCRIPTION TEXT</label>
+            <textarea id="jdText" class="jd-textarea" placeholder="Paste full job description, qualifications, and role responsibilities here..."></textarea>
+
+            <button id="btnAnalyzeJd" class="btn-action btn-next" style="width:100%;padding:0.85rem;font-size:0.92rem;">
+              Analyze Alignment & Skills →
+            </button>
+          </div>
+
+          <!-- Right: Alignment & Gap Report -->
+          <div class="results-card" id="resultsCard">
+            <div class="match-gauge-box">
+              <div style="width:100px;height:100px;border-radius:50%;border:4px solid #00d2ff;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle,rgba(0,210,255,0.15) 0%,transparent 70%);box-shadow:0 0 25px rgba(0,210,255,0.3);">
+                <span style="font-size:2rem;font-weight:800;color:#fff;" id="resMatchVal">--%</span>
+                <span style="font-size:0.6rem;color:var(--text-muted);font-weight:700;">MATCH</span>
+              </div>
+              <div>
+                <h3 style="font-size:1.25rem;font-weight:700;color:#fff;" id="resTitleHeader">Role Analysis</h3>
+                <p style="font-size:0.82rem;color:var(--text-cyan);font-weight:600;" id="resVerdictText">Readiness Verdict</p>
+                <button id="btnTrackInApplications" class="role-tag-pill" style="margin-top:0.75rem;font-size:0.75rem;">
+                  + Save to Application Tracker
+                </button>
+              </div>
+            </div>
+
+            <!-- Skills Comparison -->
+            <div style="margin-bottom:1.25rem;">
+              <h4 style="font-size:0.82rem;font-weight:700;color:#34d399;margin-bottom:0.4rem;">
+                ✓ Matched Profile Skills
+              </h4>
+              <div id="matchedSkillsBox"></div>
+            </div>
+
+            <div style="margin-bottom:1.5rem;">
+              <h4 style="font-size:0.82rem;font-weight:700;color:#f87171;margin-bottom:0.4rem;">
+                ⚠️ Missing Required Technologies
+              </h4>
+              <div id="missingSkillsBox"></div>
+            </div>
+
+            <!-- Recommendations -->
+            <div style="margin-bottom:1.5rem;">
+              <h4 style="font-size:0.82rem;font-weight:700;color:var(--text-accent);margin-bottom:0.4rem;">
+                🎯 Tailored Application Strategy
+              </h4>
+              <ul id="recommendationsList" style="list-style:none;font-size:0.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.35rem;"></ul>
+            </div>
+
+            <!-- Predicted Questions -->
+            <div>
+              <h4 style="font-size:0.82rem;font-weight:700;color:#fbbf24;margin-bottom:0.4rem;">
+                🎙️ Predicted Interview Questions
+              </h4>
+              <ul id="interviewQuestionsList" style="list-style:none;font-size:0.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem;"></ul>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let lastAnalysisData = null;
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    document.getElementById('btnAnalyzeJd').addEventListener('click', async () => {
+      const text = document.getElementById('jdText').value.trim();
+      const role = document.getElementById('jdRole').value.trim();
+      const company = document.getElementById('jdCompany').value.trim();
+
+      if (!text) {
+        window.showToast('Please paste a job description to analyze.', 'error');
+        return;
+      }
+
+      window.showToast('Analyzing job description against your profile...', 'info');
+
+      try {
+        const res = await fetch('/api/career/job-analyzer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            jobDescription: text,
+            jobTitle: role,
+            company
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          lastAnalysisData = data;
+          window.showToast('Job description analyzed successfully!', 'success');
+          renderResults(data);
+        } else {
+          window.showToast('Failed to analyze job description.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        window.showToast('Network error analyzing job description.', 'error');
+      }
+    });
+
+    function renderResults(data) {
+      document.getElementById('resultsCard').style.display = 'block';
+      document.getElementById('resMatchVal').innerText = `${data.overallMatch || 75}%`;
+      document.getElementById('resTitleHeader').innerText = `${data.jobTitle || 'Software Engineer'} at ${data.company || 'Hiring Co'}`;
+      document.getElementById('resVerdictText').innerText = data.readinessVerdict || 'High candidate alignment';
+
+      const matchBox = document.getElementById('matchedSkillsBox');
+      const matched = data.matchedSkills || [];
+      matchBox.innerHTML = matched.length > 0
+        ? matched.map(s => `<span class="pill-tag pill-match">${s}</span>`).join('')
+        : '<span style="color:var(--text-muted);font-size:0.8rem;">None detected</span>';
+
+      const missBox = document.getElementById('missingSkillsBox');
+      const missing = data.missingSkills || [];
+      missBox.innerHTML = missing.length > 0
+        ? missing.map(s => `<span class="pill-tag pill-miss">${s}</span>`).join('')
+        : '<span style="color:#34d399;font-size:0.8rem;">No critical missing technologies!</span>';
+
+      const recList = document.getElementById('recommendationsList');
+      recList.innerHTML = (data.recommendations || []).map(r => `<li>● ${r}</li>`).join('');
+
+      const qList = document.getElementById('interviewQuestionsList');
+      qList.innerHTML = (data.interviewQuestions || []).map(q => `<li>💬 "${q}"</li>`).join('');
+    }
+
+    // Save to Application Tracker
+    document.getElementById('btnTrackInApplications').addEventListener('click', async () => {
+      if (!lastAnalysisData) return;
+
+      try {
+        window.showToast('Adding to Application Tracker...', 'info');
+        const res = await fetch('/api/career/applications', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            company: lastAnalysisData.company || 'Company',
+            jobRole: lastAnalysisData.jobTitle || 'Software Engineer',
+            status: 'Applied',
+            matchPercentage: lastAnalysisData.overallMatch || 85,
+            notes: `Saved from Job Description Analyzer. Match: ${lastAnalysisData.overallMatch}%`
+          })
+        });
+
+        if (res.ok) {
+          window.showToast('Application tracked successfully!', 'success');
+          setTimeout(() => window.location.href = '/applications', 800);
+        } else {
+          window.showToast('Failed to save application.', 'error');
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Error tracking application.', 'error');
+      }
+    });
+  </script>
+</body>
+</html>

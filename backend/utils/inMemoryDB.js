@@ -10,6 +10,7 @@ const jobOpportunities = [];
 const jobApplications = [];
 const careerAssessments = [];
 const careerRoadmaps = [];
+const dailyPlans = [];
 
 // Initialize seed data
 (async () => {
@@ -463,6 +464,57 @@ const careerRoadmaps = [];
                 points: 20,
                 companies: ["Google", "Amazon", "Microsoft", "Facebook"],
                 constraints: "1 <= s.length <= 10^4"
+            },
+            {
+                _id: 'problem-4',
+                id: '4',
+                title: "Palindrome Number",
+                description: "Given an integer x, return true if x is a palindrome, and false otherwise. An integer is a palindrome when it reads the same forward and backward.",
+                difficulty: "easy",
+                category: "math",
+                testCases: [
+                    { input: '121', expectedOutput: 'true', isHidden: false },
+                    { input: '-121', expectedOutput: 'false', isHidden: false },
+                    { input: '10', expectedOutput: 'false', isHidden: true }
+                ],
+                solutionTemplate: "function solution(x) {\n    // Return true if x is a palindrome\n    if (x < 0) return false;\n    const s = String(x);\n    return s === s.split('').reverse().join('');\n}",
+                points: 10,
+                companies: ["Amazon", "Microsoft"],
+                constraints: "-2^31 <= x <= 2^31 - 1"
+            },
+            {
+                _id: 'problem-5',
+                id: '5',
+                title: "Maximum Subarray",
+                description: "Given an integer array nums, find the subarray with the largest sum, and return its sum. Solve using Kadane's algorithm in O(n) time.",
+                difficulty: "medium",
+                category: "dynamic-programming",
+                testCases: [
+                    { input: '[-2,1,-3,4,-1,2,1,-5,4]', expectedOutput: '6', isHidden: false },
+                    { input: '[1]', expectedOutput: '1', isHidden: false },
+                    { input: '[5,4,-1,7,8]', expectedOutput: '23', isHidden: true }
+                ],
+                solutionTemplate: "function solution(nums) {\n    // Kadane's Algorithm\n    let maxSoFar = nums[0];\n    let currMax = nums[0];\n    for (let i = 1; i < nums.length; i++) {\n        currMax = Math.max(nums[i], currMax + nums[i]);\n        maxSoFar = Math.max(maxSoFar, currMax);\n    }\n    return maxSoFar;\n}",
+                points: 25,
+                companies: ["Google", "Apple", "LinkedIn"],
+                constraints: "1 <= nums.length <= 10^5, -10^4 <= nums[i] <= 10^4"
+            },
+            {
+                _id: 'problem-6',
+                id: '6',
+                title: "Contains Duplicate",
+                description: "Given an integer array nums, return true if any value appears at least twice in the array, and return false if every element is distinct.",
+                difficulty: "easy",
+                category: "arrays",
+                testCases: [
+                    { input: '[1,2,3,1]', expectedOutput: 'true', isHidden: false },
+                    { input: '[1,2,3,4]', expectedOutput: 'false', isHidden: false },
+                    { input: '[1,1,1,3,3,4,3,2,4,2]', expectedOutput: 'true', isHidden: true }
+                ],
+                solutionTemplate: "function solution(nums) {\n    const set = new Set();\n    for (const n of nums) {\n        if (set.has(n)) return true;\n        set.add(n);\n    }\n    return false;\n}",
+                points: 10,
+                companies: ["Amazon", "Uber", "Adobe"],
+                constraints: "1 <= nums.length <= 10^5"
             }
         );
 
@@ -659,6 +711,18 @@ function wrapModel(collection, modelName, originalMongooseModel, mongoose) {
         return new QueryBuilder(null);
     };
 
+    ModelConstructor.findByIdAndDelete = function(id) {
+        if (mongoose.connection.readyState === 1 && originalMongooseModel) {
+            return originalMongooseModel.findByIdAndDelete(id);
+        }
+        const idx = collection.findIndex(i => String(i._id) === String(id) || String(i.id) === String(id));
+        if (idx >= 0) {
+            const removed = collection.splice(idx, 1)[0];
+            return new QueryBuilder(removed);
+        }
+        return new QueryBuilder(null);
+    };
+
     ModelConstructor.find = function(filter = {}) {
         if (mongoose.connection.readyState === 1 && originalMongooseModel) {
             return originalMongooseModel.find(filter);
@@ -702,5 +766,6 @@ module.exports = {
     jobApplications,
     careerAssessments,
     careerRoadmaps,
+    dailyPlans,
     wrapModel
 };

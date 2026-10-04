@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Skill Gap Analysis</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .skills-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .skill-kpi-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .skill-kpi-val {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #fff;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .skill-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .skill-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+    }
+    .skill-item-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 1rem;
+      border-radius: 10px;
+      margin-bottom: 0.6rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: var(--transition-smooth);
+    }
+    .skill-item-row:hover {
+      background: rgba(56, 189, 248, 0.05);
+      border-color: rgba(56, 189, 248, 0.2);
+    }
+    .priority-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.2rem 0.55rem;
+      border-radius: var(--radius-full);
+      text-transform: uppercase;
+    }
+    .priority-high { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .priority-med { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .add-skill-bar {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    .input-skill {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: rgba(6, 11, 23, 0.7);
+      color: #fff;
+      font-size: 0.9rem;
+    }
+    .input-skill:focus {
+      outline: none;
+      border-color: var(--text-accent);
+    }
+    @media (max-width: 900px) {
+      .skills-summary-grid { grid-template-columns: 1fr; }
+      .skill-split { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page-title="Skill Gap Analysis" data-page-subtitle="Real-Time Competency Alignment Against Role Standards">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <!-- Controls & Role Selector -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
+          <div>
+            <h2 style="font-size:1.25rem;font-weight:700;color:#fff;">Target Role Competency Benchmark</h2>
+            <p style="font-size:0.8rem;color:var(--text-muted);">Comparing your profile skills against tech industry hiring standards</p>
+          </div>
+          <div style="display:flex;gap:0.75rem;align-items:center;">
+            <label style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">Benchmark Role:</label>
+            <select id="roleSelect" style="padding:0.5rem 1rem;background:rgba(14,25,48,0.9);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+              <option value="Full Stack Developer">Full Stack Developer</option>
+              <option value="Frontend Engineer">Frontend Engineer</option>
+              <option value="Backend Engineer">Backend Engineer</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 3 KPIs -->
+        <div class="skills-summary-grid">
+          <div class="skill-kpi-card">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Overall Skill Match</span>
+            <div class="skill-kpi-val" id="matchPercentVal">--%</div>
+            <span style="font-size:0.75rem;color:var(--text-cyan);" id="matchStatusText">Calculating alignment...</span>
+          </div>
+
+          <div class="skill-kpi-card">
+            <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Acquired Skills</span>
+            <div class="skill-kpi-val" id="acquiredCountVal" style="color:#34d399;">--</div>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">Verified in candidate profile</span>
+          </div>
+
+          <div class="skill-kpi-card">
+            <div style="display:flex;justify-content:space-between;">
+              <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Missing Skill Gaps</span>
+              <span class="priority-badge priority-high" id="highPriorityTag">High Priority</span>
+            </div>
+            <div class="skill-kpi-val" id="missingCountVal" style="color:#f87171;">--</div>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">Requires preparation & projects</span>
+          </div>
+        </div>
+
+        <!-- Split Grid: Acquired vs Missing Gaps -->
+        <div class="skill-split">
+          <!-- Acquired Skills -->
+          <div class="skill-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+              <h3 style="font-size:1rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:0.4rem;">
+                <span style="color:#34d399;">✓</span> Acquired Competencies
+              </h3>
+              <span style="font-size:0.75rem;color:var(--text-muted);" id="acquiredSubCount">0 skills</span>
+            </div>
+            <div id="acquiredListContainer">
+              <div style="padding:1rem;text-align:center;color:var(--text-muted);">Loading skills...</div>
+            </div>
+
+            <!-- Add Skill Form -->
+            <div class="add-skill-bar">
+              <input type="text" id="newSkillInput" class="input-skill" placeholder="Add verified skill (e.g. Docker, TypeScript)...">
+              <button id="btnAddSkill" class="btn-action btn-next" style="padding:0.75rem 1.25rem;font-size:0.85rem;">+ Add</button>
+            </div>
+          </div>
+
+          <!-- Missing Gaps & Recommendations -->
+          <div class="skill-card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
+              <h3 style="font-size:1rem;font-weight:700;color:#fff;display:flex;align-items:center;gap:0.4rem;">
+                <span style="color:#f87171;">⚡</span> Critical Missing Gaps
+              </h3>
+              <span style="font-size:0.75rem;color:var(--text-muted);" id="missingSubCount">0 gaps</span>
+            </div>
+            <div id="missingListContainer">
+              <div style="padding:1rem;text-align:center;color:var(--text-muted);">Loading skill gaps...</div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let currentRole = 'Full Stack Developer';
+    let userTechnicalSkills = [];
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadSkillGap(role) {
+      try {
+        const res = await fetch(`/api/career/skill-gap?role=${encodeURIComponent(role)}`, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('matchPercentVal').innerText = `${data.matchPercentage || 0}%`;
+          document.getElementById('matchStatusText').innerText = data.matchPercentage >= 75
+            ? 'High competitive advantage for placements'
+            : 'Upskilling required on core gap skills';
+          document.getElementById('acquiredCountVal').innerText = data.acquiredCount || 0;
+          document.getElementById('missingCountVal').innerText = data.missingCount || 0;
+          document.getElementById('acquiredSubCount').innerText = `${data.acquiredCount || 0} skills`;
+          document.getElementById('missingSubCount').innerText = `${data.missingCount || 0} gaps`;
+
+          // Render Acquired
+          const acq = data.matchedSkills || [];
+          document.getElementById('acquiredListContainer').innerHTML = acq.length === 0
+            ? '<div style="padding:1rem;color:var(--text-muted);">No verified skills yet. Add your technical skills below!</div>'
+            : acq.map(s => `
+              <div class="skill-item-row">
+                <div>
+                  <div style="font-weight:600;color:#fff;font-size:0.88rem;">${s.skill}</div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);">${s.description || 'Verified competency'}</div>
+                </div>
+                <span style="font-size:0.75rem;color:#34d399;font-weight:700;">Verified ✓</span>
+              </div>
+            `).join('');
+
+          // Render Missing
+          const mis = data.missingSkills || [];
+          document.getElementById('missingListContainer').innerHTML = mis.length === 0
+            ? '<div style="padding:1rem;color:#34d399;">Congratulations! You meet all benchmark skills for this role.</div>'
+            : mis.map(m => `
+              <div class="skill-item-row">
+                <div style="flex:1;padding-right:0.5rem;">
+                  <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.2rem;">
+                    <span style="font-weight:600;color:#fff;font-size:0.88rem;">${m.skill}</span>
+                    <span class="priority-badge ${m.priority === 'High' ? 'priority-high' : 'priority-med'}">${m.priority || 'Medium'}</span>
+                  </div>
+                  <div style="font-size:0.75rem;color:var(--text-muted);">${m.description || ''}</div>
+                </div>
+                <a href="/coding" class="role-tag-pill" style="font-size:0.72rem;padding:0.3rem 0.65rem;text-decoration:none;">Practice →</a>
+              </div>
+            `).join('');
+        }
+      } catch (err) {
+        console.error('Error loading skill gap:', err);
+      }
+    }
+
+    // Add Skill to profile
+    document.getElementById('btnAddSkill').addEventListener('click', async () => {
+      const input = document.getElementById('newSkillInput');
+      const skillName = input.value.trim();
+      if (!skillName) return;
+
+      try {
+        window.showToast(`Adding ${skillName} to profile...`, 'info');
+        // Fetch current profile
+        const profRes = await fetch('/api/career/profile', { headers });
+        let currentSkills = [];
+        if (profRes.ok) {
+          const profData = await profRes.json();
+          currentSkills = profData.user?.technicalSkills || [];
+        }
+
+        if (!currentSkills.includes(skillName)) {
+          currentSkills.push(skillName);
+        }
+
+        const updateRes = await fetch('/api/career/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ technicalSkills: currentSkills })
+        });
+
+        if (updateRes.ok) {
+          input.value = '';
+          window.showToast(`Added ${skillName} successfully!`, 'success');
+          loadSkillGap(currentRole);
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Failed to add skill.', 'error');
+      }
+    });
+
+    document.getElementById('roleSelect').addEventListener('change', (e) => {
+      currentRole = e.target.value;
+      loadSkillGap(currentRole);
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadSkillGap(currentRole);
+    });
+  </script>
+</body>
+</html>

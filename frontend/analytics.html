@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Progress Analytics</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .analytics-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .analytics-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .chart-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+    }
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      margin-bottom: 0.6rem;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+    @media (max-width: 900px) {
+      .analytics-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+      .analytics-split { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 550px) {
+      .analytics-kpi-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-page-title="Progress Analytics" data-page-subtitle="Comprehensive Growth Trajectory & Competency Benchmarking">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <!-- 4 Top KPIs -->
+        <div class="analytics-kpi-grid">
+          <div class="kpi-card">
+            <span class="kpi-title">Readiness Index</span>
+            <div class="kpi-value" id="kpiReadiness" style="color:#00d2ff;">--%</div>
+            <div class="kpi-meta" id="kpiReadinessStatus">Computing alignment...</div>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-title">Coding Accuracy</span>
+            <div class="kpi-value" id="kpiAccuracy" style="color:#34d399;">--%</div>
+            <div class="kpi-meta" id="kpiAccuracySub">Accepted vs Total</div>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-title">Interview Average</span>
+            <div class="kpi-value" id="kpiInterviewAvg" style="color:#a5b4fc;">--%</div>
+            <div class="kpi-meta" id="kpiInterviewCount">Mock Sessions Evaluated</div>
+          </div>
+
+          <div class="kpi-card">
+            <span class="kpi-title">Roadmap Progress</span>
+            <div class="kpi-value" id="kpiRoadmapProg" style="color:#fbbf24;">--%</div>
+            <div class="kpi-meta">Career Milestones Completed</div>
+          </div>
+        </div>
+
+        <!-- Split 1: Readiness Breakdown & Coding Accuracy -->
+        <div class="analytics-split">
+          <!-- Readiness Factors -->
+          <div class="chart-panel">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
+              Readiness Component Breakdown
+            </h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Multi-factor weighted evaluation across 6 critical placement dimensions
+            </p>
+            <div id="readinessComponentsList">
+              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading readiness metrics...</div>
+            </div>
+          </div>
+
+          <!-- Coding Submissions Stats -->
+          <div class="chart-panel">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
+              Algorithmic Problem Velocity
+            </h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Sandbox code execution accuracy and acceptance rate
+            </p>
+            <div id="codingStatsContainer">
+              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading submission records...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Split 2: Interview Trajectory & Applications Conversion -->
+        <div class="analytics-split">
+          <!-- Interview Trajectory -->
+          <div class="chart-panel">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
+              Mock Interview Score Trajectory
+            </h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Recent technical and behavioral session performance
+            </p>
+            <div id="interviewTrajectoryList">
+              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading interview history...</div>
+            </div>
+          </div>
+
+          <!-- Applications Conversion Funnel -->
+          <div class="chart-panel">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
+              Recruitment Conversion Funnel
+            </h3>
+            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
+              Progress of tracked opportunities through recruitment stages
+            </p>
+            <div id="appFunnelContainer">
+              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading applications funnel...</div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadAnalytics() {
+      try {
+        const [readinessRes, historyRes] = await Promise.all([
+          fetch('/api/career/readiness', { headers }),
+          fetch('/api/career/analytics/history', { headers })
+        ]);
+
+        if (readinessRes.ok && historyRes.ok) {
+          const r = await readinessRes.json();
+          const h = await historyRes.json();
+          renderAnalytics(r, h);
+        }
+      } catch (err) {
+        console.error('Analytics load error:', err);
+      }
+    }
+
+    function renderAnalytics(r, h) {
+      // 1. KPIs
+      document.getElementById('kpiReadiness').innerText = `${r.overallScore || 0}%`;
+      document.getElementById('kpiReadinessStatus').innerText = r.statusBadge || 'Placement Ready';
+      document.getElementById('kpiAccuracy').innerText = `${h.coding?.accuracyRate || 0}%`;
+      document.getElementById('kpiAccuracySub').innerText = `${h.coding?.acceptedCount || 0} Accepted of ${h.coding?.totalSubmissions || 0}`;
+      document.getElementById('kpiInterviewAvg').innerText = `${h.interviews?.averageScore || 0}%`;
+      document.getElementById('kpiInterviewCount').innerText = `${h.interviews?.totalSessions || 0} Sessions Evaluated`;
+      document.getElementById('kpiRoadmapProg').innerText = `${h.roadmapProgress || 0}%`;
+
+      // 2. Readiness components
+      const b = r.breakdown || {};
+      const components = [
+        { label: 'Coding Mastery', score: b.coding?.score || 0, weight: '25%' },
+        { label: 'Career Assessment', score: b.assessment?.score || 0, weight: '20%' },
+        { label: 'Mock Interviews', score: b.interview?.score || 0, weight: '20%' },
+        { label: 'Resume ATS Score', score: b.resume?.score || 0, weight: '15%' },
+        { label: 'Roadmap Milestones', score: b.roadmap?.score || 0, weight: '10%' },
+        { label: 'Profile Depth', score: b.profile?.score || 0, weight: '10%' }
+      ];
+
+      document.getElementById('readinessComponentsList').innerHTML = components.map(c => `
+        <div style="margin-bottom:0.9rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.35rem;">
+            <span style="color:#fff;font-weight:600;">${c.label} <span style="font-size:0.72rem;color:var(--text-muted);">(${c.weight})</span></span>
+            <span style="color:#00d2ff;font-weight:700;">${c.score}%</span>
+          </div>
+          <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">
+            <div style="width:${c.score}%;height:100%;background:var(--gradient-primary);border-radius:4px;"></div>
+          </div>
+        </div>
+      `).join('');
+
+      // 3. Coding Stats
+      document.getElementById('codingStatsContainer').innerHTML = `
+        <div class="stat-row">
+          <span style="color:#fff;font-weight:600;">Total Code Submissions</span>
+          <span style="color:#38bdf8;font-weight:700;">${h.coding?.totalSubmissions || 0}</span>
+        </div>
+        <div class="stat-row">
+          <span style="color:#fff;font-weight:600;">Accepted (Passed Test Cases)</span>
+          <span style="color:#34d399;font-weight:700;">${h.coding?.acceptedCount || 0}</span>
+        </div>
+        <div class="stat-row">
+          <span style="color:#fff;font-weight:600;">Wrong Answers / Runtime Errors</span>
+          <span style="color:#f87171;font-weight:700;">${h.coding?.failedCount || 0}</span>
+        </div>
+        <div class="stat-row">
+          <span style="color:#fff;font-weight:600;">Candidate Accuracy Rate</span>
+          <span style="color:#fbbf24;font-weight:700;">${h.coding?.accuracyRate || 0}%</span>
+        </div>
+      `;
+
+      // 4. Interview Trajectory
+      const trend = h.interviews?.trend || [];
+      document.getElementById('interviewTrajectoryList').innerHTML = trend.length > 0
+        ? trend.map(t => `
+          <div class="stat-row">
+            <div>
+              <div style="font-weight:600;color:#fff;">${t.session} • ${t.role}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">${t.date}</div>
+            </div>
+            <span style="font-weight:700;color:${t.score >= 80 ? '#34d399' : '#38bdf8'};font-size:1rem;">
+              ${t.score}%
+            </span>
+          </div>
+        `).join('')
+        : '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No mock interviews completed yet. Complete your first session to see score trajectory!</div>';
+
+      // 5. Applications Funnel
+      const apps = h.applications || {};
+      const funnel = [
+        { stage: 'Total Applied', count: apps.total || 0, color: '#38bdf8' },
+        { stage: 'Screening / Assessment', count: apps.screening || 0, color: '#818cf8' },
+        { stage: 'Interviews Active', count: apps.interview || 0, color: '#fbbf24' },
+        { stage: 'Offers & Selected', count: apps.offer || 0, color: '#34d399' },
+        { stage: 'Archived / Rejected', count: apps.rejected || 0, color: '#f87171' }
+      ];
+
+      document.getElementById('appFunnelContainer').innerHTML = funnel.map(f => `
+        <div class="stat-row">
+          <span style="color:#fff;font-weight:600;">${f.stage}</span>
+          <span style="font-weight:700;color:${f.color};font-size:1rem;">${f.count}</span>
+        </div>
+      `).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', loadAnalytics);
+  </script>
+</body>
+</html>

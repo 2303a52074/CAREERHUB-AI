@@ -87,6 +87,40 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: err.message || 'Internal Server Error' });
 });
 
+// Explicit clean routes for all 14 dedicated pages and auth views
+const pageRoutes = [
+    { route: '/dashboard', file: 'dashboard.html' },
+    { route: '/assessment', file: 'assessment.html' },
+    { route: '/skills', file: 'skills.html' },
+    { route: '/roadmap', file: 'roadmap.html' },
+    { route: '/daily-plan', file: 'daily-plan.html' },
+    { route: '/coding', file: 'coding.html' },
+    { route: '/interviews', file: 'interviews.html' },
+    { route: '/resume', file: 'resume.html' },
+    { route: '/job-analyzer', file: 'job-analyzer.html' },
+    { route: '/job-matching', file: 'job-matching.html' },
+    { route: '/jobs', file: 'jobs.html' },
+    { route: '/applications', file: 'applications.html' },
+    { route: '/analytics', file: 'analytics.html' },
+    { route: '/assistant', file: 'assistant.html' },
+    { route: '/login', file: 'login.html' },
+    { route: '/register', file: 'register.html' },
+    { route: '/admin', file: 'admin.html' },
+    { route: '/problems', file: 'problems.html' },
+    { route: '/editor', file: 'editor.html' }
+];
+
+pageRoutes.forEach(({ route, file }) => {
+    app.get([route, route + '.html'], (req, res) => {
+        const filePath = path.join(frontendDir, file);
+        if (fs.existsSync(filePath)) {
+            res.sendFile(filePath);
+        } else {
+            res.sendFile(path.join(frontendDir, 'index.html'));
+        }
+    });
+});
+
 // SPA fallback for HTML pages
 app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();

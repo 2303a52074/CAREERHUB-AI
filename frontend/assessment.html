@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Career Assessment</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .assessment-layout {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .assessment-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2.25rem;
+      box-shadow: var(--shadow-card);
+    }
+    .question-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .question-badge {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.3rem 0.75rem;
+      border-radius: var(--radius-full);
+      background: rgba(0, 210, 255, 0.12);
+      color: #00d2ff;
+      border: 1px solid rgba(0, 210, 255, 0.25);
+    }
+    .question-progress {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .question-text {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.5;
+      margin-bottom: 2rem;
+    }
+    .options-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      margin-bottom: 2rem;
+    }
+    .option-item {
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-subtle);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      transition: var(--transition-smooth);
+    }
+    .option-item:hover {
+      border-color: var(--border-hover);
+      background: rgba(56, 189, 248, 0.05);
+      color: #fff;
+    }
+    .option-item.selected {
+      border-color: var(--border-glow);
+      background: rgba(0, 210, 255, 0.1);
+      color: #fff;
+      font-weight: 600;
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.15);
+    }
+    .option-radio {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 2px solid var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .option-item.selected .option-radio {
+      border-color: #00d2ff;
+    }
+    .option-item.selected .option-radio::after {
+      content: '';
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #00d2ff;
+    }
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .btn-action {
+      padding: 0.75rem 1.75rem;
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      border: none;
+    }
+    .btn-prev {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+    }
+    .btn-prev:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+    .btn-next {
+      background: var(--gradient-primary);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(0, 210, 255, 0.25);
+    }
+    .btn-next:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 25px rgba(0, 210, 255, 0.4);
+    }
+
+    /* Results Screen */
+    .results-hero {
+      text-align: center;
+      padding: 2rem 0;
+      border-bottom: 1px solid var(--border-subtle);
+      margin-bottom: 2rem;
+    }
+    .score-circle {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      border: 4px solid #00d2ff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 0 30px rgba(0, 210, 255, 0.3);
+      background: radial-gradient(circle, rgba(0, 210, 255, 0.15) 0%, transparent 70%);
+    }
+    .score-number {
+      font-size: 2.75rem;
+      font-weight: 800;
+      color: #fff;
+      line-height: 1;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+    .results-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .result-box {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.25rem;
+    }
+    .result-box h4 {
+      font-size: 0.9rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .result-box ul {
+      list-style: none;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body data-page-title="Career Assessment" data-page-subtitle="AI-Powered Aptitude & Domain Readiness Evaluation">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <div class="assessment-layout">
+          <!-- Live Assessment Card -->
+          <div class="assessment-card" id="questionCard">
+            <div class="question-header">
+              <span class="question-badge" id="questionCategory">Category</span>
+              <span class="question-progress" id="questionCounter">Question 1 of 10</span>
+            </div>
+
+            <div class="question-text" id="questionText">Loading assessment question...</div>
+
+            <div class="options-grid" id="optionsContainer">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <div class="nav-buttons">
+              <button class="btn-action btn-prev" id="btnPrev" style="display:none;">← Previous</button>
+              <button class="btn-action btn-next" id="btnNext">Next Question →</button>
+            </div>
+          </div>
+
+          <!-- Assessment Results Card (Hidden by default) -->
+          <div class="assessment-card" id="resultsCard" style="display:none;">
+            <div class="results-hero">
+              <div class="score-circle">
+                <div class="score-number" id="resOverallScore">--%</div>
+                <div style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">READINESS</div>
+              </div>
+              <h2 style="font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:0.4rem;" id="resVerdictTitle">
+                Assessment Complete!
+              </h2>
+              <p style="font-size:0.9rem;color:var(--text-secondary);" id="resRoleSubtitle">
+                Target Role: Full Stack Developer
+              </p>
+            </div>
+
+            <!-- Scores Breakdown -->
+            <div style="margin-bottom:2rem;" id="resBreakdownContainer">
+              <!-- Dynamically populated -->
+            </div>
+
+            <div class="results-grid">
+              <div class="result-box">
+                <h4 style="color:#34d399;"><span>✅</span> Core Strengths</h4>
+                <ul id="resStrengthsList"></ul>
+              </div>
+
+              <div class="result-box">
+                <h4 style="color:#f59e0b;"><span>⚠️</span> Growth Areas & Gaps</h4>
+                <ul id="resWeaknessesList"></ul>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:1rem;justify-content:center;margin-top:2rem;">
+              <a href="/roadmap" class="btn-action btn-next" style="text-decoration:none;">View Tailored Roadmap →</a>
+              <a href="/coding" class="btn-action btn-prev" style="text-decoration:none;">Practice in IDE</a>
+              <button class="btn-action btn-prev" id="btnRetake">Retake Assessment</button>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let questions = [];
+    let currentIndex = 0;
+    let userAnswers = {};
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function initAssessment() {
+      try {
+        // Fetch questions
+        const res = await fetch('/api/career/assessment/questions', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          questions = data.questions || [];
+          if (questions.length > 0) {
+            renderQuestion(0);
+          } else {
+            showEmpty();
+          }
+        } else {
+          showEmpty();
+        }
+      } catch (e) {
+        console.error(e);
+        showEmpty();
+      }
+    }
+
+    function showEmpty() {
+      document.getElementById('questionText').innerText = 'No questions available at this time.';
+    }
+
+    function renderQuestion(index) {
+      if (!questions[index]) return;
+      currentIndex = index;
+      const q = questions[index];
+
+      document.getElementById('questionCategory').innerText = q.category || 'General Assessment';
+      document.getElementById('questionCounter').innerText = `Question ${index + 1} of ${questions.length}`;
+      document.getElementById('questionText').innerText = q.question;
+
+      const optContainer = document.getElementById('optionsContainer');
+      optContainer.innerHTML = (q.options || []).map((opt, i) => {
+        const isSelected = userAnswers[q.id] === opt;
+        return `
+          <div class="option-item ${isSelected ? 'selected' : ''}" onclick="selectOption('${q.id}', '${encodeURIComponent(opt)}')">
+            <div class="option-radio"></div>
+            <span>${opt}</span>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('btnPrev').style.display = index > 0 ? 'block' : 'none';
+      document.getElementById('btnNext').innerText = index === questions.length - 1 ? 'Submit Assessment ✓' : 'Next Question →';
+    }
+
+    window.selectOption = function (qId, encodedOpt) {
+      const opt = decodeURIComponent(encodedOpt);
+      userAnswers[qId] = opt;
+      renderQuestion(currentIndex);
+    };
+
+    document.getElementById('btnPrev').addEventListener('click', () => {
+      if (currentIndex > 0) renderQuestion(currentIndex - 1);
+    });
+
+    document.getElementById('btnNext').addEventListener('click', async () => {
+      const currentQ = questions[currentIndex];
+      if (!userAnswers[currentQ.id]) {
+        window.showToast('Please select an option to proceed', 'error');
+        return;
+      }
+
+      if (currentIndex < questions.length - 1) {
+        renderQuestion(currentIndex + 1);
+      } else {
+        // Submit
+        submitAssessment();
+      }
+    });
+
+    async function submitAssessment() {
+      try {
+        window.showToast('Evaluating assessment answers...', 'info');
+        const formattedAnswers = Object.entries(userAnswers).map(([id, answer]) => ({
+          questionId: parseInt(id),
+          answer
+        }));
+
+        const res = await fetch('/api/career/assessment/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ answers: formattedAnswers })
+        });
+
+        if (res.ok) {
+          const evalResult = await res.json();
+          window.showToast('Assessment submitted successfully!', 'success');
+          showResults(evalResult);
+        } else {
+          window.showToast('Failed to evaluate submission.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        window.showToast('Network error submitting assessment.', 'error');
+      }
+    }
+
+    function showResults(data) {
+      document.getElementById('questionCard').style.display = 'none';
+      document.getElementById('resultsCard').style.display = 'block';
+
+      const readiness = data.overallReadiness || data.readinessScore || 78;
+      document.getElementById('resOverallScore').innerText = `${readiness}%`;
+
+      const scores = data.scores || {};
+      const scoreRows = [
+        { label: 'Aptitude & Logical Reasoning', val: scores.aptitude || 80 },
+        { label: 'Technical Core Knowledge', val: scores.technical || 85 },
+        { label: 'Problem Solving Velocity', val: scores.problemSolving || 75 },
+        { label: 'Communication & Clarity', val: scores.communication || 80 },
+        { label: 'Domain Architecture & System Design', val: scores.roleSpecific || 70 }
+      ];
+
+      document.getElementById('resBreakdownContainer').innerHTML = scoreRows.map(s => `
+        <div style="margin-bottom:0.85rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.3rem;">
+            <span style="color:#fff;font-weight:500;">${s.label}</span>
+            <span style="color:#00d2ff;font-weight:700;">${s.val}%</span>
+          </div>
+          <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
+            <div style="width:${s.val}%;height:100%;background:var(--gradient-primary);border-radius:3px;"></div>
+          </div>
+        </div>
+      `).join('');
+
+      const strengths = data.strengths || ['Solid grasp of algorithmic logic', 'Strong software architecture fundamentals'];
+      document.getElementById('resStrengthsList').innerHTML = strengths.map(st => `<li>● ${st}</li>`).join('');
+
+      const weaknesses = data.weaknesses || ['Advanced database scaling & indexing', 'Containerization and production CI/CD'];
+      document.getElementById('resWeaknessesList').innerHTML = weaknesses.map(w => `<li>● ${w}</li>`).join('');
+    }
+
+    document.getElementById('btnRetake').addEventListener('click', () => {
+      userAnswers = {};
+      document.getElementById('resultsCard').style.display = 'none';
+      document.getElementById('questionCard').style.display = 'block';
+      renderQuestion(0);
+    });
+
+    document.addEventListener('DOMContentLoaded', initAssessment);
+  </script>
+</body>
+</html>

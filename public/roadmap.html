@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Career Roadmap</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .roadmap-header-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .overall-progress-box {
+      min-width: 260px;
+    }
+    .phases-container {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .phase-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.75rem;
+      transition: var(--transition-smooth);
+    }
+    .phase-card:hover {
+      border-color: var(--border-hover);
+    }
+    .phase-card.phase-completed {
+      border-color: rgba(16, 185, 129, 0.3);
+      background: rgba(16, 185, 129, 0.03);
+    }
+    .phase-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+    .phase-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #fff;
+    }
+    .phase-desc {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+    .milestones-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .milestone-item {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.85rem 1rem;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      cursor: pointer;
+      transition: var(--transition-smooth);
+    }
+    .milestone-item:hover {
+      background: rgba(56, 189, 248, 0.06);
+    }
+    .milestone-checkbox {
+      width: 20px;
+      height: 20px;
+      border-radius: 6px;
+      border: 2px solid var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+    .milestone-item.completed .milestone-checkbox {
+      background: #10b981;
+      border-color: #10b981;
+      color: #fff;
+    }
+    .milestone-text {
+      font-size: 0.88rem;
+      color: var(--text-secondary);
+      flex: 1;
+    }
+    .milestone-item.completed .milestone-text {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .phase-status-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 0.25rem 0.65rem;
+      border-radius: var(--radius-full);
+      text-transform: uppercase;
+    }
+    .status-completed { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .status-in-progress { background: rgba(0, 210, 255, 0.15); color: #38bdf8; }
+    .status-pending { background: rgba(148, 163, 184, 0.12); color: #94a3b8; }
+  </style>
+</head>
+<body data-page-title="Career Roadmap" data-page-subtitle="Phased Preparation Milestones & Engineering Placement Pathway">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <!-- Header Banner & Progress Bar -->
+        <div class="roadmap-header-card">
+          <div>
+            <span style="font-size:0.75rem;font-weight:700;color:var(--text-accent);text-transform:uppercase;">Custom Career Pathway</span>
+            <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0.25rem 0 0.5rem;" id="roadmapRoleTitle">
+              Full Stack Developer Pathway
+            </h2>
+            <p style="font-size:0.85rem;color:var(--text-muted);">
+              Track and conquer each technical milestone to achieve comprehensive placement readiness.
+            </p>
+          </div>
+
+          <div class="overall-progress-box">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+              <span style="font-size:0.82rem;font-weight:600;color:#fff;">Overall Progress</span>
+              <span style="font-size:0.82rem;font-weight:700;color:var(--text-accent);" id="roadmapPercentText">--%</span>
+            </div>
+            <div style="height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;">
+              <div id="roadmapProgressBar" style="width:0%;height:100%;background:var(--gradient-primary);transition:width 0.6s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5 Phased Milestone Sections -->
+        <div class="phases-container" id="phasesContainer">
+          <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading career roadmap...</div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadRoadmap() {
+      try {
+        const res = await fetch('/api/career/roadmap', { headers });
+        if (res.ok) {
+          const roadmap = await res.json();
+          renderRoadmap(roadmap);
+        } else {
+          document.getElementById('phasesContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load roadmap.</div>';
+        }
+      } catch (e) {
+        console.error('Roadmap fetch error:', e);
+      }
+    }
+
+    function renderRoadmap(data) {
+      document.getElementById('roadmapRoleTitle').innerText = `${data.targetRole || 'Full Stack Developer'} Pathway`;
+      const progress = data.progressPercentage || 0;
+      document.getElementById('roadmapPercentText').innerText = `${progress}% Complete`;
+      document.getElementById('roadmapProgressBar').style.width = `${progress}%`;
+
+      const phases = data.phases || [];
+      const container = document.getElementById('phasesContainer');
+
+      container.innerHTML = phases.map(phase => {
+        const isAllDone = phase.status === 'completed';
+        const statusClass = `status-${(phase.status || 'pending').toLowerCase().replace(' ', '-')}`;
+        return `
+          <div class="phase-card ${isAllDone ? 'phase-completed' : ''}">
+            <div class="phase-header">
+              <h3 class="phase-title">${phase.title}</h3>
+              <span class="phase-status-badge ${statusClass}">${phase.status || 'Pending'}</span>
+            </div>
+            <p class="phase-desc">${phase.description}</p>
+
+            <div class="milestones-list">
+              ${(phase.milestones || []).map(m => `
+                <div class="milestone-item ${m.completed ? 'completed' : ''}" onclick="toggleMilestone('${m.id}', ${!m.completed})">
+                  <div class="milestone-checkbox">
+                    ${m.completed ? '✓' : ''}
+                  </div>
+                  <span class="milestone-text">${m.title}</span>
+                  <span style="font-size:0.7rem;color:var(--text-accent);font-weight:600;">+25 XP</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    window.toggleMilestone = async function (milestoneId, completed) {
+      try {
+        window.showToast('Updating milestone status...', 'info');
+        const res = await fetch('/api/career/roadmap/milestone', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ milestoneId, completed })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.showToast(completed ? 'Milestone completed! +25 XP awarded' : 'Milestone marked incomplete', 'success');
+          renderRoadmap(data.roadmap);
+        } else {
+          window.showToast('Failed to update milestone', 'error');
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Network error updating milestone', 'error');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', loadRoadmap);
+  </script>
+</body>
+</html>

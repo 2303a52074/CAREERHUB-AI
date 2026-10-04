@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Daily Preparation</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .daily-hero-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    .streak-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: rgba(245, 158, 11, 0.15);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: var(--radius-full);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #fbbf24;
+    }
+    .task-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+      transition: var(--transition-smooth);
+    }
+    .task-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+    }
+    .task-card.task-done {
+      background: rgba(16, 185, 129, 0.04);
+      border-color: rgba(16, 185, 129, 0.25);
+    }
+    .task-check-circle {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 2px solid var(--text-muted);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all 0.2s ease;
+    }
+    .task-card.task-done .task-check-circle {
+      background: #10b981;
+      border-color: #10b981;
+      color: #fff;
+    }
+    .task-details {
+      flex: 1;
+    }
+    .task-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.25rem;
+    }
+    .task-card.task-done .task-title {
+      text-decoration: line-through;
+      color: var(--text-muted);
+    }
+    .task-desc {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+    .task-category-pill {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+      background: rgba(0, 210, 255, 0.12);
+      color: #00d2ff;
+      margin-right: 0.5rem;
+    }
+    .celebration-box {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(0, 210, 255, 0.2));
+      border: 1px solid rgba(16, 185, 129, 0.4);
+      border-radius: var(--radius-md);
+      padding: 1.5rem;
+      text-align: center;
+      margin-bottom: 2rem;
+      display: none;
+    }
+  </style>
+</head>
+<body data-page-title="Daily Preparation" data-page-subtitle="Targeted Daily Practice Schedule & Habit Discipline">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        
+        <!-- Top Status Banner -->
+        <div class="daily-hero-card">
+          <div>
+            <div class="streak-badge" id="dailyStreakBadge">🔥 1 Day Streak</div>
+            <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0.75rem 0 0.35rem;" id="dailyPlanTitle">
+              Today's Preparation Goals
+            </h2>
+            <p style="font-size:0.85rem;color:var(--text-muted);" id="dailyDateDisplay">Loading schedule...</p>
+          </div>
+
+          <div style="min-width:240px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.4rem;">
+              <span style="font-weight:600;color:#fff;">Daily Completion</span>
+              <span style="font-weight:700;color:var(--text-accent);" id="dailyPercentText">0%</span>
+            </div>
+            <div style="height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;">
+              <div id="dailyProgressBar" style="width:0%;height:100%;background:var(--gradient-primary);transition:width 0.5s ease;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Celebration Banner (Shown when 100% complete) -->
+        <div class="celebration-box" id="celebrationBanner">
+          <h3 style="font-size:1.25rem;font-weight:800;color:#34d399;margin-bottom:0.3rem;">🎉 All Daily Tasks Completed!</h3>
+          <p style="font-size:0.85rem;color:#cbd5e1;">+50 XP Bonus Awarded! Your daily preparation habit is building unbeatable placement momentum.</p>
+        </div>
+
+        <!-- Tasks List -->
+        <div id="dailyTasksContainer">
+          <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading today's tasks...</div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadDailyPlan() {
+      try {
+        const res = await fetch('/api/career/daily-plan', { headers });
+        if (res.ok) {
+          const data = await res.json();
+          renderDailyPlan(data);
+        } else {
+          document.getElementById('dailyTasksContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load daily plan.</div>';
+        }
+      } catch (err) {
+        console.error('Daily plan error:', err);
+      }
+    }
+
+    function renderDailyPlan(data) {
+      const plan = data.plan || {};
+      const tasks = plan.tasks || [];
+      const streak = data.userStreak || plan.streak || 1;
+      const percent = plan.completionPercentage || 0;
+
+      document.getElementById('dailyStreakBadge').innerText = `🔥 ${streak} Day Streak`;
+      document.getElementById('dailyDateDisplay').innerText = data.date ? `Target Date: ${data.date}` : new Date().toDateString();
+      document.getElementById('dailyPercentText').innerText = `${percent}%`;
+      document.getElementById('dailyProgressBar').style.width = `${percent}%`;
+
+      const celebration = document.getElementById('celebrationBanner');
+      if (percent === 100 && tasks.length > 0) {
+        celebration.style.display = 'block';
+      } else {
+        celebration.style.display = 'none';
+      }
+
+      const container = document.getElementById('dailyTasksContainer');
+      if (tasks.length === 0) {
+        container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No tasks scheduled for today.</div>';
+        return;
+      }
+
+      container.innerHTML = tasks.map(task => `
+        <div class="task-card ${task.completed ? 'task-done' : ''}">
+          <div class="task-check-circle" onclick="toggleTask('${task.id}', ${!task.completed})">
+            ${task.completed ? '✓' : ''}
+          </div>
+          <div class="task-details">
+            <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+              <span class="task-category-pill">${task.category}</span>
+              <span style="font-size:0.75rem;color:var(--text-accent);font-weight:700;">+${task.xpReward} XP</span>
+            </div>
+            <div class="task-title">${task.title}</div>
+            <div class="task-desc">${task.description}</div>
+          </div>
+          <a href="${task.actionUrl}" class="role-tag-pill" style="text-decoration:none;padding:0.4rem 0.85rem;background:${task.completed ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.1)'};color:${task.completed ? '#34d399' : '#00d2ff'};">
+            ${task.completed ? 'Review' : (task.actionText || 'Start')} →
+          </a>
+        </div>
+      `).join('');
+    }
+
+    window.toggleTask = async function (taskId, completed) {
+      try {
+        window.showToast('Updating task status...', 'info');
+        const res = await fetch(`/api/career/daily-plan/task/${taskId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ completed })
+        });
+
+        if (res.ok) {
+          const result = await res.json();
+          window.showToast(completed ? `Task completed! +${result.task?.xpReward || 25} XP` : 'Task marked pending', 'success');
+          loadDailyPlan();
+        } else {
+          window.showToast('Failed to update task.', 'error');
+        }
+      } catch (err) {
+        console.error(err);
+        window.showToast('Network error updating task.', 'error');
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', loadDailyPlan);
+  </script>
+</body>
+</html>

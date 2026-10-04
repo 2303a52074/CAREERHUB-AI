@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Coding Practice & IDE</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: 380px 1fr;
+      gap: 1.5rem;
+      height: calc(100vh - var(--header-height) - 4rem);
+      min-height: 650px;
+    }
+    .problem-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .problem-selector-bar {
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+    .problem-content {
+      padding: 1.5rem;
+      overflow-y: auto;
+      flex: 1;
+    }
+    .problem-title-text {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .badge-diff {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 0.2rem 0.6rem;
+      border-radius: var(--radius-full);
+    }
+    .diff-easy { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+    .diff-medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
+    .diff-hard { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+    .company-pill {
+      font-size: 0.7rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-secondary);
+      display: inline-block;
+      margin-right: 0.35rem;
+    }
+    .ide-panel {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ide-toolbar {
+      padding: 0.75rem 1.25rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(6, 11, 23, 0.6);
+    }
+    .code-editor-area {
+      flex: 1;
+      position: relative;
+      background: #090e1c;
+    }
+    .code-textarea {
+      width: 100%;
+      height: 100%;
+      padding: 1.25rem;
+      background: transparent;
+      border: none;
+      color: #38bdf8;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92rem;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      white-space: pre;
+    }
+    .console-panel {
+      height: 180px;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(6, 11, 23, 0.95);
+      display: flex;
+      flex-direction: column;
+    }
+    .console-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(0, 0, 0, 0.2);
+    }
+    .console-tab {
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+    }
+    .console-tab.active {
+      color: #00d2ff;
+      border-bottom-color: #00d2ff;
+    }
+    .console-body {
+      flex: 1;
+      padding: 0.85rem 1.25rem;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+    }
+    @media (max-width: 950px) {
+      .workspace-grid { grid-template-columns: 1fr; height: auto; }
+      .problem-panel { height: 400px; }
+      .ide-panel { height: 550px; }
+    }
+  </style>
+</head>
+<body data-page-title="Coding Practice" data-page-subtitle="Sandboxed Code Execution, Test Case Runner & Big-O Analyzer">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container" style="padding:1.25rem 2rem;">
+        
+        <div class="workspace-grid">
+          <!-- Left: Problem Description & Test Cases -->
+          <div class="problem-panel">
+            <div class="problem-selector-bar">
+              <label style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Problem:</label>
+              <select id="problemDropdown" style="flex:1;padding:0.4rem 0.75rem;background:rgba(14,25,48,0.9);border:1px solid var(--border-subtle);border-radius:6px;color:#fff;font-size:0.85rem;outline:none;">
+                <option value="">Loading problems...</option>
+              </select>
+            </div>
+
+            <div class="problem-content" id="problemContent">
+              <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
+                <span class="badge-diff diff-easy" id="probDifficulty">Easy</span>
+                <span style="font-size:0.8rem;color:var(--text-accent);font-weight:700;" id="probPoints">+10 XP</span>
+              </div>
+              <h2 class="problem-title-text" id="probTitle">Two Sum</h2>
+              <div style="margin-bottom:1rem;" id="probCompanies">
+                <!-- Companies tags -->
+              </div>
+              <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.5rem;" id="probDesc">
+                Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.
+              </div>
+
+              <div style="font-size:0.8rem;font-weight:700;color:#fff;text-transform:uppercase;margin-bottom:0.5rem;">Constraints</div>
+              <div style="font-size:0.8rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.2);padding:0.6rem 0.85rem;border-radius:6px;margin-bottom:1.5rem;" id="probConstraints">
+                2 <= nums.length <= 10^4
+              </div>
+
+              <div style="font-size:0.8rem;font-weight:700;color:#fff;text-transform:uppercase;margin-bottom:0.5rem;">Example Test Cases</div>
+              <div id="probTestCases" style="display:flex;flex-direction:column;gap:0.6rem;">
+                <!-- Test cases -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Code Editor & Execution Console -->
+          <div class="ide-panel">
+            <div class="ide-toolbar">
+              <div style="display:flex;align-items:center;gap:0.75rem;">
+                <span style="font-size:0.82rem;font-weight:600;color:#fff;">Language:</span>
+                <span class="role-tag-pill" style="padding:0.25rem 0.65rem;font-size:0.75rem;">JavaScript (ES6+)</span>
+              </div>
+              <div style="display:flex;gap:0.5rem;">
+                <button id="btnAiAnalyze" class="role-tag-pill" style="border-color:rgba(99,102,241,0.4);color:#a5b4fc;" title="Get AI hint & Big-O complexity">
+                  🤖 AI Hint & Big-O
+                </button>
+                <button id="btnRunCode" class="role-tag-pill" style="border-color:rgba(56,189,248,0.4);color:#38bdf8;">
+                  ▶ Run Code
+                </button>
+                <button id="btnSubmitSolution" class="btn-action btn-next" style="padding:0.4rem 1rem;font-size:0.82rem;">
+                  Submit Solution ✓
+                </button>
+              </div>
+            </div>
+
+            <!-- Code Textarea -->
+            <div class="code-editor-area">
+              <textarea id="codeEditor" class="code-textarea" spellcheck="false"></textarea>
+            </div>
+
+            <!-- Console Output Panel -->
+            <div class="console-panel">
+              <div class="console-tabs">
+                <div class="console-tab active" id="tabOutput" onclick="switchConsoleTab('output')">Test Results</div>
+                <div class="console-tab" id="tabAi" onclick="switchConsoleTab('ai')">AI Complexity & Hint</div>
+              </div>
+              <div class="console-body" id="consoleBody">
+                <span style="color:var(--text-muted);">Press "Run Code" or "Submit Solution" to test your code against sandbox test cases.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let problemsList = [];
+    let currentProblem = null;
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    async function loadProblems() {
+      try {
+        const res = await fetch('/api/coding/problems', { headers });
+        if (res.ok) {
+          problemsList = await res.json();
+          renderDropdown();
+          
+          // Check query param for problemId
+          const urlParams = new URLSearchParams(window.location.search);
+          const qId = urlParams.get('problemId');
+          const target = problemsList.find(p => String(p._id) === qId || String(p.id) === qId) || problemsList[0];
+          if (target) selectProblem(target._id || target.id);
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    function renderDropdown() {
+      const select = document.getElementById('problemDropdown');
+      select.innerHTML = problemsList.map(p => `
+        <option value="${p._id || p.id}">${p.title} (${p.difficulty})</option>
+      `).join('');
+
+      select.onchange = (e) => selectProblem(e.target.value);
+    }
+
+    function selectProblem(id) {
+      currentProblem = problemsList.find(p => String(p._id) === String(id) || String(p.id) === String(id));
+      if (!currentProblem) return;
+
+      document.getElementById('problemDropdown').value = currentProblem._id || currentProblem.id;
+      document.getElementById('probTitle').innerText = currentProblem.title;
+      document.getElementById('probDesc').innerText = currentProblem.description;
+      document.getElementById('probPoints').innerText = `+${currentProblem.points || 10} XP`;
+      document.getElementById('probConstraints').innerText = currentProblem.constraints || 'Standard memory & runtime limits';
+
+      const diffEl = document.getElementById('probDifficulty');
+      diffEl.innerText = (currentProblem.difficulty || 'Easy').toUpperCase();
+      diffEl.className = `badge-diff diff-${(currentProblem.difficulty || 'easy').toLowerCase()}`;
+
+      // Companies
+      const compContainer = document.getElementById('probCompanies');
+      compContainer.innerHTML = (currentProblem.companies || ['Google', 'Amazon']).map(c => `
+        <span class="company-pill">${c}</span>
+      `).join('');
+
+      // Test cases preview
+      const tcContainer = document.getElementById('probTestCases');
+      tcContainer.innerHTML = (currentProblem.testCases || []).slice(0, 2).map((tc, idx) => `
+        <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);padding:0.6rem 0.85rem;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">
+          <div><span style="color:var(--text-muted);">Input:</span> ${tc.input}</div>
+          <div><span style="color:var(--text-muted);">Expected:</span> ${tc.expectedOutput}</div>
+        </div>
+      `).join('');
+
+      // Code template
+      document.getElementById('codeEditor').value = currentProblem.solutionTemplate || `function solution(nums) {\n    // Write your solution here\n    \n}`;
+    }
+
+    // Run Code
+    document.getElementById('btnRunCode').addEventListener('click', async () => {
+      const code = document.getElementById('codeEditor').value;
+      const firstInput = currentProblem?.testCases?.[0]?.input || '';
+      
+      switchConsoleTab('output');
+      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Running sandboxed code...</span>';
+
+      try {
+        const res = await fetch('/api/coding/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ code, testInput: firstInput })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('consoleBody').innerHTML = `
+            <div style="color:#34d399;font-weight:700;margin-bottom:0.4rem;">Execution Succeeded:</div>
+            <pre style="color:#cbd5e1;white-space:pre-wrap;">${data.output || 'No output'}</pre>
+          `;
+        } else {
+          document.getElementById('consoleBody').innerHTML = `
+            <div style="color:#f87171;font-weight:700;margin-bottom:0.4rem;">Runtime Error:</div>
+            <pre style="color:#fca5a5;white-space:pre-wrap;">${data.error || 'Execution failed'}</pre>
+          `;
+        }
+      } catch (e) {
+        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Execution error: ${e.message}</span>`;
+      }
+    });
+
+    // AI Analyze
+    document.getElementById('btnAiAnalyze').addEventListener('click', async () => {
+      const code = document.getElementById('codeEditor').value;
+      switchConsoleTab('ai');
+      document.getElementById('consoleBody').innerHTML = '<span style="color:#a5b4fc;">🤖 Gemini analyzing code complexity & Big-O...</span>';
+
+      try {
+        const res = await fetch('/api/coding/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            code,
+            problemTitle: currentProblem?.title,
+            problemDescription: currentProblem?.description
+          })
+        });
+        const data = await res.json();
+        document.getElementById('consoleBody').innerHTML = `
+          <div style="color:#a5b4fc;font-weight:700;margin-bottom:0.4rem;">AI Code Review & Big-O Complexity:</div>
+          <pre style="color:#e0e7ff;white-space:pre-wrap;font-family:inherit;">${data.analysis || 'Analysis complete'}</pre>
+        `;
+      } catch (e) {
+        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Analysis error: ${e.message}</span>`;
+      }
+    });
+
+    // Submit Solution
+    document.getElementById('btnSubmitSolution').addEventListener('click', async () => {
+      const code = document.getElementById('codeEditor').value;
+      if (!currentProblem) return;
+
+      switchConsoleTab('output');
+      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Evaluating test cases in sandbox...</span>';
+
+      try {
+        const res = await fetch(`/api/coding/submit/${currentProblem._id || currentProblem.id}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ code, language: 'javascript' })
+        });
+        const data = await res.json();
+
+        if (data.status === 'accepted') {
+          window.showToast(`🎉 Accepted! +${data.score || 10} XP awarded`, 'success');
+          document.getElementById('consoleBody').innerHTML = `
+            <div style="color:#34d399;font-weight:700;font-size:1rem;margin-bottom:0.5rem;">✅ Accepted! All test cases passed.</div>
+            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Score: +${data.score} XP awarded to candidate profile.</div>
+            ${(data.results || []).map((r, i) => `
+              <div style="font-size:0.78rem;color:#34d399;margin-bottom:0.25rem;">Test Case ${i+1}: Passed ✓</div>
+            `).join('')}
+          `;
+        } else {
+          window.showToast('Failed some test cases. Check console output.', 'error');
+          document.getElementById('consoleBody').innerHTML = `
+            <div style="color:#f87171;font-weight:700;font-size:1rem;margin-bottom:0.5rem;">❌ Wrong Answer</div>
+            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Some test cases did not match expected output.</div>
+            ${(data.results || []).map((r, i) => `
+              <div style="font-size:0.78rem;color:${r.passed ? '#34d399' : '#f87171'};margin-bottom:0.25rem;">
+                Test Case ${i+1}: ${r.passed ? 'Passed ✓' : `Failed ❌ (Expected: ${r.expectedOutput}, Got: ${r.actualOutput || r.error})`}
+              </div>
+            `).join('')}
+          `;
+        }
+      } catch (e) {
+        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Submission error: ${e.message}</span>`;
+      }
+    });
+
+    window.switchConsoleTab = function (tab) {
+      document.getElementById('tabOutput').classList.toggle('active', tab === 'output');
+      document.getElementById('tabAi').classList.toggle('active', tab === 'ai');
+    };
+
+    // Tab key support in textarea
+    document.getElementById('codeEditor').addEventListener('keydown', function(e) {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const start = this.selectionStart;
+        const end = this.selectionEnd;
+        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
+        this.selectionStart = this.selectionEnd = start + 4;
+      }
+    });
+
+    document.addEventListener('DOMContentLoaded', loadProblems);
+  </script>
+</body>
+</html>

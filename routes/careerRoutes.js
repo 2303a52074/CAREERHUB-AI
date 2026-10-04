@@ -6,6 +6,10 @@ const JobOpportunity = require('../models/JobOpportunity');
 const JobApplication = require('../models/JobApplication');
 const CareerAssessment = require('../models/CareerAssessment');
 const CareerRoadmap = require('../models/CareerRoadmap');
+const DailyPlan = require('../models/DailyPlan');
+const Interview = require('../models/Interview');
+const CodeSubmission = require('../models/CodeSubmission');
+const CodingProblem = require('../models/CodingProblem');
 const {
     chatCareerAssistant,
     getAssessmentQuestions,
@@ -692,6 +696,470 @@ router.delete('/applications/:id', optionalAuth, async (req, res) => {
         res.json({ message: "Application deleted successfully." });
     } catch (err) {
         res.status(500).json({ message: "Failed to delete application." });
+    }
+});
+
+// ----------------------------------------------------
+// 8. DAILY PREPARATION PLAN
+// ----------------------------------------------------
+router.get('/daily-plan', optionalAuth, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId) || req.user;
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        let plan = await DailyPlan.findOne({ userId, date: todayStr });
+
+        if (!plan) {
+            const targetRole = user.targetRole || 'Full Stack Developer';
+            const roadmap = await CareerRoadmap.findOne({ userId });
+            let pendingRoadmapMilestone = null;
+            if (roadmap && Array.isArray(roadmap.phases)) {
+                for (const ph of roadmap.phases) {
+                    const found = (ph.milestones || []).find(m => !m.completed);
+                    if (found) {
+                        pendingRoadmapMilestone = found.title;
+                        break;
+                    }
+                }
+            }
+
+            const problems = await CodingProblem.find() || [];
+            const randomProblem = problems.length > 0
+                ? problems[Math.floor(Math.random() * problems.length)]
+                : { _id: '1', id: '1', title: 'Two Sum' };
+
+            const generatedTasks = [
+                {
+                    id: 'task-code-1',
+                    title: `Solve Coding Challenge: ${randomProblem.title}`,
+                    category: 'coding',
+                    description: `Implement and pass all test cases for ${randomProblem.title}. Sharpen problem-solving velocity.`,
+                    xpReward: 35,
+                    completed: false,
+                    actionUrl: `/coding?problemId=${randomProblem._id || randomProblem.id}`,
+                    actionText: 'Solve Problem'
+                },
+                {
+                    id: 'task-interview-1',
+                    title: `AI Mock Interview: ${targetRole} Practice`,
+                    category: 'interview',
+                    description: `Answer technical and behavioral questions in Voice or Text mode with AI scoring.`,
+                    xpReward: 30,
+                    completed: false,
+                    actionUrl: `/interviews?role=${encodeURIComponent(targetRole)}`,
+                    actionText: 'Start Interview'
+                },
+                {
+                    id: 'task-skill-1',
+                    title: `Target Skill Review: Core Architecture`,
+                    category: 'skill',
+                    description: `Analyze your skill gaps for ${targetRole} and review benchmark standards.`,
+                    xpReward: 20,
+                    completed: false,
+                    actionUrl: '/skills',
+                    actionText: 'Review Skills'
+                },
+                {
+                    id: 'task-roadmap-1',
+                    title: pendingRoadmapMilestone
+                        ? `Roadmap Progress: ${pendingRoadmapMilestone}`
+                        : `Career Roadmap: Complete next milestone`,
+                    category: 'roadmap',
+                    description: `Advance your step-by-step career milestones to elevate placement readiness.`,
+                    xpReward: 25,
+                    completed: false,
+                    actionUrl: '/roadmap',
+                    actionText: 'View Roadmap'
+                },
+                {
+                    id: 'task-job-1',
+                    title: `Review AI Job Recommendations & Opportunities`,
+                    category: 'application',
+                    description: `Inspect recent opportunities tailored to your ${targetRole} profile and track new applications.`,
+                    xpReward: 20,
+                    completed: false,
+                    actionUrl: '/job-matching',
+                    actionText: 'Explore Matches'
+                }
+            ];
+
+            plan = new DailyPlan({
+                userId,
+                date: todayStr,
+                targetRole,
+                completionPercentage: 0,
+                streak: user.streak || 1,
+                tasks: generatedTasks
+            });
+            await plan.save();
+        }
+
+        res.json({
+            date: todayStr,
+            plan,
+            userStreak: user.streak || 1
+        });
+    } catch (err) {
+        console.error('Daily plan fetch error:', err);
+        res.status(500).json({ message: 'Failed to fetch daily plan.' });
+    }
+});
+
+router.put('/daily-plan/task/:taskId', optionalAuth, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const { taskId } = req.params;
+        const { completed } = req.body;
+        const todayStr = new Date().toISOString().slice(0, 10);
+
+        let plan = await DailyPlan.findOne({ userId, date: todayStr });
+        if (!plan) {
+            return res.status(404).json({ message: 'No daily plan found for today.' });
+        }
+
+        const task = (plan.tasks || []).find(t => t.id === taskId);
+        if (!task) {
+            return res.status(404).json({ message: 'Task not found in daily plan.' });
+        }
+
+        const wasCompleted = task.completed;
+        const targetCompleted = completed !== undefined ? !!completed : !task.completed;
+        task.completed = targetCompleted;
+        if (targetCompleted) task.completedAt = new Date();
+
+        const total = plan.tasks.length;
+        const done = plan.tasks.filter(t => t.completed).length;
+        plan.completionPercentage = Math.round((done / (total || 1)) * 100);
+
+        const user = await User.findById(userId);
+        if (user) {
+            if (targetCompleted && !wasCompleted) {
+                user.xp = (user.xp || 0) + (task.xpReward || 25);
+                if (done === total) {
+                    user.xp += 50;
+                    user.streak = (user.streak || 0) + 1;
+                }
+            } else if (!targetCompleted && wasCompleted) {
+                user.xp = Math.max(0, (user.xp || 0) - (task.xpReward || 25));
+            }
+            user.level = Math.floor((user.xp || 0) / 100) + 1;
+            await user.save();
+        }
+
+        await plan.save();
+
+        res.json({
+            message: 'Task updated successfully',
+            task,
+            plan,
+            user: user ? { xp: user.xp, level: user.level, streak: user.streak } : null
+        });
+    } catch (err) {
+        console.error('Task update error:', err);
+        res.status(500).json({ message: 'Failed to update daily plan task.' });
+    }
+});
+
+// ----------------------------------------------------
+// 9. JOB DESCRIPTION ANALYZER
+// ----------------------------------------------------
+router.post('/job-analyzer', optionalAuth, async (req, res) => {
+    try {
+        const { jobDescription, jobTitle, company } = req.body;
+        if (!jobDescription || !jobDescription.trim()) {
+            return res.status(400).json({ message: 'Job description text cannot be empty.' });
+        }
+
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId) || req.user;
+
+        const text = jobDescription.toLowerCase();
+
+        const techSkillsCatalog = [
+            'javascript', 'typescript', 'react', 'next.js', 'vue', 'angular', 'node.js', 'express',
+            'python', 'django', 'fastapi', 'flask', 'java', 'spring boot', 'c++', 'c#', '.net',
+            'golang', 'rust', 'ruby', 'php', 'sql', 'mysql', 'postgresql', 'mongodb', 'redis',
+            'graphql', 'rest api', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'ci/cd',
+            'git', 'system design', 'microservices', 'kafka', 'tailwind', 'html', 'css',
+            'unit testing', 'jest', 'agile', 'scrum', 'data structures', 'algorithms'
+        ];
+
+        const softSkillsCatalog = [
+            'communication', 'teamwork', 'leadership', 'problem solving', 'critical thinking',
+            'adaptability', 'time management', 'collaboration', 'ownership', 'mentorship'
+        ];
+
+        const detectedReqTech = techSkillsCatalog.filter(skill => text.includes(skill));
+        const detectedReqSoft = softSkillsCatalog.filter(skill => text.includes(skill));
+
+        const userSkills = (user.technicalSkills || []).map(s => s.toLowerCase());
+        const userSoft = (user.softSkills || []).map(s => s.toLowerCase());
+
+        const matchedTech = detectedReqTech.filter(reqSkill =>
+            userSkills.some(us => us.includes(reqSkill) || reqSkill.includes(us))
+        );
+        const missingTech = detectedReqTech.filter(reqSkill =>
+            !userSkills.some(us => us.includes(reqSkill) || reqSkill.includes(us))
+        );
+
+        const matchedSoft = detectedReqSoft.filter(reqSkill =>
+            userSoft.some(us => us.includes(reqSkill) || reqSkill.includes(us))
+        );
+
+        const totalReq = Math.max(1, detectedReqTech.length);
+        const rawScore = Math.round((matchedTech.length / totalReq) * 85);
+        const roleBonus = (jobTitle && user.targetRole && user.targetRole.toLowerCase().includes(jobTitle.toLowerCase())) ? 15 : 10;
+        const overallMatch = Math.min(98, Math.max(25, rawScore + roleBonus));
+
+        const cap = s => s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+        const recommendations = [];
+        if (missingTech.length > 0) {
+            recommendations.push(`Target High-Priority Skills: Focus on acquiring ${missingTech.slice(0, 3).map(cap).join(', ')} to boost alignment.`);
+            recommendations.push(`Resume Tailoring: Integrate past projects or coursework demonstrating familiarity with ${missingTech[0]}.`);
+        } else {
+            recommendations.push(`Exceptional Technical Match: Your skillset directly mirrors the core requirements of this role.`);
+        }
+        recommendations.push(`Quantify Impact: Ensure your resume highlights measurable achievements (e.g. "Improved query performance by 40%").`);
+        recommendations.push(`System Architecture: Expect architecture questions on distributed data flow and component decoupling.`);
+
+        const interviewQuestions = [
+            `Can you describe your experience with ${matchedTech[0] ? cap(matchedTech[0]) : 'modern web frameworks'} and how you structured your most complex application?`,
+            `How would you handle a production bottleneck when working with ${detectedReqTech[1] ? cap(detectedReqTech[1]) : 'relational databases and caching'}?`,
+            `Tell us about a challenging bug you encountered in a team setting and how you resolved it under tight deadlines.`
+        ];
+
+        res.json({
+            jobTitle: jobTitle || 'Software Engineer',
+            company: company || 'Hiring Organization',
+            overallMatch,
+            extractedRequirements: detectedReqTech.map(cap),
+            matchedSkills: matchedTech.map(cap),
+            missingSkills: missingTech.map(cap),
+            matchedSoftSkills: matchedSoft.map(cap),
+            recommendations,
+            interviewQuestions,
+            readinessVerdict: overallMatch >= 80
+                ? 'Strong Candidate: High interview conversion likelihood.'
+                : overallMatch >= 60
+                ? 'Competitive Candidate: Bridge gap skills before applying.'
+                : 'Developing Fit: Recommended to upskill on critical missing technologies.'
+        });
+    } catch (err) {
+        console.error('Job analyzer error:', err);
+        res.status(500).json({ message: 'Failed to analyze job description.' });
+    }
+});
+
+// ----------------------------------------------------
+// 10. DYNAMIC PLACEMENT READINESS SCORE
+// ----------------------------------------------------
+router.get('/readiness', optionalAuth, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId) || req.user;
+
+        const [assessment, submissions, interviews, roadmap, applications] = await Promise.all([
+            CareerAssessment.findOne({ userId }).sort({ createdAt: -1 }),
+            CodeSubmission.find({ userId }),
+            Interview.find({ userId }),
+            CareerRoadmap.findOne({ userId }),
+            JobApplication.find({ userId })
+        ]);
+
+        const profileCompletion = calculateProfileCompletion(user);
+        const profileScore = profileCompletion.completionPercentage;
+
+        let assessmentScore = 0;
+        let hasAssessment = false;
+        if (assessment && assessment.scores) {
+            assessmentScore = assessment.scores.overallReadiness || 0;
+            hasAssessment = true;
+        }
+
+        let codingScore = 0;
+        const acceptedSubmissions = (submissions || []).filter(s => s.status === 'accepted');
+        const uniqueSolvedProblems = new Set(acceptedSubmissions.map(s => String(s.problemId))).size;
+        if (uniqueSolvedProblems > 0) {
+            codingScore = Math.min(100, Math.round((uniqueSolvedProblems / 5) * 80 + (acceptedSubmissions.length > 0 ? 15 : 0)));
+        }
+
+        let interviewScore = 0;
+        const interviewCount = (interviews || []).length;
+        if (interviewCount > 0) {
+            const sum = interviews.reduce((acc, curr) => acc + (curr.totalScore || 70), 0);
+            interviewScore = Math.round(sum / interviewCount);
+        }
+
+        const resumeScore = user.resumeScore || 0;
+        const roadmapScore = roadmap ? (roadmap.progressPercentage || 0) : 0;
+
+        let weightedSum = 0;
+        let totalWeight = 0;
+
+        const factors = [
+            { name: 'Coding Mastery', score: codingScore, weight: 25, active: uniqueSolvedProblems > 0 },
+            { name: 'Career Assessment', score: assessmentScore, weight: 20, active: hasAssessment },
+            { name: 'Mock Interviews', score: interviewScore, weight: 20, active: interviewCount > 0 },
+            { name: 'Resume ATS Score', score: resumeScore, weight: 15, active: resumeScore > 0 },
+            { name: 'Roadmap Progress', score: roadmapScore, weight: 10, active: roadmapScore > 0 },
+            { name: 'Profile Depth', score: profileScore, weight: 10, active: true }
+        ];
+
+        factors.forEach(f => {
+            if (f.active) {
+                weightedSum += f.score * f.weight;
+                totalWeight += f.weight;
+            }
+        });
+
+        let overallScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : 0;
+        if (totalWeight < 40) {
+            overallScore = Math.min(overallScore, Math.round(overallScore * (totalWeight / 100) + 15));
+        }
+
+        let statusBadge = 'Needs Preparation';
+        let statusColor = '#ef4444';
+        if (overallScore >= 85) {
+            statusBadge = 'Elite Candidate';
+            statusColor = '#10b981';
+        } else if (overallScore >= 75) {
+            statusBadge = 'Placement Ready';
+            statusColor = '#3b82f6';
+        } else if (overallScore >= 55) {
+            statusBadge = 'Interview Ready';
+            statusColor = '#06b6d4';
+        } else if (overallScore >= 35) {
+            statusBadge = 'Building Foundations';
+            statusColor = '#f59e0b';
+        }
+
+        const nextMilestones = [];
+        if (!hasAssessment) {
+            nextMilestones.push({ task: 'Take Career Assessment', impact: '+20% Readiness', url: '/assessment' });
+        }
+        if (uniqueSolvedProblems < 3) {
+            nextMilestones.push({ task: `Solve ${3 - uniqueSolvedProblems} more coding challenges`, impact: '+15% Readiness', url: '/coding' });
+        }
+        if (interviewCount < 2) {
+            nextMilestones.push({ task: 'Complete AI Mock Interview', impact: '+15% Readiness', url: '/interviews' });
+        }
+        if (resumeScore < 70) {
+            nextMilestones.push({ task: 'Analyze and optimize resume with ATS', impact: '+15% Readiness', url: '/resume' });
+        }
+        if (roadmapScore < 50) {
+            nextMilestones.push({ task: 'Complete Phase 1 Roadmap Milestones', impact: '+10% Readiness', url: '/roadmap' });
+        }
+
+        if (user.careerReadinessScore !== overallScore) {
+            await User.findByIdAndUpdate(userId, { careerReadinessScore: overallScore });
+        }
+
+        res.json({
+            overallScore,
+            statusBadge,
+            statusColor,
+            breakdown: {
+                coding: { score: codingScore, problemsSolved: uniqueSolvedProblems, weight: 25 },
+                assessment: { score: assessmentScore, completed: hasAssessment, weight: 20 },
+                interview: { score: interviewScore, count: interviewCount, weight: 20 },
+                resume: { score: resumeScore, weight: 15 },
+                roadmap: { score: roadmapScore, weight: 10 },
+                profile: { score: profileScore, weight: 10 }
+            },
+            nextMilestones,
+            user: {
+                name: user.name,
+                targetRole: user.targetRole || 'Full Stack Developer',
+                xp: user.xp || 0,
+                level: user.level || 1,
+                streak: user.streak || 1
+            }
+        });
+    } catch (err) {
+        console.error('Readiness error:', err);
+        res.status(500).json({ message: 'Failed to compute readiness score.' });
+    }
+});
+
+// ----------------------------------------------------
+// 11. DETAILED PROGRESS ANALYTICS
+// ----------------------------------------------------
+router.get('/analytics/history', optionalAuth, async (req, res) => {
+    try {
+        const userId = req.user._id || req.user.id;
+        const user = await User.findById(userId) || req.user;
+
+        const [submissions, interviews, applications, roadmap, assessment] = await Promise.all([
+            CodeSubmission.find({ userId }).sort({ createdAt: 1 }),
+            Interview.find({ userId }).sort({ date: 1 }),
+            JobApplication.find({ userId }),
+            CareerRoadmap.findOne({ userId }),
+            CareerAssessment.findOne({ userId }).sort({ createdAt: -1 })
+        ]);
+
+        const accepted = (submissions || []).filter(s => s.status === 'accepted');
+        const failed = (submissions || []).filter(s => s.status !== 'accepted');
+        const accuracyRate = submissions.length > 0
+            ? Math.round((accepted.length / submissions.length) * 100)
+            : 0;
+
+        const interviewTrend = (interviews || []).map((inv, idx) => ({
+            session: `Session ${idx + 1}`,
+            score: inv.totalScore || 75,
+            role: inv.role || 'Full Stack',
+            date: inv.date ? new Date(inv.date).toLocaleDateString() : 'Recent'
+        }));
+
+        const appStats = {
+            total: applications.length,
+            applied: applications.filter(a => a.status === 'Applied').length,
+            screening: applications.filter(a => a.status === 'Shortlisted' || a.status === 'Screening').length,
+            interview: applications.filter(a => a.status === 'Interview').length,
+            offer: applications.filter(a => a.status === 'Selected' || a.status === 'Offer').length,
+            rejected: applications.filter(a => a.status === 'Rejected').length
+        };
+
+        const technicalSkills = user.technicalSkills || [];
+        const competencies = technicalSkills.map((skill, i) => ({
+            skill,
+            proficiency: Math.min(95, 60 + ((i * 7) % 35)),
+            status: i < 5 ? 'Verified' : 'In Practice'
+        }));
+
+        res.json({
+            user: {
+                name: user.name,
+                email: user.email,
+                targetRole: user.targetRole || 'Full Stack Developer',
+                xp: user.xp || 0,
+                level: user.level || 1,
+                streak: user.streak || 1,
+                readinessScore: user.careerReadinessScore || 0,
+                resumeScore: user.resumeScore || 0
+            },
+            coding: {
+                totalSubmissions: submissions.length,
+                acceptedCount: accepted.length,
+                failedCount: failed.length,
+                accuracyRate
+            },
+            interviews: {
+                totalSessions: interviews.length,
+                averageScore: interviews.length > 0
+                    ? Math.round(interviews.reduce((acc, curr) => acc + (curr.totalScore || 75), 0) / interviews.length)
+                    : 0,
+                trend: interviewTrend
+            },
+            applications: appStats,
+            roadmapProgress: roadmap ? roadmap.progressPercentage : 0,
+            assessmentScore: assessment?.scores?.overallReadiness || 0,
+            competencies
+        });
+    } catch (err) {
+        console.error('Analytics history error:', err);
+        res.status(500).json({ message: 'Failed to fetch analytics history.' });
     }
 });
 

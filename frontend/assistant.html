@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Career Assistant</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .assistant-wrapper {
+      max-width: 950px;
+      margin: 0 auto;
+      height: calc(100vh - var(--header-height) - 4rem);
+      min-height: 600px;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      box-shadow: var(--shadow-card);
+    }
+    .chat-header-bar {
+      padding: 1.25rem 1.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(6, 11, 23, 0.7);
+    }
+    .prompts-bar {
+      padding: 0.75rem 1.75rem;
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      gap: 0.5rem;
+      overflow-x: auto;
+      background: rgba(0, 0, 0, 0.15);
+    }
+    .quick-prompt-btn {
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-full);
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .quick-prompt-btn:hover {
+      border-color: #00d2ff;
+      color: #fff;
+      background: rgba(0, 210, 255, 0.08);
+    }
+    .messages-area {
+      flex: 1;
+      padding: 1.5rem 1.75rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .message-bubble {
+      display: flex;
+      gap: 1rem;
+      max-width: 82%;
+    }
+    .message-user {
+      align-self: flex-end;
+      flex-direction: row-reverse;
+    }
+    .message-ai {
+      align-self: flex-start;
+    }
+    .msg-avatar {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 0.95rem;
+    }
+    .msg-user-avatar { background: #3b82f6; color: #fff; }
+    .msg-ai-avatar { background: linear-gradient(135deg, #00d2ff, #6366f1); color: #fff; box-shadow: 0 0 10px rgba(0, 210, 255, 0.4); }
+    .msg-content {
+      padding: 1rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+    .message-user .msg-content {
+      background: rgba(37, 99, 235, 0.2);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      color: #fff;
+    }
+    .message-ai .msg-content {
+      background: rgba(14, 25, 48, 0.85);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+    .chat-input-bar {
+      padding: 1rem 1.5rem;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      gap: 0.75rem;
+      background: rgba(6, 11, 23, 0.8);
+    }
+    .chat-input {
+      flex: 1;
+      padding: 0.85rem 1.25rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-subtle);
+      background: rgba(14, 25, 48, 0.6);
+      color: #fff;
+      font-size: 0.92rem;
+      outline: none;
+    }
+    .chat-input:focus {
+      border-color: var(--text-accent);
+    }
+  </style>
+</head>
+<body data-page-title="Career Assistant" data-page-subtitle="AI Guidance on Technical Placements, Resume Tailoring & System Design">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container" style="padding:1.25rem 2rem;">
+        
+        <div class="assistant-wrapper">
+          <!-- Header -->
+          <div class="chat-header-bar">
+            <div>
+              <div style="font-weight:700;color:#fff;font-size:1rem;display:flex;align-items:center;gap:0.5rem;">
+                <span>🤖</span> CareerHub AI Placement Copilot
+              </div>
+              <div style="font-size:0.75rem;color:var(--text-cyan);">Equipped with your target role and skills context</div>
+            </div>
+            <button id="btnClearChat" class="role-tag-pill" style="font-size:0.72rem;padding:0.25rem 0.65rem;">
+              Clear History
+            </button>
+          </div>
+
+          <!-- Quick Starter Prompts -->
+          <div class="prompts-bar">
+            <button class="quick-prompt-btn" onclick="sendPrompt('How should I structure my resume for Full Stack Developer roles?')">
+              📄 Resume Structuring
+            </button>
+            <button class="quick-prompt-btn" onclick="sendPrompt('What are the most commonly asked System Design questions in top tech interviews?')">
+              🏗️ System Design Questions
+            </button>
+            <button class="quick-prompt-btn" onclick="sendPrompt('Give me a 30-day preparation strategy for LeetCode medium problems.')">
+              💻 30-Day LeetCode Plan
+            </button>
+            <button class="quick-prompt-btn" onclick="sendPrompt('How do I answer \'Tell me about yourself\' using the STAR framework?')">
+              🎙️ Behavioral STAR Answers
+            </button>
+          </div>
+
+          <!-- Messages Area -->
+          <div class="messages-area" id="messagesArea">
+            <div class="message-bubble message-ai">
+              <div class="msg-avatar msg-ai-avatar">🤖</div>
+              <div class="msg-content">
+                Hello! I am your <strong>CareerHub AI Copilot</strong>. I am synced with your candidate profile, target role, and placement roadmap.<br><br>
+                Ask me anything about interview answers, technical concepts, algorithmic strategies, or resume optimizations!
+              </div>
+            </div>
+          </div>
+
+          <!-- Chat Input -->
+          <div class="chat-input-bar">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Ask about interviews, system design, coding problems, or resume tips..." autocomplete="off">
+            <button id="btnSend" class="btn-action btn-next" style="padding:0.85rem 1.5rem;font-size:0.9rem;">
+              Send →
+            </button>
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    let chatHistory = [];
+
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    const messagesArea = document.getElementById('messagesArea');
+    const chatInput = document.getElementById('chatInput');
+
+    function appendMessage(role, text) {
+      const isUser = role === 'user';
+      const bubble = document.createElement('div');
+      bubble.className = `message-bubble ${isUser ? 'message-user' : 'message-ai'}`;
+
+      bubble.innerHTML = `
+        <div class="msg-avatar ${isUser ? 'msg-user-avatar' : 'msg-ai-avatar'}">
+          ${isUser ? '👤' : '🤖'}
+        </div>
+        <div class="msg-content">
+          ${formatText(text)}
+        </div>
+      `;
+
+      messagesArea.appendChild(bubble);
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    function formatText(text) {
+      // Basic markdown parser for bold, line breaks, bullet points
+      return text
+        .replace(/\n\n/g, '<br><br>')
+        .replace(/\n/g, '<br>')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/^\* (.*$)/gim, '• $1');
+    }
+
+    async function handleSendMessage(msgText) {
+      const message = msgText || chatInput.value.trim();
+      if (!message) return;
+
+      appendMessage('user', message);
+      chatInput.value = '';
+      chatInput.focus();
+
+      // Show typing indicator
+      const typingBubble = document.createElement('div');
+      typingBubble.className = 'message-bubble message-ai';
+      typingBubble.id = 'typingIndicator';
+      typingBubble.innerHTML = `
+        <div class="msg-avatar msg-ai-avatar">🤖</div>
+        <div class="msg-content" style="color:var(--text-muted);">
+          CareerHub AI is thinking...
+        </div>
+      `;
+      messagesArea.appendChild(typingBubble);
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+
+      try {
+        const res = await fetch('/api/career/assistant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ message, history: chatHistory })
+        });
+
+        typingBubble.remove();
+
+        if (res.ok) {
+          const data = await res.json();
+          const reply = data.reply || 'I am ready to assist with your placement preparation.';
+          appendMessage('ai', reply);
+          chatHistory.push({ role: 'user', content: message });
+          chatHistory.push({ role: 'assistant', content: reply });
+        } else {
+          appendMessage('ai', 'I encountered a temporary issue generating a response. Please try again.');
+        }
+      } catch (err) {
+        typingBubble.remove();
+        console.error(err);
+        appendMessage('ai', 'Network connection error. Please ensure the server is running.');
+      }
+    }
+
+    window.sendPrompt = function (promptText) {
+      handleSendMessage(promptText);
+    };
+
+    document.getElementById('btnSend').addEventListener('click', () => handleSendMessage());
+
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') handleSendMessage();
+    });
+
+    document.getElementById('btnClearChat').addEventListener('click', () => {
+      chatHistory = [];
+      messagesArea.innerHTML = `
+        <div class="message-bubble message-ai">
+          <div class="msg-avatar msg-ai-avatar">🤖</div>
+          <div class="msg-content">
+            Conversation history cleared. How can I help you today with your technical career goals?
+          </div>
+        </div>
+      `;
+    });
+  </script>
+</body>
+</html>
