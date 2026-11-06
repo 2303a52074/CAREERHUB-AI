@@ -10,21 +10,10 @@ const authMiddleware = require('../middleware/authMiddleware');
 const CodingProblem = require('../models/CodingProblem');
 const CodeSubmission = require('../models/CodeSubmission');
 const User = require('../models/User');
+const { evaluateCode } = require('../utils/aiService');
+const { providerErrorMessage } = require('../backend/utils/providerErrors');
 
 const router = express.Router();
-
-let genAIClient = null;
-function getGenAI() {
-    if (!genAIClient && process.env.GEMINI_API_KEY) {
-        try {
-            const { GoogleGenAI } = require('@google/genai');
-            genAIClient = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        } catch (e) {
-            console.warn("Gemini SDK init warning:", e.message);
-        }
-    }
-    return genAIClient;
-}
 
 // ========== SECURE EVALUATE FUNCTION ==========
 function runSandboxedScript(script, timeout = 2000) {
@@ -170,39 +159,25 @@ router.post('/run', async (req, res) => {
 // ========== AI CODE ANALYSIS ROUTE ==========
 router.post('/analyze', authMiddleware, async (req, res) => {
     const { code, problemTitle, problemDescription } = req.body;
-
-    const prompt = `You are a Senior Technical Interviewer.
-Problem: ${problemTitle || 'Coding Challenge'}
-Description: ${problemDescription || 'N/A'}
-User's Code:
-\`\`\`
-${code || ''}
-\`\`\`
-
-Provide a brief review:
-1. Logic Check: Is the approach correct?
-2. Efficiency: Mention Time and Space Complexity (Big O).
-3. Hint: If there is a bug, give a subtle hint without giving the full code.
-Keep it under 150 words.`;
-
-    const ai = getGenAI();
-    if (ai) {
-        try {
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: prompt,
-            });
-            return res.json({ analysis: response.text });
-        } catch (error) {
-            console.warn("Gemini analyze failed:", error.message);
-        }
+    try {
+        const result = await evaluateCode(
+            `${problemTitle || 'Coding Challenge'}\n${problemDescription || ''}`,
+            code || ''
+        );
+        return res.json({
+            analysis: result.feedback,
+            score: result.score,
+            source: result.source,
+            model: result.model
+        });
+    } catch (error) {
+        const code = error.code || 'AI_PROVIDER_ERROR';
+        console.error('Gemini code analysis failed:', code);
+        return res.status(error.status || 502).json({
+            code,
+            message: providerErrorMessage(code, 'Code analysis')
+        });
     }
-
-    // Fallback static analysis
-    const length = (code || '').length;
-    res.json({
-        analysis: `Code analysis:\n1. Logic Check: Structure appears valid (${length} chars).\n2. Efficiency: Estimated O(N) or O(N log N) based on standard iterative traversal.\n3. Hint: Verify boundary limits and null checks for all input arrays.`
-    });
 });
 
 // ========== SUBMIT CODE SOLUTION ==========

@@ -11,10 +11,9 @@
   <style>
     .workspace-grid {
       display: grid;
-      grid-template-columns: 380px 1fr;
-      gap: 1.5rem;
-      height: calc(100vh - var(--header-height) - 4rem);
-      min-height: 650px;
+      grid-template-columns: minmax(310px, 0.88fr) minmax(0, 1.12fr);
+      gap: 1rem;
+      min-height: max(640px, calc(100dvh - var(--header-height) - 3rem));
     }
     .problem-panel {
       background: var(--surface-card);
@@ -27,9 +26,36 @@
     .problem-selector-bar {
       padding: 1rem 1.25rem;
       border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+    }
+    .selector-field {
+      display: grid;
+      min-width: 0;
+      gap: 0.35rem;
+    }
+    .selector-field label {
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 700;
+    }
+    .selector-field select,
+    .selector-field input,
+    .language-select {
+      width: 100%;
+      min-width: 0;
+      min-height: 42px;
+      padding: 0.55rem 0.7rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: 7px;
+      background: #0b1422;
+      color: #f3f6fb;
+      font: inherit;
+      font-size: 0.82rem;
+    }
+    .selector-problem {
+      grid-column: 1 / -1;
     }
     .problem-content {
       padding: 1.5rem;
@@ -75,12 +101,30 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 0.75rem;
       background: rgba(6, 11, 23, 0.6);
     }
+    .ide-toolbar-actions {
+      display: flex;
+      flex: 1 1 460px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 0.45rem;
+      min-width: 0;
+    }
+    .ide-toolbar-actions > button { flex: 0 1 auto; }
     .code-editor-area {
       flex: 1;
       position: relative;
+      min-height: 340px;
+      min-width: 0;
       background: #090e1c;
+    }
+    #monacoCodingEditor {
+      position: absolute;
+      inset: 0;
+      display: none;
     }
     .code-textarea {
       width: 100%;
@@ -97,7 +141,8 @@
       white-space: pre;
     }
     .console-panel {
-      height: 180px;
+      height: 220px;
+      flex: 0 0 220px;
       border-top: 1px solid var(--border-subtle);
       background: rgba(6, 11, 23, 0.95);
       display: flex;
@@ -109,12 +154,18 @@
       background: rgba(0, 0, 0, 0.2);
     }
     .console-tab {
+      min-height: 42px;
       padding: 0.5rem 1rem;
       font-size: 0.75rem;
       font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
       border-bottom: 2px solid transparent;
+      background: transparent;
+      border-top: 0;
+      border-right: 0;
+      border-left: 0;
+      white-space: nowrap;
     }
     .console-tab.active {
       color: #00d2ff;
@@ -128,10 +179,19 @@
       font-size: 0.82rem;
       color: var(--text-secondary);
     }
-    @media (max-width: 950px) {
-      .workspace-grid { grid-template-columns: 1fr; height: auto; }
-      .problem-panel { height: 400px; }
-      .ide-panel { height: 550px; }
+    @media (max-width: 1100px) {
+      .workspace-grid { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+      .problem-panel { min-height: 500px; }
+      .ide-panel { min-height: 650px; }
+    }
+    @media (max-width: 560px) {
+      .problem-selector-bar { padding: 0.85rem; }
+      .ide-toolbar { padding: 0.75rem; }
+      .ide-toolbar-actions { flex-basis: 100%; justify-content: stretch; }
+      .ide-toolbar-actions > button { flex: 1 1 45%; }
+      .console-panel { height: 250px; flex-basis: 250px; }
+      .console-tabs { overflow-x: auto; }
+      .console-tab { padding-inline: 0.7rem; font-size: 0.68rem; }
     }
   </style>
 </head>
@@ -140,16 +200,26 @@
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
       <div id="header-container"></div>
-      <main class="page-container" style="padding:1.25rem 2rem;">
+      <main class="page-container coding-page">
         
         <div class="workspace-grid">
           <!-- Left: Problem Description & Test Cases -->
           <div class="problem-panel">
             <div class="problem-selector-bar">
-              <label style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Problem:</label>
-              <select id="problemDropdown" style="flex:1;padding:0.4rem 0.75rem;background:rgba(14,25,48,0.9);border:1px solid var(--border-subtle);border-radius:6px;color:#fff;font-size:0.85rem;outline:none;">
+              <div class="selector-field"><label for="difficultyFilter">Difficulty</label>
+              <select id="difficultyFilter" aria-label="Filter problems by difficulty">
+                <option value="">All</option><option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
+              </select></div>
+              <div class="selector-field"><label for="topicFilter">Topic</label>
+              <select id="topicFilter" aria-label="Filter problems by topic">
+                <option value="">All</option>
+              </select></div>
+              <div class="selector-field selector-problem"><label for="problemSearch">Search curated problems</label>
+              <input id="problemSearch" type="search" maxlength="80" placeholder="Search by title, topic, or description" autocomplete="off"></div>
+              <div class="selector-field selector-problem"><label for="problemDropdown">Problem</label>
+              <select id="problemDropdown">
                 <option value="">Loading problems...</option>
-              </select>
+              </select></div>
             </div>
 
             <div class="problem-content" id="problemContent">
@@ -158,6 +228,14 @@
                 <span style="font-size:0.8rem;color:var(--text-accent);font-weight:700;" id="probPoints">+10 XP</span>
               </div>
               <h2 class="problem-title-text" id="probTitle">Two Sum</h2>
+              <div style="display:flex;flex-wrap:wrap;gap:.55rem;margin:.7rem 0 1rem;">
+                <a href="#codeEditor" id="practiceLocalLink" class="role-tag-pill" style="display:inline-flex;align-items:center;text-decoration:none;">Practice in CareerHub</a>
+                <a id="officialProblemLink" target="_blank" rel="noopener noreferrer" style="display:none;font-size:.82rem;font-weight:700;color:var(--text-accent);align-items:center;">Open on LeetCode ↗</a>
+              </div>
+              <div id="officialProblemAttribution" style="display:none;padding:0.75rem 0.9rem;margin-bottom:1rem;border:1px solid var(--border-subtle);border-radius:8px;background:rgba(56,189,248,0.05);">
+                <p style="font-size:0.72rem;color:var(--text-muted);">Code runs on a configured isolated execution service. Runs and submissions are not sent to or submitted on your LeetCode account.</p>
+              </div>
+              <p id="problemCatalogSource" style="font-size:0.72rem;color:var(--text-muted);margin-bottom:.7rem;">CareerHub curated practice problem</p>
               <div style="margin-bottom:1rem;" id="probCompanies">
                 <!-- Companies tags -->
               </div>
@@ -180,13 +258,16 @@
           <!-- Right: Code Editor & Execution Console -->
           <div class="ide-panel">
             <div class="ide-toolbar">
-              <div style="display:flex;align-items:center;gap:0.75rem;">
-                <span style="font-size:0.82rem;font-weight:600;color:#fff;">Language:</span>
-                <span class="role-tag-pill" style="padding:0.25rem 0.65rem;font-size:0.75rem;">JavaScript (ES6+)</span>
+              <div style="display:flex;align-items:center;gap:0.65rem;min-width:180px;">
+                <label for="codeLanguage" style="font-size:0.78rem;font-weight:600;color:#fff;">Language</label>
+                <select class="language-select" id="codeLanguage" aria-label="Code execution language" disabled><option value="">Checking isolated runner…</option></select>
               </div>
-              <div style="display:flex;gap:0.5rem;">
-                <button id="btnAiAnalyze" class="role-tag-pill" style="border-color:rgba(99,102,241,0.4);color:#a5b4fc;" title="Get AI hint & Big-O complexity">
+              <div class="ide-toolbar-actions">
+                <button id="btnAiHint" class="role-tag-pill" style="border-color:rgba(99,102,241,0.4);color:#a5b4fc;" title="Get a progressive hint without a full solution">
                   🤖 AI Hint & Big-O
+                </button>
+                <button id="btnAiReview" class="role-tag-pill" style="border-color:rgba(129,140,248,0.4);color:#c4b5fd;" title="Review your current code with the AI Code Reviewer">
+                  AI Code Review
                 </button>
                 <button id="btnRunCode" class="role-tag-pill" style="border-color:rgba(56,189,248,0.4);color:#38bdf8;">
                   ▶ Run Code
@@ -200,16 +281,23 @@
             <!-- Code Textarea -->
             <div class="code-editor-area">
               <textarea id="codeEditor" class="code-textarea" spellcheck="false"></textarea>
+              <div id="monacoCodingEditor" aria-label="Code editor"></div>
             </div>
+            <label for="executionInput" style="padding:0.45rem 1rem 0;font-size:0.72rem;color:var(--text-muted);">
+              Problem input (JSON arguments; standalone languages receive one JSON argument per line)
+            </label>
+            <textarea id="executionInput" rows="2" maxlength="5000" aria-label="Problem input"
+              style="margin:0.35rem 1rem 0.6rem;padding:0.55rem 0.7rem;resize:vertical;min-height:44px;max-height:90px;background:#090e1c;color:#cbd5e1;border:1px solid var(--border-subtle);border-radius:6px;font:0.78rem 'JetBrains Mono',monospace;"></textarea>
 
             <!-- Console Output Panel -->
             <div class="console-panel">
-              <div class="console-tabs">
-                <div class="console-tab active" id="tabOutput" onclick="switchConsoleTab('output')">Test Results</div>
-                <div class="console-tab" id="tabAi" onclick="switchConsoleTab('ai')">AI Complexity & Hint</div>
+              <div class="console-tabs" role="tablist" aria-label="Coding results">
+                  <button type="button" class="console-tab active" id="tabOutput" role="tab" aria-selected="true" onclick="switchConsoleTab('output')">Test Results</button>
+                  <button type="button" class="console-tab" id="tabAi" role="tab" aria-selected="false" onclick="switchConsoleTab('ai')">AI Complexity & Hint</button>
+                  <button type="button" class="console-tab" id="tabSubmissions" role="tab" aria-selected="false" onclick="switchConsoleTab('submissions')">Submissions History</button>
               </div>
               <div class="console-body" id="consoleBody">
-                <span style="color:var(--text-muted);">Press "Run Code" or "Submit Solution" to test your code against sandbox test cases.</span>
+                <span style="color:var(--text-muted);">Press "Run Code" or "Submit Solution" to test your code on the isolated execution service.</span>
               </div>
             </div>
           </div>
@@ -220,18 +308,134 @@
   </div>
 
   <script src="/assets/shared-nav.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
   <script>
     let problemsList = [];
     let currentProblem = null;
+    let availableLanguages = [];
+    let executionReady = false;
+    let codeEditorInstance = null;
+    const savedCode = new Map();
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    function currentLanguage() {
+      return document.getElementById('codeLanguage').value || 'javascript';
+    }
+
+    function getEditorCode() {
+      return codeEditorInstance
+        ? codeEditorInstance.getValue()
+        : document.getElementById('codeEditor').value;
+    }
+
+    function setEditorCode(code) {
+      const text = String(code || '');
+      document.getElementById('codeEditor').value = text;
+      if (codeEditorInstance) codeEditorInstance.setValue(text);
+    }
+
+    function codeKey(problem = currentProblem, language = currentLanguage()) {
+      return `${problem?._id || problem?.id || 'none'}:${language}`;
+    }
+
+    function saveEditorState() {
+      if (currentProblem) savedCode.set(codeKey(), getEditorCode());
+    }
+
+    function languageInfo(value = currentLanguage()) {
+      return availableLanguages.find(language => language.value === value);
+    }
+
+    function updateExecutionButtons() {
+      const disabled = !executionReady || !currentProblem;
+      document.getElementById('btnRunCode').disabled = disabled;
+      document.getElementById('btnSubmitSolution').disabled = disabled;
+    }
+
+    function initializeMonaco() {
+      if (!window.require) return;
+      require.config({ paths: {
+        vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs'
+      }});
+      require(['vs/editor/editor.main'], () => {
+        const fallback = document.getElementById('codeEditor');
+        const host = document.getElementById('monacoCodingEditor');
+        codeEditorInstance = monaco.editor.create(host, {
+          value: fallback.value,
+          language: languageInfo()?.editorLanguage || 'javascript',
+          theme: 'vs-dark',
+          automaticLayout: true,
+          fontSize: 14,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false
+        });
+        fallback.style.display = 'none';
+        host.style.display = 'block';
+      });
+    }
+
+    async function loadLanguages() {
+      const select = document.getElementById('codeLanguage');
+      try {
+        const res = await fetch('/api/coding/languages', { headers });
+        const data = await res.json();
+        if (res.status === 401) {
+          throw new Error('Sign in again to use the coding runner; your session may have expired.');
+        }
+        if (!res.ok || !Array.isArray(data.languages) || !data.languages.length) {
+          throw new Error(data.message || 'No supported languages are available from the isolated runner.');
+        }
+        availableLanguages = data.languages;
+        select.innerHTML = availableLanguages.map(language =>
+          `<option value="${escapeHtml(language.value)}">${escapeHtml(language.label)}</option>`
+        ).join('');
+        select.value = availableLanguages.some(language => language.value === 'javascript')
+          ? 'javascript'
+          : availableLanguages[0].value;
+        select.disabled = false;
+        executionReady = true;
+        const chosen = languageInfo();
+        if (codeEditorInstance && chosen) {
+          monaco.editor.setModelLanguage(codeEditorInstance.getModel(), chosen.editorLanguage);
+        }
+        if (!getEditorCode() && chosen) setEditorCode(chosen.starterCode);
+        updateExecutionButtons();
+      } catch (error) {
+        select.innerHTML = '<option value="">Runner unavailable</option>';
+        select.disabled = true;
+        executionReady = false;
+        updateExecutionButtons();
+        document.getElementById('consoleBody').textContent =
+          error.message.includes('Sign in again')
+            ? error.message
+            : `${error.message} Configure the backend runner and reload this page.`;
+      }
+    }
+
+    document.getElementById('codeLanguage').addEventListener('change', event => {
+      saveEditorState();
+      const language = languageInfo(event.target.value);
+      if (!language) return;
+      if (codeEditorInstance) {
+        monaco.editor.setModelLanguage(codeEditorInstance.getModel(), language.editorLanguage);
+      }
+      const saved = savedCode.get(codeKey(currentProblem, language.value));
+      setEditorCode(saved || (language.value === 'javascript'
+        ? currentProblem?.solutionTemplate || language.starterCode
+        : language.starterCode));
+    });
 
     async function loadProblems() {
       try {
         const res = await fetch('/api/coding/problems', { headers });
         if (res.ok) {
           problemsList = await res.json();
+          if (!Array.isArray(problemsList) || problemsList.length === 0) {
+            showProblemLoadError('No coding problems are currently available.');
+            return;
+          }
           renderDropdown();
           
           // Check query param for problemId
@@ -239,27 +443,100 @@
           const qId = urlParams.get('problemId');
           const target = problemsList.find(p => String(p._id) === qId || String(p.id) === qId) || problemsList[0];
           if (target) selectProblem(target._id || target.id);
+        } else {
+          showProblemLoadError('Coding problems could not be loaded. Please try again later.');
         }
       } catch (err) {
         console.error(err);
+        showProblemLoadError('Could not connect to the coding practice service.');
       }
+    }
+
+    function showProblemLoadError(message) {
+      problemsList = [];
+      currentProblem = null;
+      updateExecutionButtons();
+      document.getElementById('problemDropdown').innerHTML = '<option value="">Problems unavailable</option>';
+      document.getElementById('probTitle').textContent = 'Problems unavailable';
+      document.getElementById('probDesc').textContent = message;
+      document.getElementById('problemCatalogSource').textContent = '';
+      document.getElementById('officialProblemAttribution').style.display = 'none';
     }
 
     function renderDropdown() {
       const select = document.getElementById('problemDropdown');
-      select.innerHTML = problemsList.map(p => `
-        <option value="${p._id || p.id}">${p.title} (${p.difficulty})</option>
-      `).join('');
+      const topics = [...new Set(problemsList.map(problem => problem.category).filter(Boolean))].sort();
+      document.getElementById('topicFilter').innerHTML =
+        '<option value="">All</option>' + topics.map(topic =>
+          `<option value="${escapeHtml(topic)}">${escapeHtml(topic.replace(/-/g, ' '))}</option>`
+        ).join('');
+      applyProblemFilters();
+      document.getElementById('difficultyFilter').onchange = applyProblemFilters;
+      document.getElementById('topicFilter').onchange = applyProblemFilters;
+      document.getElementById('problemSearch').addEventListener('input', applyProblemFilters);
 
       select.onchange = (e) => selectProblem(e.target.value);
     }
 
-    function selectProblem(id) {
+    function applyProblemFilters() {
+      const select = document.getElementById('problemDropdown');
+      const difficulty = document.getElementById('difficultyFilter').value;
+      const topic = document.getElementById('topicFilter').value;
+      const query = document.getElementById('problemSearch').value.trim().toLocaleLowerCase();
+      const filtered = problemsList.filter(problem =>
+        (!difficulty || problem.difficulty === difficulty) &&
+        (!topic || problem.category === topic) &&
+        (!query || [problem.title, problem.category, problem.description]
+          .some(value => String(value || '').toLocaleLowerCase().includes(query)))
+      );
+      select.innerHTML = filtered.map(p => `
+        <option value="${escapeHtml(p._id || p.id)}">${escapeHtml(p.title)} (${escapeHtml(p.difficulty)})</option>
+      `).join('');
+      if (!filtered.length) {
+        select.innerHTML = '<option value="">No curated problems match these filters</option>';
+        currentProblem = null;
+        ['btnAiHint', 'btnAiReview'].forEach(id => {
+          document.getElementById(id).disabled = true;
+        });
+        updateExecutionButtons();
+        return;
+      }
+      const currentId = currentProblem?._id || currentProblem?.id;
+      const selected = filtered.find(problem =>
+        String(problem._id || problem.id) === String(currentId)
+      ) || filtered[0];
+      select.value = selected._id || selected.id;
+      selectProblem(selected._id || selected.id, String(selected._id || selected.id) !== String(currentId));
+    }
+
+    function selectProblem(id, resetEditor = true) {
+      saveEditorState();
       currentProblem = problemsList.find(p => String(p._id) === String(id) || String(p.id) === String(id));
       if (!currentProblem) return;
+      ['btnAiHint', 'btnAiReview', 'btnRunCode', 'btnSubmitSolution'].forEach(buttonId => {
+        document.getElementById(buttonId).disabled = false;
+      });
+      updateExecutionButtons();
 
       document.getElementById('problemDropdown').value = currentProblem._id || currentProblem.id;
       document.getElementById('probTitle').innerText = currentProblem.title;
+      document.getElementById('problemCatalogSource').textContent =
+        currentProblem.officialSource === 'LeetCode'
+          ? `Curated practice · official LeetCode problem #${currentProblem.officialProblemNumber}`
+          : 'CareerHub curated practice problem · no official listing verified';
+      const attribution = document.getElementById('officialProblemAttribution');
+      if (currentProblem.officialSource === 'LeetCode' &&
+          /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(currentProblem.officialUrl || '')) {
+        const link = document.getElementById('officialProblemLink');
+        link.href = currentProblem.officialUrl;
+        link.textContent = `Open on LeetCode #${currentProblem.officialProblemNumber} ↗`;
+        link.style.display = 'inline-flex';
+        attribution.style.display = 'block';
+      } else {
+        document.getElementById('officialProblemLink').removeAttribute('href');
+        document.getElementById('officialProblemLink').style.display = 'none';
+        attribution.style.display = 'none';
+      }
       document.getElementById('probDesc').innerText = currentProblem.description;
       document.getElementById('probPoints').innerText = `+${currentProblem.points || 10} XP`;
       document.getElementById('probConstraints').innerText = currentProblem.constraints || 'Standard memory & runtime limits';
@@ -270,59 +547,107 @@
 
       // Companies
       const compContainer = document.getElementById('probCompanies');
-      compContainer.innerHTML = (currentProblem.companies || ['Google', 'Amazon']).map(c => `
-        <span class="company-pill">${c}</span>
+      compContainer.innerHTML = (currentProblem.companies || []).map(c => `
+        <span class="company-pill">${escapeHtml(c)}</span>
       `).join('');
 
       // Test cases preview
       const tcContainer = document.getElementById('probTestCases');
       tcContainer.innerHTML = (currentProblem.testCases || []).slice(0, 2).map((tc, idx) => `
         <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);padding:0.6rem 0.85rem;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">
-          <div><span style="color:var(--text-muted);">Input:</span> ${tc.input}</div>
-          <div><span style="color:var(--text-muted);">Expected:</span> ${tc.expectedOutput}</div>
+          <div><span style="color:var(--text-muted);">Input:</span> ${escapeHtml(tc.input)}</div>
+          <div><span style="color:var(--text-muted);">Expected:</span> ${escapeHtml(tc.expectedOutput)}</div>
         </div>
       `).join('');
 
       // Code template
-      document.getElementById('codeEditor').value = currentProblem.solutionTemplate || `function solution(nums) {\n    // Write your solution here\n    \n}`;
+      if (resetEditor) {
+        const language = languageInfo();
+        const saved = savedCode.get(codeKey());
+        setEditorCode(saved || (currentLanguage() === 'javascript'
+          ? currentProblem.solutionTemplate || language?.starterCode || ''
+          : language?.starterCode || ''));
+        document.getElementById('executionInput').value = currentProblem.testCases?.[0]?.input || '';
+      }
     }
+
+    document.getElementById('practiceLocalLink').addEventListener('click', () => {
+      window.setTimeout(() => document.getElementById('codeEditor').focus(), 0);
+    });
 
     // Run Code
     document.getElementById('btnRunCode').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
-      const firstInput = currentProblem?.testCases?.[0]?.input || '';
-      
+      if (!currentProblem || !executionReady) return;
+      const code = getEditorCode();
+      const testInput = document.getElementById('executionInput').value;
+      const button = document.getElementById('btnRunCode');
+      button.disabled = true;
       switchConsoleTab('output');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Running sandboxed code...</span>';
+      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Sending code to the isolated execution service...</span>';
 
       try {
         const res = await fetch('/api/coding/run', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ code, testInput: firstInput })
+          body: JSON.stringify({ code, language: currentLanguage(), testInput })
         });
         const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('consoleBody').textContent =
+            data.error || data.message || 'The isolated code execution service is unavailable.';
+          return;
+        }
         if (data.success) {
           document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#34d399;font-weight:700;margin-bottom:0.4rem;">Execution Succeeded:</div>
-            <pre style="color:#cbd5e1;white-space:pre-wrap;">${data.output || 'No output'}</pre>
+            <div style="color:#34d399;font-weight:700;margin-bottom:0.4rem;">${escapeHtml(data.statusDescription || 'Execution Succeeded')}</div>
+            <pre style="color:#cbd5e1;white-space:pre-wrap;">${escapeHtml(data.stdout || data.output || 'No output')}</pre>
+            <div style="color:var(--text-muted);font-size:0.72rem;">Runtime: ${escapeHtml(data.executionTime || 'n/a')}s · Memory: ${escapeHtml(data.memoryUsed ?? 'n/a')} KB</div>
           `;
         } else {
           document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#f87171;font-weight:700;margin-bottom:0.4rem;">Runtime Error:</div>
-            <pre style="color:#fca5a5;white-space:pre-wrap;">${data.error || 'Execution failed'}</pre>
+            <div style="color:#f87171;font-weight:700;margin-bottom:0.4rem;">${escapeHtml(data.status || 'Execution failed')}</div>
+            <pre style="color:#fca5a5;white-space:pre-wrap;">${escapeHtml(data.error || data.stderr || data.compileOutput || 'Execution failed')}</pre>
           `;
         }
       } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Execution error: ${e.message}</span>`;
+        document.getElementById('consoleBody').textContent = `Execution error: ${e.message}`;
+      } finally {
+        updateExecutionButtons();
       }
     });
 
-    // AI Analyze
-    document.getElementById('btnAiAnalyze').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
+    document.getElementById('btnAiHint').addEventListener('click', async () => {
+      if (!currentProblem) {
+        window.showToast('Select a coding problem first.', 'error');
+        return;
+      }
       switchConsoleTab('ai');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#a5b4fc;">🤖 Gemini analyzing code complexity & Big-O...</span>';
+      document.getElementById('consoleBody').textContent = 'Generating a progressive hint…';
+      try {
+        const res = await fetch('/api/coding/hint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ problemId: currentProblem._id || currentProblem.id })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('consoleBody').textContent =
+            data.message || 'AI hint is temporarily unavailable. Please try again.';
+          return;
+        }
+        const concepts = Array.isArray(data.concepts) ? data.concepts.join(', ') : '';
+        document.getElementById('consoleBody').textContent =
+          `AI-generated hint\n\nHint: ${data.hint}\n\nConcepts: ${concepts || 'Not specified'}\n\nComplexity considerations: ${data.complexityConsiderations}`;
+      } catch (error) {
+        document.getElementById('consoleBody').textContent = 'Could not reach the AI service for a coding hint.';
+      }
+    });
+
+    // AI code review
+    document.getElementById('btnAiReview').addEventListener('click', async () => {
+      const code = getEditorCode();
+      switchConsoleTab('ai');
+      document.getElementById('consoleBody').textContent = 'AI Code Reviewer is reviewing your code…';
 
       try {
         const res = await fetch('/api/coding/analyze', {
@@ -335,36 +660,52 @@
           })
         });
         const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('consoleBody').textContent =
+            data.message || 'AI code review is temporarily unavailable. Please try again.';
+          return;
+        }
         document.getElementById('consoleBody').innerHTML = `
-          <div style="color:#a5b4fc;font-weight:700;margin-bottom:0.4rem;">AI Code Review & Big-O Complexity:</div>
-          <pre style="color:#e0e7ff;white-space:pre-wrap;font-family:inherit;">${data.analysis || 'Analysis complete'}</pre>
+          <div style="color:#a5b4fc;font-weight:700;margin-bottom:0.4rem;">AI Code Review:</div>
+          <pre style="color:#e0e7ff;white-space:pre-wrap;font-family:inherit;">${escapeHtml(data.analysis || 'Analysis complete')}</pre>
         `;
       } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Analysis error: ${e.message}</span>`;
+        document.getElementById('consoleBody').textContent = 'Could not reach the AI service for code review.';
       }
     });
 
     // Submit Solution
     document.getElementById('btnSubmitSolution').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
-      if (!currentProblem) return;
+      const code = getEditorCode();
+      if (!currentProblem || !executionReady) return;
+      const button = document.getElementById('btnSubmitSolution');
+      button.disabled = true;
+      saveEditorState();
 
       switchConsoleTab('output');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Evaluating test cases in sandbox...</span>';
+      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Evaluating test cases on the isolated execution service...</span>';
 
       try {
         const res = await fetch(`/api/coding/submit/${currentProblem._id || currentProblem.id}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ code, language: 'javascript' })
+          body: JSON.stringify({ code, language: document.getElementById('codeLanguage').value })
         });
         const data = await res.json();
+        if (!res.ok) {
+          document.getElementById('consoleBody').textContent =
+            data.message || 'The isolated code execution service is unavailable.';
+          window.showToast(data.message || 'Code execution is unavailable.', 'error');
+          return;
+        }
 
         if (data.status === 'accepted') {
-          window.showToast(`🎉 Accepted! +${data.score || 10} XP awarded`, 'success');
+          window.showToast(data.xpEarned
+            ? `🎉 Accepted! +${data.xpEarned} XP awarded`
+            : 'Accepted! Completion XP for this problem was already awarded.', 'success');
           document.getElementById('consoleBody').innerHTML = `
             <div style="color:#34d399;font-weight:700;font-size:1rem;margin-bottom:0.5rem;">✅ Accepted! All test cases passed.</div>
-            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Score: +${data.score} XP awarded to candidate profile.</div>
+            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">${data.xpEarned ? `+${data.xpEarned} XP awarded.` : 'Completion XP was already awarded for this problem.'}</div>
             ${(data.results || []).map((r, i) => `
               <div style="font-size:0.78rem;color:#34d399;margin-bottom:0.25rem;">Test Case ${i+1}: Passed ✓</div>
             `).join('')}
@@ -376,22 +717,87 @@
             <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Some test cases did not match expected output.</div>
             ${(data.results || []).map((r, i) => `
               <div style="font-size:0.78rem;color:${r.passed ? '#34d399' : '#f87171'};margin-bottom:0.25rem;">
-                Test Case ${i+1}: ${r.passed ? 'Passed ✓' : `Failed ❌ (Expected: ${r.expectedOutput}, Got: ${r.actualOutput || r.error})`}
+                Test Case ${i+1}: ${r.passed ? 'Passed ✓' : `Failed ❌ (${escapeHtml(r.status || 'error')}${r.expectedOutput !== undefined ? `; Expected: ${escapeHtml(r.expectedOutput)}, Got: ${escapeHtml(r.actualOutput || r.error)}` : ''})`}
               </div>
             `).join('')}
           `;
         }
       } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Submission error: ${e.message}</span>`;
+        document.getElementById('consoleBody').textContent = `Submission error: ${e.message}`;
+      } finally {
+        updateExecutionButtons();
       }
     });
 
     window.switchConsoleTab = function (tab) {
-      document.getElementById('tabOutput').classList.toggle('active', tab === 'output');
-      document.getElementById('tabAi').classList.toggle('active', tab === 'ai');
+      const tabs = {
+        output: document.getElementById('tabOutput'),
+        ai: document.getElementById('tabAi'),
+        submissions: document.getElementById('tabSubmissions')
+      };
+      Object.entries(tabs).forEach(([name, element]) => {
+        const active = name === tab;
+        element.classList.toggle('active', active);
+        element.setAttribute('aria-selected', String(active));
+      });
+
+      if (tab === 'submissions') {
+        loadSubmissions();
+      }
     };
 
-    // Tab key support in textarea
+    async function loadSubmissions() {
+      const consoleBody = document.getElementById('consoleBody');
+      consoleBody.innerHTML = '<span style="color:#00d2ff;">Loading past submissions...</span>';
+      try {
+        const res = await fetch('/api/coding/submissions', { headers });
+        if (res.ok) {
+          const allSubs = await res.json();
+          const targetId = currentProblem ? (currentProblem._id || currentProblem.id) : null;
+          const filtered = targetId
+            ? allSubs.filter(s => String(s.problemId) === String(targetId))
+            : allSubs;
+
+          if (filtered.length === 0) {
+            consoleBody.innerHTML = '<div style="color:var(--text-muted);padding:0.5rem 0;">No previous submissions recorded for this problem yet. Submit your solution to track progress!</div>';
+            return;
+          }
+
+          consoleBody.innerHTML = `
+            <div style="font-weight:700;color:#fff;margin-bottom:0.6rem;font-size:0.85rem;">Past Submissions (${filtered.length}):</div>
+            ${filtered.slice(-5).reverse().map((sub, i) => `
+              <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.03);padding:0.4rem 0.75rem;border-radius:6px;margin-bottom:0.35rem;border:1px solid rgba(255,255,255,0.05);">
+                <div>
+                  <span style="font-weight:700;color:${sub.status === 'accepted' ? '#34d399' : '#f87171'};font-size:0.8rem;">
+                    ${sub.status === 'accepted' ? 'Accepted ✓' : 'Wrong Answer ❌'}
+                  </span>
+                  <span style="color:var(--text-muted);font-size:0.75rem;margin-left:0.5rem;">${sub.language || 'javascript'}</span>
+                </div>
+                <div style="font-size:0.75rem;color:var(--text-secondary);">
+                  <span>+${sub.score || 0} XP</span> • <span>${sub.executionTime || 12}ms</span>
+                </div>
+              </div>
+            `).join('')}
+          `;
+        } else {
+          consoleBody.innerHTML = '<div style="color:var(--text-muted);">Unable to load submissions.</div>';
+        }
+      } catch (err) {
+        consoleBody.innerHTML = `<span style="color:#f87171;">Error loading submissions: ${err.message}</span>`;
+      }
+    }
+
+    // Tab key support in the fallback editor.
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character]);
+    }
+
     document.getElementById('codeEditor').addEventListener('keydown', function(e) {
       if (e.key === 'Tab') {
         e.preventDefault();
@@ -402,7 +808,11 @@
       }
     });
 
-    document.addEventListener('DOMContentLoaded', loadProblems);
+    document.addEventListener('DOMContentLoaded', () => {
+      initializeMonaco();
+      loadProblems();
+      loadLanguages();
+    });
   </script>
 </body>
 </html>

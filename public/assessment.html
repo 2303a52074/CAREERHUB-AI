@@ -9,15 +9,24 @@
   <link rel="stylesheet" href="/assets/shared-nav.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .assessment-layout {
-      max-width: 900px;
-      margin: 0 auto;
-    }
+    .assessment-layout { max-width: 900px; margin: 0 auto; }
+    .assessment-intro { margin: 0 0 1rem; padding: .25rem .1rem; }
+    .assessment-intro h2 { margin: 0 0 .3rem; font-size: clamp(1.25rem, 2.4vw, 1.65rem); letter-spacing: -.035em; }
+    .assessment-intro p { margin: 0; color: var(--text-muted); font-size: .87rem; }
+    .assessment-setup-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.85rem; margin:1rem 0; }
+    .assessment-setup-field { display:flex; flex-direction:column; gap:.4rem; color:var(--text-secondary); font-size:.78rem; font-weight:650; }
+    .assessment-setup-field select { width:100%; min-height:44px; padding:.65rem .75rem; border:1px solid var(--border-subtle); border-radius:var(--radius-sm); background:#0b1522; color:#eef5fb; font:inherit; }
+    .assessment-setup-note { margin:.8rem 0 1rem; color:var(--text-muted); font-size:.8rem; line-height:1.55; }
+    .assessment-source { color:#9eb4c7; font-size:.73rem; }
+    .assessment-review { margin-top:1rem; display:grid; gap:.7rem; }
+    .assessment-review-item { border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:.8rem; }
+    .assessment-review-item h5 { margin:0 0 .4rem; font-size:.84rem; color:#eef5fb; }
+    .assessment-review-item p { margin:.25rem 0; color:var(--text-secondary); font-size:.78rem; line-height:1.5; }
     .assessment-card {
       background: var(--surface-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 2.25rem;
+      padding: clamp(1rem, 3.5vw, 2.25rem);
       box-shadow: var(--shadow-card);
     }
     .question-header {
@@ -28,6 +37,7 @@
       padding-bottom: 1rem;
       border-bottom: 1px solid var(--border-subtle);
     }
+    .question-heading-group { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; min-width: 0; }
     .question-badge {
       font-size: 0.75rem;
       font-weight: 700;
@@ -45,12 +55,14 @@
       font-weight: 600;
     }
     .question-text {
-      font-size: 1.25rem;
+      font-size: clamp(1.08rem, 2.2vw, 1.35rem);
       font-weight: 600;
       color: #fff;
       line-height: 1.5;
-      margin-bottom: 2rem;
+      margin-bottom: 1.35rem;
     }
+    .assessment-progress { height: 6px; margin: -0.55rem 0 1.2rem; overflow: hidden; border-radius: 99px; background: #1b2b3d; }
+    .assessment-progress-fill { width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #40b9d4, #718fe0); transition: width .2s ease; }
     .options-grid {
       display: flex;
       flex-direction: column;
@@ -58,7 +70,8 @@
       margin-bottom: 2rem;
     }
     .option-item {
-      padding: 1rem 1.25rem;
+      min-width: 0;
+      padding: .9rem 1rem;
       border-radius: var(--radius-md);
       border: 1px solid var(--border-subtle);
       background: rgba(255, 255, 255, 0.02);
@@ -66,10 +79,13 @@
       font-size: 0.95rem;
       cursor: pointer;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 1rem;
       transition: var(--transition-smooth);
     }
+    .option-item input { width: 18px; height: 18px; flex: 0 0 18px; min-height: 18px !important; margin: .1rem 0 0; accent-color: #58cbe0; }
+    .option-item > span { min-width: 0; overflow-wrap: anywhere; }
+    .option-key { color: #83d8e8; font-weight: 700; margin-right: .5rem; }
     .option-item:hover {
       border-color: var(--border-hover);
       background: rgba(56, 189, 248, 0.05);
@@ -168,6 +184,15 @@
       gap: 1.5rem;
       margin-bottom: 2rem;
     }
+    .assessment-results-actions { display:flex; flex-wrap:wrap; justify-content:center; gap:.75rem; margin-top:1.5rem; }
+    .assessment-results-actions > * { display:inline-flex; align-items:center; justify-content:center; min-height:42px; padding:.65rem 1rem; }
+    @media (max-width: 620px) {
+      .assessment-setup-grid { grid-template-columns:1fr; }
+      .question-header { align-items:flex-start; flex-direction:column; gap:.75rem; }
+      .question-text { margin-bottom:1rem; }
+      .results-grid { grid-template-columns:1fr; }
+      .assessment-results-actions > * { flex:1 1 100%; }
+    }
     .result-box {
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid var(--border-subtle);
@@ -192,7 +217,7 @@
     }
   </style>
 </head>
-<body data-page-title="Career Assessment" data-page-subtitle="AI-Powered Aptitude & Domain Readiness Evaluation">
+<body data-page-title="Career Assessment" data-page-subtitle="Curated objective practice with role-aware guidance">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
@@ -200,12 +225,45 @@
       <main class="page-container">
         
         <div class="assessment-layout">
+          <header class="assessment-intro">
+            <h2>Career assessment</h2>
+            <p>Practice career-readiness questions; results and guidance use your saved target role: <strong id="assessmentRoleLabel">Loading profile…</strong></p>
+          </header>
+          <section class="assessment-card" id="assessmentSetupCard" aria-labelledby="assessmentSetupTitle">
+            <h3 id="assessmentSetupTitle" style="margin:0;font-size:1.05rem;">Configure your assessment</h3>
+            <p class="assessment-setup-note">The saved target role is used for question generation and is not changed by this practice session. If a configured AI provider rejects a request, the assessment will show the error instead of substituting questions.</p>
+            <div class="assessment-setup-grid">
+              <label class="assessment-setup-field" for="assessmentCategory">Category
+                <select id="assessmentCategory">
+                  <option>Mixed</option>
+                </select>
+              </label>
+              <label class="assessment-setup-field" for="assessmentDifficulty">Difficulty
+                <select id="assessmentDifficulty">
+                  <option value="easy">Easy</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </label>
+              <label class="assessment-setup-field" for="assessmentLength">Session length
+                <select id="assessmentLength">
+                  <option value="1">1 question</option>
+                  <option value="2">2 questions</option>
+                  <option value="5" selected>5 questions</option>
+                  <option value="10">10 questions</option>
+                </select>
+              </label>
+            </div>
+            <p class="assessment-setup-note" id="assessmentProviderStatus" role="status">Checking available question sources…</p>
+            <button class="btn-action btn-next" id="btnStartAssessment" type="button" disabled>Start assessment</button>
+          </section>
           <!-- Live Assessment Card -->
-          <div class="assessment-card" id="questionCard">
+          <div class="assessment-card" id="questionCard" style="display:none;">
             <div class="question-header">
-              <span class="question-badge" id="questionCategory">Category</span>
+              <div class="question-heading-group"><span class="question-badge" id="questionCategory">Category</span><span class="question-progress" id="questionRole">Target role</span><span class="assessment-source" id="questionSource"></span></div>
               <span class="question-progress" id="questionCounter">Question 1 of 10</span>
             </div>
+            <div class="assessment-progress" role="progressbar" aria-label="Assessment progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="assessment-progress-fill" id="assessmentProgressFill"></div></div>
 
             <div class="question-text" id="questionText">Loading assessment question...</div>
 
@@ -230,7 +288,7 @@
                 Assessment Complete!
               </h2>
               <p style="font-size:0.9rem;color:var(--text-secondary);" id="resRoleSubtitle">
-                Target Role: Full Stack Developer
+                Target role will be shown after assessment.
               </p>
             </div>
 
@@ -250,8 +308,17 @@
                 <ul id="resWeaknessesList"></ul>
               </div>
             </div>
+            <section class="result-box" id="assessmentAiInsightPanel" aria-live="polite">
+              <h4><span>✦</span> Personalized AI insight</h4>
+              <p id="assessmentAiSummary">AI insight status will appear here.</p>
+              <ul id="assessmentAiNextSteps"></ul>
+            </section>
+            <section class="result-box" aria-labelledby="assessmentReviewTitle">
+              <h4 id="assessmentReviewTitle">Answer review</h4>
+              <div class="assessment-review" id="assessmentReview"></div>
+            </section>
 
-            <div style="display:flex;gap:1rem;justify-content:center;margin-top:2rem;">
+            <div class="assessment-results-actions">
               <a href="/roadmap" class="btn-action btn-next" style="text-decoration:none;">View Tailored Roadmap →</a>
               <a href="/coding" class="btn-action btn-prev" style="text-decoration:none;">Practice in IDE</a>
               <button class="btn-action btn-prev" id="btnRetake">Retake Assessment</button>
@@ -268,33 +335,123 @@
     let questions = [];
     let currentIndex = 0;
     let userAnswers = {};
+    let assessmentTargetRole = null;
+    let isSubmitting = false;
+    let activeAssessmentSessionId = null;
+    let activeAssessmentSource = 'openrouter';
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
     async function initAssessment() {
       try {
-        // Fetch questions
-        const res = await fetch('/api/career/assessment/questions', { headers });
-        if (res.ok) {
-          const data = await res.json();
-          questions = data.questions || [];
-          if (questions.length > 0) {
-            renderQuestion(0);
-          } else {
-            showEmpty();
-          }
-        } else {
-          showEmpty();
+        const optionsResponse = await fetch('/api/career/assessment/options', { headers });
+        if (optionsResponse.ok) {
+          const options = await optionsResponse.json();
+          const categorySelect = document.getElementById('assessmentCategory');
+          categorySelect.replaceChildren(...(options.categories || ['Mixed']).map(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            return option;
+          }));
         }
+        const profileResponse = await fetch('/api/career/profile', { headers });
+        if (!profileResponse.ok) {
+          showEmpty(profileResponse.status === 401
+            ? 'Sign in to start a personalized career assessment.'
+            : 'Unable to load your profile. Please retry.');
+          return;
+        }
+        const profileData = await profileResponse.json();
+        assessmentTargetRole = profileData.user?.targetRole?.trim() || null;
+        document.getElementById('assessmentRoleLabel').textContent = assessmentTargetRole || 'Not set';
+        if (!assessmentTargetRole) {
+          showEmpty('Choose a target career role in your Profile before starting the assessment.');
+          return;
+        }
+        document.getElementById('btnStartAssessment').disabled = false;
+        const providerResponse = await fetch('/api/career/assistant/status', { headers });
+        const providerStatus = providerResponse.ok ? await providerResponse.json() : { ready: false };
+        document.getElementById('assessmentProviderStatus').textContent = providerStatus.configured
+          ? 'Questions are generated by OpenRouter when you start. Provider errors are shown without substituting a demo set.'
+          : 'OpenRouter is not configured on the server. Add OPENROUTER_API_KEY to backend/.env to generate questions.';
       } catch (e) {
         console.error(e);
         showEmpty();
       }
     }
 
-    function showEmpty() {
-      document.getElementById('questionText').innerText = 'No questions available at this time.';
+    function assessmentProviderFailure(code) {
+      const errors = {
+        AI_PROVIDER_NOT_CONFIGURED: 'AI generation is not configured.',
+        AI_PROVIDER_QUOTA_EXCEEDED: 'AI generation is blocked because the provider account has no credits remaining.',
+        AI_PROVIDER_AUTH_ERROR: 'AI generation is unavailable because provider credentials were rejected.',
+        AI_MODEL_INVALID: 'AI generation is unavailable because the configured model is unsupported.',
+        AI_RATE_LIMITED: 'AI generation was rate-limited. Please wait before retrying.',
+        AI_PROVIDER_TIMEOUT: 'AI generation timed out.',
+        AI_PROVIDER_INVALID_OUTPUT: 'AI returned questions that did not meet the required format.',
+        AI_PROVIDER_UNAVAILABLE: 'AI generation is temporarily unavailable.'
+      };
+      return errors[code] || 'AI generation was unavailable.';
+    }
+
+    function showEmpty(message = 'No questions available at this time.') {
+      document.getElementById('assessmentProviderStatus').textContent = message;
+      document.getElementById('assessmentRoleLabel').textContent = assessmentTargetRole || 'Not set';
+      document.getElementById('assessmentSetupCard').style.display = 'block';
+      document.getElementById('questionCard').style.display = 'none';
+      document.getElementById('btnStartAssessment').disabled = !assessmentTargetRole;
+    }
+
+    async function startAssessment() {
+      const startButton = document.getElementById('btnStartAssessment');
+      startButton.disabled = true;
+      startButton.textContent = 'Preparing questions…';
+      document.getElementById('assessmentProviderStatus').textContent = 'Preparing your assessment session…';
+      try {
+        const response = await fetch('/api/career/assessment/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({
+            category: document.getElementById('assessmentCategory').value,
+            difficulty: document.getElementById('assessmentDifficulty').value,
+            count: Number(document.getElementById('assessmentLength').value)
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          document.getElementById('assessmentProviderStatus').textContent =
+            `${data.message || 'Unable to prepare this assessment. Please change the selections and retry.'}${data.generationError
+              ? ` ${assessmentProviderFailure(data.generationError)}` : ''}`;
+          return;
+        }
+        if (!Array.isArray(data.questions) || !data.questions.length || !data.sessionId) {
+          document.getElementById('assessmentProviderStatus').textContent =
+            'The assessment service returned no usable questions. Please retry.';
+          return;
+        }
+        if (data.targetRole !== assessmentTargetRole) {
+          document.getElementById('assessmentProviderStatus').textContent =
+            'Your saved target role changed. Refresh the page before starting a new assessment.';
+          return;
+        }
+        questions = data.questions;
+        userAnswers = {};
+        activeAssessmentSessionId = data.sessionId;
+        activeAssessmentSource = data.source;
+        document.getElementById('assessmentProviderStatus').textContent = 'This session uses OpenRouter-generated questions.';
+        document.getElementById('assessmentSetupCard').style.display = 'none';
+        document.getElementById('questionCard').style.display = 'block';
+        renderQuestion(0);
+      } catch (error) {
+        console.error(error);
+        document.getElementById('assessmentProviderStatus').textContent =
+          'Unable to start the assessment right now. Check your connection and try again.';
+      } finally {
+        startButton.disabled = false;
+        startButton.textContent = 'Start assessment';
+      }
     }
 
     function renderQuestion(index) {
@@ -304,32 +461,46 @@
 
       document.getElementById('questionCategory').innerText = q.category || 'General Assessment';
       document.getElementById('questionCounter').innerText = `Question ${index + 1} of ${questions.length}`;
+      document.getElementById('questionRole').textContent = assessmentTargetRole;
+      document.getElementById('questionSource').textContent =
+        `${q.difficulty || document.getElementById('assessmentDifficulty').value} · OpenRouter AI`;
+      const progress = Math.round(((index + 1) / questions.length) * 100);
+      document.getElementById('assessmentProgressFill').style.width = `${progress}%`;
+      document.querySelector('.assessment-progress').setAttribute('aria-valuenow', String(progress));
       document.getElementById('questionText').innerText = q.question;
 
       const optContainer = document.getElementById('optionsContainer');
-      optContainer.innerHTML = (q.options || []).map((opt, i) => {
-        const isSelected = userAnswers[q.id] === opt;
-        return `
-          <div class="option-item ${isSelected ? 'selected' : ''}" onclick="selectOption('${q.id}', '${encodeURIComponent(opt)}')">
-            <div class="option-radio"></div>
-            <span>${opt}</span>
-          </div>
-        `;
-      }).join('');
+      optContainer.replaceChildren();
+      (q.options || []).forEach((option, index) => {
+        const label = document.createElement('label');
+        label.className = `option-item ${userAnswers[q.id] === option ? 'selected' : ''}`;
+        const input = document.createElement('input');
+        input.type = 'radio';
+        input.name = 'assessmentOption';
+        input.value = String(index);
+        input.checked = userAnswers[q.id] === option;
+        input.addEventListener('change', () => {
+          userAnswers[q.id] = option;
+          renderQuestion(currentIndex);
+        });
+        const text = document.createElement('span');
+        const key = document.createElement('span');
+        key.className = 'option-key';
+        key.textContent = String.fromCharCode(65 + index);
+        text.append(key, document.createTextNode(String(option)));
+        label.append(input, text);
+        optContainer.append(label);
+      });
 
       document.getElementById('btnPrev').style.display = index > 0 ? 'block' : 'none';
       document.getElementById('btnNext').innerText = index === questions.length - 1 ? 'Submit Assessment ✓' : 'Next Question →';
     }
 
-    window.selectOption = function (qId, encodedOpt) {
-      const opt = decodeURIComponent(encodedOpt);
-      userAnswers[qId] = opt;
-      renderQuestion(currentIndex);
-    };
-
     document.getElementById('btnPrev').addEventListener('click', () => {
       if (currentIndex > 0) renderQuestion(currentIndex - 1);
     });
+
+    document.getElementById('btnStartAssessment').addEventListener('click', startAssessment);
 
     document.getElementById('btnNext').addEventListener('click', async () => {
       const currentQ = questions[currentIndex];
@@ -347,17 +518,26 @@
     });
 
     async function submitAssessment() {
+      if (isSubmitting) return;
+      isSubmitting = true;
+      const submitButton = document.getElementById('btnNext');
+      submitButton.disabled = true;
+      submitButton.textContent = 'Submitting…';
       try {
         window.showToast('Evaluating assessment answers...', 'info');
-        const formattedAnswers = Object.entries(userAnswers).map(([id, answer]) => ({
-          questionId: parseInt(id),
-          answer
+        const formattedAnswers = questions.map(question => ({
+          questionId: question.id,
+          answer: userAnswers[question.id]
         }));
 
         const res = await fetch('/api/career/assessment/submit', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ answers: formattedAnswers })
+          body: JSON.stringify({
+            answers: formattedAnswers,
+            targetRole: assessmentTargetRole,
+            sessionId: activeAssessmentSessionId
+          })
         });
 
         if (res.ok) {
@@ -365,54 +545,103 @@
           window.showToast('Assessment submitted successfully!', 'success');
           showResults(evalResult);
         } else {
-          window.showToast('Failed to evaluate submission.', 'error');
+          const error = await res.json().catch(() => ({}));
+          window.showToast(error.message || 'Failed to evaluate submission.', 'error');
+          isSubmitting = false;
+          submitButton.disabled = false;
+          submitButton.textContent = 'Submit Assessment ✓';
         }
       } catch (err) {
         console.error(err);
         window.showToast('Network error submitting assessment.', 'error');
+        isSubmitting = false;
+        submitButton.disabled = false;
+        submitButton.textContent = 'Submit Assessment ✓';
       }
     }
 
     function showResults(data) {
       document.getElementById('questionCard').style.display = 'none';
+      document.getElementById('assessmentSetupCard').style.display = 'none';
       document.getElementById('resultsCard').style.display = 'block';
 
-      const readiness = data.overallReadiness || data.readinessScore || 78;
-      document.getElementById('resOverallScore').innerText = `${readiness}%`;
+      document.getElementById('resRoleSubtitle').innerText =
+        `Target Role: ${data.targetRole || assessmentTargetRole || 'Not set'}`;
+      const readiness = data.overallReadiness ?? data.readinessScore;
+      document.getElementById('resOverallScore').innerText = readiness == null ? 'Not assessed' : `${readiness}%`;
 
       const scores = data.scores || {};
-      const scoreRows = [
-        { label: 'Aptitude & Logical Reasoning', val: scores.aptitude || 80 },
-        { label: 'Technical Core Knowledge', val: scores.technical || 85 },
-        { label: 'Problem Solving Velocity', val: scores.problemSolving || 75 },
-        { label: 'Communication & Clarity', val: scores.communication || 80 },
-        { label: 'Domain Architecture & System Design', val: scores.roleSpecific || 70 }
-      ];
+      const scoreRows = data.categoryScores
+        ? Object.entries(data.categoryScores).map(([label, val]) => ({ label, val }))
+        : [
+            { label: 'Aptitude & Logical Reasoning', val: scores.aptitude },
+            { label: 'Technical Core Knowledge', val: scores.technical },
+            { label: 'Problem Solving Velocity', val: scores.problemSolving },
+            { label: 'Communication & Clarity', val: scores.communication },
+            { label: 'Applied Engineering Foundations', val: scores.roleSpecific }
+          ];
 
       document.getElementById('resBreakdownContainer').innerHTML = scoreRows.map(s => `
         <div style="margin-bottom:0.85rem;">
           <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.3rem;">
             <span style="color:#fff;font-weight:500;">${s.label}</span>
-            <span style="color:#00d2ff;font-weight:700;">${s.val}%</span>
+            <span style="color:#00d2ff;font-weight:700;">${s.val == null ? 'Not assessed' : `${s.val}%`}</span>
           </div>
           <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;">
-            <div style="width:${s.val}%;height:100%;background:var(--gradient-primary);border-radius:3px;"></div>
+            ${s.val == null ? '' : `<div style="width:${s.val}%;height:100%;background:var(--gradient-primary);border-radius:3px;"></div>`}
           </div>
         </div>
       `).join('');
 
-      const strengths = data.strengths || ['Solid grasp of algorithmic logic', 'Strong software architecture fundamentals'];
+      const strengths = data.strengths || [];
       document.getElementById('resStrengthsList').innerHTML = strengths.map(st => `<li>● ${st}</li>`).join('');
 
-      const weaknesses = data.weaknesses || ['Advanced database scaling & indexing', 'Containerization and production CI/CD'];
+      const weaknesses = data.weaknesses || [];
       document.getElementById('resWeaknessesList').innerHTML = weaknesses.map(w => `<li>● ${w}</li>`).join('');
+
+      const reviewContainer = document.getElementById('assessmentReview');
+      reviewContainer.replaceChildren();
+      (data.breakdown || []).forEach(answer => {
+        const review = document.createElement('article');
+        review.className = 'assessment-review-item';
+        const title = document.createElement('h5');
+        title.textContent = `${answer.questionId}. ${answer.question}`;
+        const yourAnswer = document.createElement('p');
+        yourAnswer.textContent = `Your answer: ${answer.userAnswer || 'Not answered'}`;
+        const correctAnswer = document.createElement('p');
+        const correctOptionIndex = ['A', 'B', 'C', 'D'].indexOf(answer.correctAnswer);
+        const correctOption = questions[answer.questionId - 1]?.options?.[correctOptionIndex];
+        correctAnswer.textContent = `Correct answer: ${answer.correctAnswer}${correctOption ? ` (${correctOption})` : ''}`;
+        const explanation = document.createElement('p');
+        explanation.textContent = answer.explanation || answer.feedback || '';
+        review.append(title, yourAnswer, correctAnswer, explanation);
+        reviewContainer.append(review);
+      });
+
+      const aiSummary = document.getElementById('assessmentAiSummary');
+      const aiNextSteps = document.getElementById('assessmentAiNextSteps');
+      aiNextSteps.replaceChildren();
+      if (data.aiInsights?.summary) {
+        aiSummary.textContent = `AI-generated insights: ${data.aiInsights.summary} Objective category scores remain deterministic.`;
+        (data.aiInsights.nextSteps || []).forEach(step => {
+          const item = document.createElement('li');
+          item.textContent = step;
+          aiNextSteps.appendChild(item);
+        });
+      } else {
+        aiSummary.textContent = data.aiInsightsStatus?.status === 'unavailable'
+          ? 'Personalized AI insights are unavailable right now. The deterministic assessment score and feedback are still shown.'
+          : 'Personalized AI insights are temporarily unavailable. Deterministic assessment scores remain available.';
+      }
     }
 
     document.getElementById('btnRetake').addEventListener('click', () => {
       userAnswers = {};
+      questions = [];
+      activeAssessmentSessionId = null;
       document.getElementById('resultsCard').style.display = 'none';
-      document.getElementById('questionCard').style.display = 'block';
-      renderQuestion(0);
+      document.getElementById('assessmentSetupCard').style.display = 'block';
+      document.getElementById('questionSource').textContent = '';
     });
 
     document.addEventListener('DOMContentLoaded', initAssessment);

@@ -7,6 +7,7 @@
     <title>Login — CareerHub AI Placement Platform</title>
     <link rel="icon" type="image/png" href="assets/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -185,15 +186,6 @@
         
         <div id="errorMessage" class="error-message" style="display: none;"></div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-            <button type="button" class="btn-login" style="background: linear-gradient(135deg, #ffa116, #ea580c); margin: 0; padding: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 15px rgba(254, 161, 22, 0.3);" onclick="leetCodeLogin()">
-                <i class="fas fa-code"></i> Login with LeetCode
-            </button>
-            <button type="button" class="btn-login" style="background: linear-gradient(135deg, #10b981, #059669); margin: 0; padding: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);" onclick="quickDemoLogin()">
-                <i class="fas fa-bolt"></i> Instant Demo
-            </button>
-        </div>
-
         <div style="display: flex; align-items: center; margin: 15px 0; color: rgba(255,255,255,0.4); font-size: 12px;">
             <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.15);"></div>
             <span style="padding: 0 10px;">or sign in with email</span>
@@ -203,12 +195,12 @@
         <form id="loginForm" onsubmit="event.preventDefault(); login();">
             <div class="input-group">
                 <label><i class="fas fa-envelope"></i> Email Address</label>
-                <input type="email" id="email" value="demo@example.com" placeholder="Enter your email" required autocomplete="email">
+                <input type="email" id="email" placeholder="Enter your email" required autocomplete="email">
             </div>
             
             <div class="input-group">
                 <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="password" value="password123" placeholder="Enter your password" required autocomplete="current-password">
+                <input type="password" id="password" placeholder="Enter your password" required autocomplete="current-password">
             </div>
             
             <button type="submit" class="btn-login" id="loginBtn">
@@ -217,73 +209,21 @@
         </form>
         
         <div class="register-link">
-            Don't have an account? <a href="register.html">Create Account</a>
+            Don't have an account? <a href="/register">Create Account</a>
         </div>
     </div>
     
     <script>
         const BASE_URL = window.location.origin;
 
-        async function leetCodeLogin() {
-            const username = prompt("Enter your official LeetCode handle (e.g. neal_wu or your username):");
-            if (!username || !username.trim()) return;
-
-            const cleanUser = username.trim();
-            const loginBtn = document.getElementById('loginBtn');
-            if (loginBtn) {
-                loginBtn.disabled = true;
-                loginBtn.innerHTML = '<span class="spinner"></span> Syncing LeetCode...';
-            }
-
-            try {
-                // Fetch LeetCode stats
-                const lcRes = await fetch(`${BASE_URL}/api/user/leetcode/${encodeURIComponent(cleanUser)}`);
-                const lcData = await lcRes.json();
-
-                // Authenticate demo candidate session
-                const authRes = await fetch(`${BASE_URL}/api/auth/demo`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const authData = await authRes.json();
-
-                if (authData.token) {
-                    localStorage.setItem('token', authData.token);
-                    localStorage.setItem('userName', cleanUser);
-                    localStorage.setItem('leetcodeUsername', cleanUser);
-                    if (lcData.success) {
-                        localStorage.setItem('leetcodeStats', JSON.stringify(lcData));
-                    }
-                    window.location.href = 'dashboard.html?section=coding&synced=true';
-                } else {
-                    quickDemoLogin();
-                }
-            } catch (e) {
-                quickDemoLogin();
-            }
+        function postLoginPath() {
+            const requested = new URLSearchParams(window.location.search).get('next');
+            return requested && requested.startsWith('/') && !requested.startsWith('//') &&
+                !requested.startsWith('/login') && !requested.startsWith('/register')
+                ? requested
+                : '/dashboard';
         }
 
-        async function quickDemoLogin() {
-            try {
-                const response = await fetch(`${BASE_URL}/api/auth/demo`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    if (data.user) {
-                        localStorage.setItem('userName', data.user.name);
-                    }
-                    window.location.href = 'dashboard.html';
-                } else {
-                    login();
-                }
-            } catch (e) {
-                login();
-            }
-        }
-        
         async function login() {
             const email = document.getElementById('email').value;
             const password = document.getElementById('password').value;
@@ -318,8 +258,7 @@
                         localStorage.setItem('userName', data.user.name);
                     }
                     
-                    // Redirect to dashboard
-                    window.location.href = 'dashboard.html';
+                    window.location.href = postLoginPath();
                 } else {
                     showError(data.message || 'Login failed. Please check your credentials.');
                     loginBtn.disabled = false;
@@ -345,7 +284,7 @@
         
         // Check if already logged in
         if (localStorage.getItem('token')) {
-            window.location.href = 'dashboard.html';
+            window.location.href = postLoginPath();
         }
     </script>
 </body>

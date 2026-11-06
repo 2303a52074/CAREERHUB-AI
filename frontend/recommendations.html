@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Career Recommendations</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .reco-layout { max-width: 960px; margin: 0 auto; }
+    .reco-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      margin-bottom: 1.25rem;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .reco-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-card); }
+    .reco-card.top-match { border-color: rgba(16,185,129,0.35); }
+    .reco-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.25rem; gap: 1rem; }
+    .reco-left { flex: 1; }
+    .reco-rank { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.35rem; }
+    .reco-title { font-size: 1.25rem; font-weight: 700; color: #fff; }
+    .reco-score-ring {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column;
+      position: relative; flex-shrink: 0;
+    }
+    .reco-score-val { font-size: 1.4rem; font-weight: 800; color: #fff; line-height: 1; }
+    .reco-score-label { font-size: 0.62rem; color: var(--text-muted); font-weight: 600; }
+    .why-box {
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.25rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+      border-left: 3px solid var(--text-cyan);
+    }
+    .skills-section-title { font-size: 0.72rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 0.5rem; }
+    .skill-pills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+    .pill-green { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; }
+    .pill-red { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.25); font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; }
+    .pill-yellow { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); font-size: 0.75rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; }
+    .priority-skills { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .priority-chip {
+      display: flex; align-items: center; gap: 0.35rem;
+      background: rgba(99,102,241,0.1); color: #818cf8;
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 6px; padding: 0.3rem 0.7rem;
+      font-size: 0.75rem; font-weight: 600;
+    }
+    .reco-actions { display: flex; gap: 0.75rem; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }
+    .btn-set-target {
+      padding: 0.65rem 1.5rem;
+      background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+      border: none; border-radius: 8px;
+      color: #fff; font-size: 0.88rem; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-set-target:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,210,255,0.3); }
+    .btn-set-target.current { background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); color: #34d399; cursor: default; transform: none; box-shadow: none; }
+    .btn-view-roadmap {
+      padding: 0.65rem 1.25rem;
+      background: transparent; border: 1px solid var(--border-subtle);
+      border-radius: 8px; color: var(--text-secondary);
+      font-size: 0.88rem; cursor: pointer; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 0.4rem;
+    }
+    .btn-view-roadmap:hover { border-color: var(--border-hover); color: #fff; }
+    .top-badge {
+      position: absolute; top: -10px; right: 1.5rem;
+      background: linear-gradient(135deg, #34d399, #059669);
+      color: #fff; font-size: 0.68rem; font-weight: 700;
+      padding: 0.2rem 0.75rem; border-radius: 20px; text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .methodology-box {
+      background: rgba(56,189,248,0.05);
+      border: 1px solid rgba(56,189,248,0.15);
+      border-radius: 10px; padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem; font-size: 0.82rem; color: var(--text-muted);
+      line-height: 1.6;
+    }
+    .profile-snapshot {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+      display: flex; gap: 2rem; flex-wrap: wrap;
+    }
+    .snapshot-item { flex: 1; min-width: 120px; }
+    .snapshot-label { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700; margin-bottom: 0.3rem; }
+    .snapshot-value { font-size: 0.92rem; color: #fff; font-weight: 600; }
+  </style>
+</head>
+<body data-page-title="Career Recommendations" data-page-subtitle="Role matches calculated from your profile and skills">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        <div class="reco-layout">
+
+          <!-- Methodology note -->
+          <div class="methodology-box">
+            <strong style="color:#38bdf8;">How recommendations work:</strong> Each role is scored using a transparent content-based algorithm:
+            <strong>Skill Overlap (60%)</strong> — how many required skills you already have,
+            <strong>Education Alignment (20%)</strong> — degree and CGPA fit,
+            <strong>Experience Relevance (20%)</strong> — internship and project alignment.
+            Scores reflect your current profile and will update as you add skills.
+          </div>
+
+          <!-- Profile Snapshot -->
+          <p id="recommendationAiStatus" class="methodology-box" role="status" aria-live="polite">Checking personalized guidance status...</p>
+          <div class="profile-snapshot" id="profileSnapshot">
+            <div class="snapshot-item">
+              <div class="snapshot-label">Current Target Role</div>
+              <div class="snapshot-value" id="snapTargetRole">Loading...</div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">Technical Skills</div>
+              <div class="snapshot-value" id="snapSkillCount">—</div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">CGPA</div>
+              <div class="snapshot-value" id="snapCgpa">—</div>
+            </div>
+            <div class="snapshot-item">
+              <div class="snapshot-label">Experience</div>
+              <div class="snapshot-value" id="snapExp">—</div>
+            </div>
+          </div>
+
+          <!-- Recommendations List -->
+          <div id="recoContainer">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+              <div style="font-size:2rem;margin-bottom:0.75rem;">🎯</div>
+              Analyzing your profile...
+            </div>
+          </div>
+
+          <!-- Update Profile CTA -->
+          <div style="text-align:center;margin-top:2rem;padding:1.5rem;background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-md);">
+            <p style="color:var(--text-muted);font-size:0.85rem;margin-bottom:0.75rem;">Recommendations improve as you complete your profile</p>
+            <a href="/profile" class="btn-set-target" style="text-decoration:none;display:inline-block;">Complete Your Profile →</a>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    let currentTargetRole = '';
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+
+    async function loadRecommendations() {
+      try {
+        const [recoRes, profileRes] = await Promise.all([
+          fetch('/api/career/recommendations', { headers }),
+          fetch('/api/career/profile', { headers })
+        ]);
+
+        if (profileRes.ok) {
+          const data = await profileRes.json();
+          const u = data.user || data;
+          currentTargetRole = u.targetRole || '';
+          document.getElementById('snapTargetRole').textContent = u.targetRole || 'Not Set';
+          document.getElementById('snapSkillCount').textContent = `${(u.technicalSkills || []).length} skills`;
+          document.getElementById('snapCgpa').textContent = u.cgpa || 'Not Set';
+          document.getElementById('snapExp').textContent = (u.experience || []).length > 0
+            ? `${(u.experience || []).length} position${(u.experience || []).length > 1 ? 's' : ''}`
+            : 'No experience yet';
+        }
+
+        if (!recoRes.ok) throw new Error('Failed to load recommendations');
+        const data = await recoRes.json();
+        const recos = data.recommendations || data;
+        const aiStatus = document.getElementById('recommendationAiStatus');
+        aiStatus.textContent = data.aiAdviceStatus?.status === 'generated'
+          ? 'Personalized explanations generated with AI. Match scores are calculated from your profile using the methodology above.'
+          : data.aiAdviceStatus?.status === 'unavailable'
+            ? 'AI explanations are currently unavailable. Calculated role matches remain available.'
+            : 'AI explanations are temporarily unavailable. Role match scores are calculated independently.';
+
+        if (!recos || recos.length === 0) {
+          document.getElementById('recoContainer').innerHTML = `
+            <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+              <div style="font-size:2rem;margin-bottom:0.75rem;">⚠️</div>
+              Could not generate recommendations. Please complete your profile first.
+            </div>`;
+          return;
+        }
+
+        renderRecommendations(recos);
+      } catch (e) {
+        console.error(e);
+        document.getElementById('recoContainer').innerHTML = `
+          <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+            Failed to load recommendations. <a href="/profile" style="color:#00d2ff;">Complete your profile</a> and try again.
+          </div>`;
+      }
+    }
+
+    function renderRecommendations(recos) {
+      const container = document.getElementById('recoContainer');
+      container.innerHTML = recos.map((r, i) => {
+        const isTop = i === 0;
+        const isCurrent = r.role === currentTargetRole;
+        const score = r.matchScore || 0;
+        const scoreColor = score >= 75 ? '#34d399' : score >= 55 ? '#00d2ff' : '#fbbf24';
+
+        return `
+          <div class="reco-card ${isTop ? 'top-match' : ''}">
+            ${isTop ? '<div class="top-badge">⭐ Best Match</div>' : ''}
+
+            <div class="reco-header">
+              <div class="reco-left">
+                <div class="reco-rank">#${i + 1} Recommended Role</div>
+                <div class="reco-title">${escapeHtml(r.role)}</div>
+              </div>
+              <div class="reco-score-ring" style="background: conic-gradient(${scoreColor} ${score}%, rgba(255,255,255,0.06) 0%);">
+                <div style="position:absolute;width:62px;height:62px;border-radius:50%;background:var(--surface-card);"></div>
+                <div style="position:relative;text-align:center;">
+                  <div class="reco-score-val" style="color:${scoreColor};">${score}%</div>
+                  <div class="reco-score-label">Match</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="why-box">
+              💡 ${escapeHtml(r.whyRecommended || 'Based on your current skill profile and education background.')}
+            </div>
+            ${r.aiExplanation ? `<div class="why-box" style="border-left-color:#818cf8;"><strong>AI guidance:</strong> ${escapeHtml(r.aiExplanation)}${(r.aiNextSteps || []).length ? `<ul>${r.aiNextSteps.map(step => `<li>${escapeHtml(step)}</li>`).join('')}</ul>` : ''}</div>` : ''}
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1rem;">
+              <div>
+                <div class="skills-section-title">✅ Skills You Have (${(r.matchedSkills || []).length})</div>
+                <div class="skill-pills">
+                  ${(r.matchedSkills || []).length > 0
+                    ? (r.matchedSkills || []).map(s => `<span class="pill-green">${escapeHtml(s)}</span>`).join('')
+                    : '<span style="font-size:0.8rem;color:var(--text-muted);">None matched yet</span>'}
+                </div>
+              </div>
+              <div>
+                <div class="skills-section-title">❌ Skills Needed (${(r.missingSkills || []).length})</div>
+                <div class="skill-pills">
+                  ${(r.missingSkills || []).length > 0
+                    ? (r.missingSkills || []).slice(0, 6).map(s => `<span class="pill-red">${escapeHtml(s)}</span>`).join('')
+                    : '<span style="font-size:0.8rem;color:#34d399;">All core skills matched!</span>'}
+                </div>
+              </div>
+            </div>
+
+            ${(r.prioritySkills || r.prioritySkillsToLearn || []).length > 0 ? `
+              <div>
+                <div class="skills-section-title">🎯 Priority Skills to Learn</div>
+                <div class="priority-skills">
+                  ${(r.prioritySkills || r.prioritySkillsToLearn || []).map(s => `<span class="priority-chip">🔥 ${escapeHtml(s)}</span>`).join('')}
+                </div>
+              </div>
+            ` : ''}
+
+            <div class="reco-actions">
+              ${isCurrent
+                ? `<button class="btn-set-target current" disabled>✅ Current Target Role</button>`
+                : `<button class="btn-set-target" onclick="setTargetRole('${r.role}', this)">Set as Target Role</button>`
+              }
+              <a href="/skills" class="btn-view-roadmap">📊 View Skill Gap →</a>
+              <a href="/roadmap" class="btn-view-roadmap">🗺️ View Roadmap →</a>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    window.setTargetRole = async function(role, btn) {
+      btn.disabled = true;
+      btn.textContent = 'Updating...';
+      try {
+        const res = await fetch('/api/career/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ targetRole: role })
+        });
+        if (res.ok) {
+          currentTargetRole = role;
+          window.showToast(`Target role set to "${role}" ✅`, 'success');
+          document.getElementById('snapTargetRole').textContent = role;
+          // Update all buttons
+          document.querySelectorAll('.btn-set-target:not(.current)').forEach(b => {
+            b.disabled = false;
+            b.textContent = 'Set as Target Role';
+            b.classList.remove('current');
+          });
+          btn.textContent = '✅ Current Target Role';
+          btn.classList.add('current');
+        } else {
+          window.showToast('Failed to update target role.', 'error');
+          btn.disabled = false;
+          btn.textContent = 'Set as Target Role';
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Network error.', 'error');
+        btn.disabled = false;
+        btn.textContent = 'Set as Target Role';
+      }
+    };
+
+    document.addEventListener('DOMContentLoaded', loadRecommendations);
+  </script>
+</body>
+</html>

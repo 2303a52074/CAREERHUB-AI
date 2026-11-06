@@ -1,118 +1,13 @@
-<!--Develop a coding editor interface using Monaco Editor with multi-language support -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Coding Arena — CareerHub AI</title>
-    <link rel="icon" type="image/png" href="assets/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/editor/editor.main.min.css">
-    <style>
-        :root { --primary: #00d2ff; --bg: #060b17; --glass: rgba(14,25,48,0.7); }
-        body { margin: 0; background: var(--bg); color: white; font-family: 'Plus Jakarta Sans', sans-serif; height: 100vh; overflow: hidden; }
-        
-        .layout { display: flex; height: 100vh; }
-        
-        /* Left Panel: Problem Stats */
-        .problem-side { width: 40%; padding: 30px; border-right: 1px solid rgba(56, 189, 248, 0.15); overflow-y: auto; background: #080f20; }
-        .difficulty { color: #38bdf8; font-weight: bold; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; }
-        
-        /* Right Panel: Editor & Console */
-        .editor-side { flex: 1; display: flex; flex-direction: column; position: relative; }
-        .toolbar { padding: 12px 24px; background: #0b1428; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(56, 189, 248, 0.15); }
-        #monaco-editor { flex: 1; border-bottom: 2px solid rgba(56, 189, 248, 0.15); }
-        
-        /* Console/Terminal Area */
-        .console { height: 200px; background: #040812; padding: 15px; font-family: 'Fira Code', monospace; font-size: 14px; overflow-y: auto; }
-        .output-line { color: #8da4c4; margin-bottom: 5px; }
-        .output-success { color: #34d399; }
-        .output-error { color: #f87171; }
-
-        .btn-run { background: linear-gradient(135deg, #00d2ff, #2563eb); border: none; color: white; padding: 9px 22px; border-radius: 999px; cursor: pointer; font-weight: 700; box-shadow: 0 4px 15px rgba(0,210,255,0.3); transition: 0.3s; }
-        .btn-run:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,210,255,0.5); }
-        .btn-ai { background: rgba(56, 189, 248, 0.15); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8; padding: 9px 20px; border-radius: 999px; cursor: pointer; font-weight: 600; margin-right: 10px; transition: 0.3s; }
-        .btn-ai:hover { background: rgba(56, 189, 248, 0.25); color: #00d2ff; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="refresh" content="0;url=/coding">
+  <title>LeetCode Progress — CareerHub AI</title>
+  <script>window.location.replace('/coding');</script>
 </head>
 <body>
-
-<div class="layout">
-    <div class="problem-side">
-        <a href="index.html" style="display: inline-flex; align-items: center; gap: 10px; text-decoration: none; margin-bottom: 24px;">
-            <img src="assets/logo.png" alt="CareerHub AI" style="width: 36px; height: 36px; border-radius: 10px; box-shadow: 0 0 12px rgba(0, 210, 255, 0.4);">
-            <span style="color: #ffffff; font-weight: 800; font-size: 16px;">CareerHub <span style="color: #00d2ff;">AI</span></span>
-        </a>
-        <br>
-        <span class="difficulty">Medium • LeetCode 1</span>
-        <h1 style="font-size: 24px; margin: 12px 0 16px;">Two Sum Challenge</h1>
-        <p style="color: #cbd5e1; line-height: 1.6;">Given an array of integers <code>nums</code> and an integer <code>target</code>, return indices of the two numbers such that they add up to <code>target</code>.</p>
-        <div style="background: var(--glass); border: 1px solid rgba(56, 189, 248, 0.15); padding: 18px; border-radius: 14px; margin-top: 24px; font-size: 14px; line-height: 1.6;">
-            <strong style="color: #00d2ff;">Example 1:</strong><br>
-            <code>Input: nums = [2,7,11,15], target = 9</code><br>
-            <code>Output: [0,1]</code><br>
-            <span style="color: #8da4c4; font-size: 12px;">Explanation: Because nums[0] + nums[1] == 9, we return [0, 1].</span>
-        </div>
-    </div>
-
-    <div class="editor-side">
-        <div class="toolbar">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <select style="background: #14223d; color: white; border: 1px solid rgba(56, 189, 248, 0.25); padding: 7px 16px; border-radius: 8px; outline: none;">
-                    <option>JavaScript (Node.js)</option>
-                    <option>Python 3</option>
-                </select>
-                <a href="dashboard.html" style="color: #8da4c4; text-decoration: none; font-size: 13px; font-weight: 600; margin-left: 8px;">
-                    <i class="fas fa-arrow-left"></i> Cockpit
-                </a>
-            </div>
-            <div>
-                <button class="btn-ai" onclick="getAIHint()"><i class="fas fa-brain"></i> AI Hint</button>
-                <button class="btn-run" onclick="submitCode()">Run Code <i class="fas fa-play"></i></button>
-            </div>
-        </div>
-        
-        <div id="monaco-editor"></div>
-
-        <div class="console" id="console-output">
-            <div class="output-line">> Console initialized. Ready for input.</div>
-        </div>
-    </div>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
-<script>
-    require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs' }});
-    let editor;
-
-    require(['vs/editor/editor.main'], function() {
-        editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-            value: "function twoSum(nums, target) {\n    // Type your solution here\n    \n}",
-            language: 'javascript',
-            theme: 'vs-dark',
-            automaticLayout: true,
-            fontSize: 16
-        });
-    });
-
-    async function submitCode() {
-        const code = editor.getValue();
-        const outputDiv = document.getElementById('console-output');
-        outputDiv.innerHTML += `<div class="output-line">> Running test cases...</div>`;
-
-        const response = await fetch('/api/coding/run', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, language: 'javascript' })
-        });
-        const result = await response.json();
-        
-        if(result.success) {
-            outputDiv.innerHTML += `<div class="output-success">✓ Test Cases Passed! Output: ${result.output}</div>`;
-        } else {
-            outputDiv.innerHTML += `<div class="output-error">✗ Error: ${result.error}</div>`;
-        }
-    }
-</script>
+  <p>Coding execution is no longer available. <a href="/coding">Open LeetCode Progress</a> for verified profile links and CareerHub practice history.</p>
 </body>
 </html>

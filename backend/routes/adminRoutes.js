@@ -8,7 +8,7 @@ const router = express.Router();
 
 router.get('/users', authMiddleware, adminMiddleware, async (req, res) => {
 
-    const users = await User.find().select('-password');
+    const users = await User.find().select('-password -calendarRefreshToken');
     res.json(users);
 });
 

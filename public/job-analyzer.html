@@ -114,6 +114,9 @@
               </div>
             </div>
 
+            <p id="jobAnalyzerAiStatus" class="methodology-box" role="status" aria-live="polite"></p>
+            <p id="jobAnalyzerAiSummary" class="why-box" style="display:none;"></p>
+
             <!-- Skills Comparison -->
             <div style="margin-bottom:1.25rem;">
               <h4 style="font-size:0.82rem;font-weight:700;color:#34d399;margin-bottom:0.4rem;">
@@ -154,6 +157,9 @@
   <script src="/assets/shared-nav.js"></script>
   <script>
     let lastAnalysisData = null;
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -197,27 +203,36 @@
 
     function renderResults(data) {
       document.getElementById('resultsCard').style.display = 'block';
-      document.getElementById('resMatchVal').innerText = `${data.overallMatch || 75}%`;
-      document.getElementById('resTitleHeader').innerText = `${data.jobTitle || 'Software Engineer'} at ${data.company || 'Hiring Co'}`;
-      document.getElementById('resVerdictText').innerText = data.readinessVerdict || 'High candidate alignment';
+      document.getElementById('resMatchVal').innerText = data.overallMatch == null ? 'Not calculated' : `${data.overallMatch}%`;
+      document.getElementById('resTitleHeader').innerText = [data.jobTitle, data.company].filter(Boolean).join(' at ') || 'Job description analysis';
+      document.getElementById('resVerdictText').innerText = data.readinessVerdict || 'Analysis complete';
+      document.getElementById('jobAnalyzerAiStatus').textContent =
+        data.aiAdviceStatus?.status === 'generated'
+          ? 'AI-generated recommendations and questions are shown below. Match overlap is calculated independently from recognized requirements and your profile.'
+          : data.aiAdviceStatus?.status === 'unavailable'
+            ? 'AI preparation guidance is currently unavailable. The calculated requirement overlap is still shown.'
+            : 'AI preparation guidance is currently unavailable. The displayed overlap is calculated from the supplied description.';
+      const summaryBox = document.getElementById('jobAnalyzerAiSummary');
+      summaryBox.style.display = data.aiSummary ? 'block' : 'none';
+      summaryBox.textContent = data.aiSummary || '';
 
       const matchBox = document.getElementById('matchedSkillsBox');
       const matched = data.matchedSkills || [];
       matchBox.innerHTML = matched.length > 0
-        ? matched.map(s => `<span class="pill-tag pill-match">${s}</span>`).join('')
+        ? matched.map(s => `<span class="pill-tag pill-match">${escapeHtml(s)}</span>`).join('')
         : '<span style="color:var(--text-muted);font-size:0.8rem;">None detected</span>';
 
       const missBox = document.getElementById('missingSkillsBox');
       const missing = data.missingSkills || [];
       missBox.innerHTML = missing.length > 0
-        ? missing.map(s => `<span class="pill-tag pill-miss">${s}</span>`).join('')
+        ? missing.map(s => `<span class="pill-tag pill-miss">${escapeHtml(s)}</span>`).join('')
         : '<span style="color:#34d399;font-size:0.8rem;">No critical missing technologies!</span>';
 
       const recList = document.getElementById('recommendationsList');
-      recList.innerHTML = (data.recommendations || []).map(r => `<li>● ${r}</li>`).join('');
+      recList.innerHTML = (data.recommendations || []).map(r => `<li>● ${escapeHtml(r)}</li>`).join('');
 
       const qList = document.getElementById('interviewQuestionsList');
-      qList.innerHTML = (data.interviewQuestions || []).map(q => `<li>💬 "${q}"</li>`).join('');
+      qList.innerHTML = (data.interviewQuestions || []).map(q => `<li>💬 "${escapeHtml(q)}"</li>`).join('');
     }
 
     // Save to Application Tracker
@@ -230,16 +245,20 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
           body: JSON.stringify({
-            company: lastAnalysisData.company || 'Company',
-            jobRole: lastAnalysisData.jobTitle || 'Software Engineer',
-            status: 'Applied',
-            matchPercentage: lastAnalysisData.overallMatch || 85,
-            notes: `Saved from Job Description Analyzer. Match: ${lastAnalysisData.overallMatch}%`
+            company: lastAnalysisData.company || 'Unspecified company',
+            jobRole: lastAnalysisData.jobTitle || 'Unspecified role',
+            status: 'Saved',
+            matchPercentage: lastAnalysisData.overallMatch ?? null,
+            notes: `Saved from Job Description Analyzer. Match: ${
+              Number.isFinite(lastAnalysisData.overallMatch)
+                ? `${lastAnalysisData.overallMatch}%`
+                : 'not calculated'
+            }`
           })
         });
 
         if (res.ok) {
-          window.showToast('Application tracked successfully!', 'success');
+          window.showToast('Analysis saved to your application tracker.', 'success');
           setTimeout(() => window.location.href = '/applications', 800);
         } else {
           window.showToast('Failed to save application.', 'error');

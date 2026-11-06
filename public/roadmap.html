@@ -127,7 +127,7 @@
           <div>
             <span style="font-size:0.75rem;font-weight:700;color:var(--text-accent);text-transform:uppercase;">Custom Career Pathway</span>
             <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0.25rem 0 0.5rem;" id="roadmapRoleTitle">
-              Full Stack Developer Pathway
+              Career Pathway
             </h2>
             <p style="font-size:0.85rem;color:var(--text-muted);">
               Track and conquer each technical milestone to achieve comprehensive placement readiness.
@@ -142,6 +142,7 @@
             <div style="height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;">
               <div id="roadmapProgressBar" style="width:0%;height:100%;background:var(--gradient-primary);transition:width 0.6s ease;"></div>
             </div>
+            <p id="roadmapSourceStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:0.7rem;"></p>
           </div>
         </div>
 
@@ -159,6 +160,10 @@
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
+
     async function loadRoadmap() {
       try {
         const res = await fetch('/api/career/roadmap', { headers });
@@ -166,18 +171,31 @@
           const roadmap = await res.json();
           renderRoadmap(roadmap);
         } else {
-          document.getElementById('phasesContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load roadmap.</div>';
+          const error = await res.json().catch(() => ({}));
+          const message = escapeHtml(error.message || 'Unable to load roadmap.');
+          const action = error.actionUrl
+            ? ` <a href="${escapeHtml(error.actionUrl)}">Choose a target role</a>.`
+            : '';
+          document.getElementById('phasesContainer').innerHTML =
+            `<div style="padding:2rem;text-align:center;color:var(--text-muted);">${message}${action}</div>`;
         }
       } catch (e) {
         console.error('Roadmap fetch error:', e);
+        document.getElementById('phasesContainer').innerHTML =
+          '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Could not load your career roadmap. Please retry.</div>';
       }
     }
 
     function renderRoadmap(data) {
-      document.getElementById('roadmapRoleTitle').innerText = `${data.targetRole || 'Full Stack Developer'} Pathway`;
+      document.getElementById('roadmapRoleTitle').innerText = `${data.targetRole || 'Career'} Pathway`;
       const progress = data.progressPercentage || 0;
       document.getElementById('roadmapPercentText').innerText = `${progress}% Complete`;
       document.getElementById('roadmapProgressBar').style.width = `${progress}%`;
+      document.getElementById('roadmapSourceStatus').textContent = data.generationSource === 'openrouter'
+        ? 'AI-personalized roadmap. Progress is based on saved milestone completion.'
+        : data.aiGenerationStatus && data.aiGenerationStatus !== 'not_configured' && data.aiGenerationStatus !== 'generated'
+          ? 'AI roadmap generation was unavailable when this roadmap was created; the curated starter pathway is shown.'
+          : 'Curated starter pathway. AI-personalized milestones are temporarily unavailable.';
 
       const phases = data.phases || [];
       const container = document.getElementById('phasesContainer');
@@ -188,10 +206,10 @@
         return `
           <div class="phase-card ${isAllDone ? 'phase-completed' : ''}">
             <div class="phase-header">
-              <h3 class="phase-title">${phase.title}</h3>
+              <h3 class="phase-title">${escapeHtml(phase.title)}</h3>
               <span class="phase-status-badge ${statusClass}">${phase.status || 'Pending'}</span>
             </div>
-            <p class="phase-desc">${phase.description}</p>
+            <p class="phase-desc">${escapeHtml(phase.description)}</p>
 
             <div class="milestones-list">
               ${(phase.milestones || []).map(m => `
@@ -199,8 +217,8 @@
                   <div class="milestone-checkbox">
                     ${m.completed ? '✓' : ''}
                   </div>
-                  <span class="milestone-text">${m.title}</span>
-                  <span style="font-size:0.7rem;color:var(--text-accent);font-weight:600;">+25 XP</span>
+                  <span class="milestone-text">${escapeHtml(m.title)}${m.completionCriteria ? `<small style="display:block;color:var(--text-muted);margin-top:0.2rem;">Done when: ${escapeHtml(m.completionCriteria)}</small>` : ''}</span>
+                  <span style="font-size:0.7rem;color:var(--text-accent);font-weight:600;">${Number.isFinite(m.estimatedHours) ? `${m.estimatedHours}h` : 'Progress'}</span>
                 </div>
               `).join('')}
             </div>
@@ -220,7 +238,7 @@
 
         if (res.ok) {
           const data = await res.json();
-          window.showToast(completed ? 'Milestone completed! +25 XP awarded' : 'Milestone marked incomplete', 'success');
+          window.showToast(completed ? 'Milestone completed' : 'Milestone marked incomplete', 'success');
           renderRoadmap(data.roadmap);
         } else {
           window.showToast('Failed to update milestone', 'error');

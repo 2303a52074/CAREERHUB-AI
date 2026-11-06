@@ -2,452 +2,733 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CareerHub AI — AI Mock Interview</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <title>Mock Interview Studio — CareerHub AI</title>
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/assets/shared-nav.css">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .interview-layout {
-      max-width: 960px;
-      margin: 0 auto;
-    }
-    .setup-card {
-      background: var(--surface-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2rem;
-      margin-bottom: 2rem;
-    }
-    .setup-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.25rem;
-      margin-top: 1.25rem;
-      margin-bottom: 1.5rem;
-    }
-    .select-group label {
-      display: block;
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      margin-bottom: 0.4rem;
-      text-transform: uppercase;
-    }
-    .interview-select {
-      width: 100%;
-      padding: 0.75rem 1rem;
-      background: rgba(6, 11, 23, 0.75);
-      border: 1px solid var(--border-subtle);
-      border-radius: 8px;
-      color: #fff;
-      font-size: 0.9rem;
-      outline: none;
-    }
-    .chamber-card {
-      background: var(--surface-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2.25rem;
-      display: none;
-    }
-    .speaker-wave {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      font-size: 0.85rem;
-      color: #38bdf8;
-      cursor: pointer;
-    }
-    .answer-textarea {
-      width: 100%;
-      height: 160px;
-      padding: 1.25rem;
-      background: rgba(6, 11, 23, 0.8);
-      border: 1px solid var(--border-subtle);
-      border-radius: 10px;
-      color: #fff;
-      font-family: inherit;
-      font-size: 0.95rem;
-      line-height: 1.6;
-      resize: vertical;
-      outline: none;
-      margin-bottom: 1.5rem;
-    }
-    .answer-textarea:focus {
-      border-color: var(--border-glow);
-    }
-    .mic-button {
-      padding: 0.75rem 1.5rem;
-      border-radius: var(--radius-full);
-      background: rgba(239, 68, 68, 0.15);
-      border: 1px solid rgba(239, 68, 68, 0.35);
-      color: #f87171;
-      font-weight: 700;
-      font-size: 0.88rem;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      transition: all 0.2s ease;
-    }
-    .mic-button.recording {
-      background: #ef4444;
-      color: #fff;
-      box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
-      animation: pulseMic 1.5s infinite;
-    }
-    @keyframes pulseMic {
-      0% { transform: scale(1); }
-      50% { transform: scale(1.05); }
-      100% { transform: scale(1); }
-    }
-    .feedback-box {
-      margin-top: 1.5rem;
-      padding: 1.25rem;
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.02);
-      border: 1px solid var(--border-subtle);
-      display: none;
-    }
-    .scorecard-card {
-      background: var(--surface-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 2.25rem;
-      text-align: center;
-      display: none;
-    }
-    @media (max-width: 768px) {
-      .setup-grid { grid-template-columns: 1fr; }
-    }
+    .interview-page { max-width: 1180px; margin: 0 auto; }
+    .interview-hero { display:flex; justify-content:space-between; align-items:flex-end; gap:1.5rem; margin-bottom:1.5rem; }
+    .interview-hero h1 { margin:0; font-size:clamp(1.7rem,3vw,2.35rem); color:#f5f8ff; letter-spacing:-.04em; }
+    .interview-hero p { margin:.45rem 0 0; max-width:700px; color:var(--text-secondary); line-height:1.6; }
+    .provider-status { max-width:100%; font-size:.78rem; color:#9ab0c8; border:1px solid var(--border-subtle); background:rgba(8,19,34,.7); border-radius:10px; padding:.55rem .8rem; white-space:normal; overflow-wrap:anywhere; }
+    .provider-status[data-state="ready"] { color:#74e2c0; }
+    .provider-status[data-state="unavailable"] { color:#f8c97a; }
+    .panel { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:16px; padding:clamp(1rem,2.4vw,1.65rem); box-shadow:0 16px 40px rgba(0,0,0,.12); }
+    .panel-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin-bottom:1.15rem; }
+    .panel-heading h2,.panel-heading h3 { margin:0; color:#f4f7fd; }
+    .panel-heading p { margin:.35rem 0 0; color:var(--text-muted); font-size:.88rem; line-height:1.55; }
+    .mode-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.75rem; margin-bottom:1.3rem; }
+    .mode-option { display:block; position:relative; min-width:0; cursor:pointer; }
+    .mode-option input { position:absolute; width:1px; height:1px; opacity:0; overflow:hidden; clip-path:inset(50%); }
+    .mode-card { display:block; height:100%; min-height:148px; padding:1.1rem; border:1px solid var(--border-subtle); border-radius:12px; background:rgba(7,17,31,.62); transition:border-color .15s ease,background .15s ease; }
+    .mode-option input:checked + .mode-card { border-color:#38bdf8; background:rgba(14,51,77,.42); box-shadow:inset 0 0 0 1px rgba(56,189,248,.14); }
+    .mode-option input:focus-visible + .mode-card { outline:3px solid rgba(56,189,248,.65); outline-offset:2px; }
+    .mode-icon { width:34px; height:34px; display:grid; place-items:center; margin-bottom:.7rem; border:1px solid rgba(103,215,244,.2); border-radius:9px; color:#67d7f4; background:rgba(103,215,244,.07); }
+    .mode-icon svg { display:block; width:19px; height:19px; flex:none; }
+    .mode-card strong { display:block; color:#f5f8ff; font-size:.96rem; }
+    .mode-card small { display:block; margin-top:.35rem; color:var(--text-muted); line-height:1.45; }
+    .setup-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:.85rem; margin-bottom:1.1rem; }
+    .field label { display:block; color:#b6c4d6; font-size:.76rem; font-weight:700; margin-bottom:.4rem; }
+    .field input,.field select,.answer-input { width:100%; box-sizing:border-box; min-height:44px; padding:.72rem .8rem; border:1px solid #263b52; border-radius:9px; background:#081523; color:#f5f8ff; font:inherit; }
+    .field input:focus,.field select:focus,.answer-input:focus { outline:3px solid rgba(56,189,248,.25); border-color:#38bdf8; }
+    .button-row { display:flex; flex-wrap:wrap; align-items:center; gap:.65rem; }
+    .action-button { min-height:42px; border:1px solid #2a4762; border-radius:9px; padding:.65rem .95rem; background:#0c2135; color:#e8f5ff; font:600 .86rem Inter,sans-serif; cursor:pointer; transition:background .15s,border-color .15s; }
+    .action-button:hover:not(:disabled) { background:#123451; border-color:#3981a8; }
+    .action-button:focus-visible { outline:3px solid rgba(56,189,248,.55); outline-offset:2px; }
+    .action-button:disabled { opacity:.5; cursor:not-allowed; }
+    .action-primary { background:#087c9f; border-color:#16a3c8; color:#fff; }
+    .action-primary:hover:not(:disabled) { background:#0992b8; }
+    .action-danger { border-color:#693e49; background:#351c29; color:#ffdce2; }
+    .source-banner,.status-banner { padding:.7rem .85rem; border:1px solid var(--border-subtle); border-radius:9px; background:rgba(7,17,31,.65); color:#b9cadc; font-size:.82rem; line-height:1.5; }
+    .status-banner { margin-top:.8rem; }
+    .status-banner.error { color:#ffc4c4; border-color:#6d343b; background:rgba(77,22,31,.25); }
+    .status-banner.success { color:#9debd4; border-color:#27614e; background:rgba(19,74,57,.22); }
+    .hidden { display:none !important; }
+    .workspace { margin-top:1rem; }
+    .workspace-top { display:flex; justify-content:space-between; gap:1rem; align-items:center; margin-bottom:1rem; }
+    .progress-meta { display:flex; justify-content:space-between; color:#bdcad9; font-size:.83rem; margin-bottom:.45rem; }
+    .progress-track { height:7px; border-radius:99px; background:#17283b; overflow:hidden; }
+    .progress-fill { height:100%; width:0; background:linear-gradient(90deg,#168fbe,#62d9ed); transition:width .2s ease; }
+    .timer { color:#d9e8f4; font-variant-numeric:tabular-nums; font-size:.92rem; font-weight:700; }
+    .question-copy { margin:1.1rem 0; color:#f3f7fc; font-size:clamp(1.1rem,2vw,1.42rem); line-height:1.55; }
+    .mcq-question-header { display:flex; justify-content:space-between; align-items:center; gap:.8rem; margin:.8rem 0 .45rem; color:#9fb5c9; font-size:.78rem; font-weight:700; }
+    .mcq-question-header span:last-child { color:#67d7f4; text-align:right; }
+    .mcq-question-title { margin:0 0 .9rem; color:#f3f7fc; font-size:clamp(1.05rem,1.8vw,1.32rem); line-height:1.5; }
+    .mcq-options { display:grid; gap:.5rem; }
+    .mcq-option { display:flex; align-items:center; gap:.7rem; min-height:46px; border:1px solid #273a50; border-radius:9px; padding:.58rem .75rem; color:#dce7f1; cursor:pointer; line-height:1.4; transition:background .15s,border-color .15s; }
+    .mcq-option:hover { border-color:#43728d; background:rgba(20,54,76,.24); }
+    .mcq-option.selected { border-color:#38bdf8; background:rgba(14,51,77,.42); box-shadow:inset 0 0 0 1px rgba(56,189,248,.12); }
+    .mcq-option:focus-within { outline:2px solid rgba(56,189,248,.55); outline-offset:2px; }
+    .mcq-option input { appearance:auto; flex:0 0 16px; width:16px; height:16px; margin:0; accent-color:#23b7dc; }
+    .mcq-option-letter { display:inline-grid; flex:0 0 24px; width:24px; height:24px; place-items:center; border-radius:6px; background:rgba(148,163,184,.1); color:#aabed2; font-size:.74rem; font-weight:800; }
+    .mcq-option.selected .mcq-option-letter { background:rgba(56,189,248,.16); color:#91e7ff; }
+    .mcq-option-copy { min-width:0; }
+    .workspace-footer { display:flex; justify-content:space-between; gap:.8rem; align-items:center; margin-top:1rem; }
+    .video-grid { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(300px,.88fr); gap:1rem; }
+    .video-frame { min-height:260px; aspect-ratio:16/10; background:#03080e; border:1px solid #24384d; border-radius:12px; display:grid; place-items:center; overflow:hidden; color:#9eb0c1; text-align:center; }
+    .video-frame video { display:block; width:100%; height:100%; min-height:260px; object-fit:cover; transform:scaleX(-1); }
+    .answer-input { min-height:150px; resize:vertical; line-height:1.55; }
+    .record-consent { display:flex; gap:.55rem; align-items:flex-start; margin:.8rem 0; color:#b6c6d6; font-size:.82rem; line-height:1.45; }
+    .recording-indicator { display:inline-flex; align-items:center; gap:.4rem; color:#ff8585; font-size:.8rem; font-weight:700; }
+    .recording-dot { width:8px; height:8px; border-radius:50%; background:#f04444; }
+    .feedback-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; margin-top:.8rem; }
+    .feedback-section { border:1px solid #263a50; border-radius:10px; padding:.8rem; background:rgba(5,14,25,.48); }
+    .feedback-section h4 { margin:0 0 .5rem; color:#d9e9f4; font-size:.82rem; }
+    .feedback-section p,.feedback-section li { color:#aab9c9; font-size:.82rem; line-height:1.5; }
+    .feedback-section ul { padding-left:1.1rem; margin:.2rem 0; }
+    .review-list { display:grid; gap:.7rem; }
+    .review-item { border:1px solid #283c52; border-radius:10px; padding:.85rem; }
+    .review-item h4 { margin:0 0 .45rem; color:#f0f5fb; line-height:1.45; }
+    .review-item p { margin:.35rem 0 0; color:#aebdcd; font-size:.84rem; line-height:1.5; }
+    .history-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.7rem; }
+    .history-card { border:1px solid #263a50; border-radius:10px; padding:.8rem; background:rgba(6,16,28,.6); }
+    .history-card strong { display:block; color:#e8f2fb; }
+    .history-card small { color:#9eafc1; }
+    .role-saved-value { min-height:44px; display:flex; align-items:center; padding:.65rem .8rem; border:1px solid #263b52; border-radius:9px; background:#0c1928; color:#e0edf6; font-size:.84rem; overflow-wrap:anywhere; }
+    .role-override { display:flex; align-items:center; gap:.45rem; margin:.55rem 0; color:#bdcad9; font-size:.75rem; line-height:1.4; cursor:pointer; }
+    .role-override input { width:16px; min-height:16px; height:16px; margin:0; accent-color:#48bdd9; }
+    #overrideRoleInput:disabled { opacity:.6; cursor:not-allowed; }
+    .workspace-top > :is(.source-banner,.button-row) { flex:0 0 auto; }
+    .video-grid > div { min-width:0; }
+    .video-frame { position:relative; width:100%; aspect-ratio:16/10; min-height:220px; height:auto; }
+    .video-frame video { position:absolute; inset:0; width:100%; height:100%; min-height:0; }
+    .mode-option:has(input:checked) .mode-card { border-color:#38bdf8; }
+    .mode-option:has(input:focus-visible) .mode-card { outline:3px solid rgba(56,189,248,.65); outline-offset:2px; }
+    @media (max-width:1050px) { .setup-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .video-grid { grid-template-columns:1fr; } }
+    @media (max-width:820px) { .mode-grid { grid-template-columns:repeat(3,minmax(0,1fr)); } .mode-card { min-height:170px; padding:.85rem; } .mode-card small { font-size:.75rem; } }
+    @media (max-width:640px) { .interview-hero { display:block; } .provider-status { display:inline-block; margin-top:.8rem; } .mode-grid { grid-template-columns:1fr; } .mode-card { min-height:unset; } .setup-grid { grid-template-columns:1fr; } .workspace-top,.workspace-footer { align-items:stretch; flex-direction:column; } .workspace-footer .button-row { justify-content:space-between; } .feedback-grid { grid-template-columns:1fr; } .video-frame { min-height:200px; } }
+    @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; } }
   </style>
 </head>
-<body data-page-title="AI Mock Interview" data-page-subtitle="Real-Time Speech Recognition & Multi-Factor Rubric Scoring">
+<body data-page-title="Mock Interview Studio" data-page-subtitle="Practice, reflect, and improve with honest AI feedback">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
       <div id="header-container"></div>
       <main class="page-container">
-        
-        <div class="interview-layout">
-          <!-- Setup Config Card -->
-          <div class="setup-card" id="setupCard">
-            <h2 style="font-size:1.35rem;font-weight:700;color:#fff;">Simulate Live Technical & Behavioral Interview</h2>
-            <p style="font-size:0.85rem;color:var(--text-muted);margin-top:0.25rem;">
-              Practice under real interview conditions. Toggle Voice Mode to speak naturally with the AI interviewer.
-            </p>
+        <div class="interview-page">
+          <header class="interview-hero">
+            <div>
+              <h1>Interview Studio</h1>
+              <p>Choose a practice format, work through questions generated for your role when AI is available, and get evidence-based feedback. Video stays on your device and is never uploaded.</p>
+            </div>
+            <div class="provider-status" id="providerStatus" data-state="checking" role="status">Checking AI availability…</div>
+          </header>
+
+          <section class="panel" id="setupPanel" aria-labelledby="setupHeading">
+            <div class="panel-heading">
+              <div><h2 id="setupHeading">Choose your practice mode</h2><p>AI-generated questions are identified clearly. If generation is unavailable, curated practice is clearly labeled.</p></div>
+            </div>
+            <fieldset style="border:0;padding:0;margin:0">
+              <legend class="hidden">Interview practice mode</legend>
+              <div class="mode-grid">
+                <label class="mode-option"><input type="radio" name="practiceMode" value="mcq" checked><span class="mode-card"><span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="m15 17 2 2 4-5"/></svg></span><strong>MCQ Practice</strong><small>Timed, scored questions with answer explanations and topic performance.</small></span></label>
+                <label class="mode-option"><input type="radio" name="practiceMode" value="video"><span class="mode-card"><span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3z"/></svg></span><strong>Video Interview</strong><small>Practice beside a local webcam preview. Recording is optional and consent-based.</small></span></label>
+                <label class="mode-option"><input type="radio" name="practiceMode" value="voice"><span class="mode-card"><span class="mode-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4m-4 0h8"/></svg></span><strong>Voice / Behavioral</strong><small>Speak or type a response; optional browser speech transcription.</small></span></label>
+              </div>
+            </fieldset>
 
             <div class="setup-grid">
-              <div class="select-group">
-                <label>Target Role</label>
-                <select id="roleSelect" class="interview-select">
-                  <option value="Full Stack Developer">Full Stack Developer</option>
-                  <option value="Frontend Engineer">Frontend Engineer</option>
-                  <option value="Backend Engineer">Backend Engineer</option>
-                  <option value="SDE-1">SDE-1</option>
-                </select>
+              <div class="field"><label>Saved target role</label><div class="role-saved-value" id="savedRoleDisplay" role="status">Loading saved role…</div><label class="role-override" for="enableRoleOverride"><input type="checkbox" id="enableRoleOverride">Use a temporary role for this session</label><input id="overrideRoleInput" maxlength="120" placeholder="Enter a temporary target role" disabled aria-label="Temporary interview target role"><small id="roleOverrideNote">Your saved profile role is used unless you enable a session-only override.</small></div>
+              <div class="field"><label for="topicSelect">Topic / category</label><select id="topicSelect"><option>Mixed</option><option>Frontend</option><option>Backend</option><option>Data Structures</option><option>System Design</option><option>Behavioral</option><option>Technical</option></select></div>
+              <div class="field"><label for="difficultySelect">Difficulty</label><select id="difficultySelect"><option value="easy">Entry level</option><option value="medium" selected>Intermediate</option><option value="hard">Advanced</option></select></div>
+              <div class="field"><label for="lengthSelect">Session length</label><select id="lengthSelect"><option value="1">1 question · quick practice</option><option value="2">2 questions · short practice</option><option value="3">3 questions · quick practice</option><option value="5" selected>5 questions · standard</option><option value="8">8 questions · extended</option><option value="10">10 questions · deep practice</option></select></div>
+            </div>
+            <div class="button-row"><button class="action-button action-primary" id="startButton" type="button">Start practice</button><span class="source-banner" id="setupNotice">No answer keys or recordings are sent to the browser/server before their intended use.</span></div>
+            <div class="status-banner hidden" id="setupError" role="alert"></div>
+            <button class="action-button hidden" id="retryQuestionButton" type="button">Retry question generation</button>
+          </section>
+
+          <section class="panel workspace hidden" id="workspace" aria-live="polite">
+            <div class="workspace-top">
+              <div style="flex:1"><div class="progress-meta"><span id="questionProgress">Question 1</span><span id="progressPercent">0%</span></div><div class="progress-track" role="progressbar" aria-label="Interview progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="progress-fill" id="progressFill"></div></div></div>
+              <div class="button-row"><div class="timer" id="sessionTimer" aria-label="Elapsed session time">00:00</div><button class="action-button hidden" id="pauseSession" type="button">Pause</button></div>
+              <span class="source-banner" id="sessionSource"></span>
+            </div>
+
+            <div id="mcqWorkspace" class="hidden">
+              <div class="mcq-question-header"><span id="mcqQuestionNumber">Question 1</span><span id="mcqQuestionTopic"></span></div>
+              <h2 class="mcq-question-title" id="mcqQuestion" aria-live="polite"></h2>
+              <div class="mcq-options" id="mcqOptions" role="radiogroup" aria-label="Answer choices"></div>
+              <div class="workspace-footer"><button class="action-button" type="button" id="mcqPrevious">Previous</button><div class="button-row"><button class="action-button" type="button" id="mcqNext">Next</button><button class="action-button action-primary" type="button" id="mcqSubmit">Submit answers</button></div></div>
+              <div id="mcqResult" class="hidden"></div>
+            </div>
+
+            <div id="spokenWorkspace" class="hidden">
+              <div class="video-grid">
+                <div>
+                  <div class="video-frame" id="videoFrame"><div id="videoPlaceholder">Camera preview starts only after you start a Video Interview.<br><small>Or practice with the text response field.</small></div><video id="cameraPreview" autoplay playsinline muted class="hidden"></video></div>
+                  <div class="button-row" style="margin-top:.7rem">
+                    <button class="action-button" id="cameraToggle" type="button" disabled>Camera off</button>
+                    <button class="action-button" id="microphoneToggle" type="button" disabled>Microphone off</button>
+                    <button class="action-button" id="recordToggle" type="button" disabled>Start local recording</button>
+                    <span id="recordingStatus" class="recording-indicator hidden" role="status"><span class="recording-dot"></span>Recording locally</span>
+                    <a class="action-button hidden" id="downloadRecording" download="careerhub-interview-practice.webm">Download recording</a>
+                  </div>
+                  <label class="record-consent" id="recordConsentWrap"><input type="checkbox" id="recordConsent"><span>I explicitly consent to record this practice locally in this browser. It will not be uploaded.</span></label>
+                  <div class="status-banner hidden" id="cameraStatus" role="status"></div>
+                </div>
+                <div>
+                  <div class="panel-heading"><div><h3 id="spokenQuestion"></h3><p id="spokenTopic"></p></div><button class="action-button" id="speakQuestion" type="button">Read aloud</button></div>
+                  <label for="spokenAnswer" style="display:block;color:#bdcad9;font-size:.82rem;font-weight:700;margin-bottom:.45rem">Your response</label>
+                  <textarea class="answer-input" id="spokenAnswer" maxlength="10000" placeholder="Speak your answer or type it here. Video/audio is not submitted for AI evaluation."></textarea>
+                  <div class="button-row" style="margin-top:.65rem"><button class="action-button" id="speechToggle" type="button">Start speech transcription</button><span id="speechStatus" class="source-banner">Manual typing is always available.</span></div>
+                  <div class="workspace-footer"><button class="action-button action-danger" id="finishSpoken" type="button">Finish session</button><button class="action-button action-primary" id="evaluateSpoken" type="button">Evaluate response</button><button class="action-button hidden" id="nextSpoken" type="button">Next question</button></div>
+                </div>
               </div>
-
-              <div class="select-group">
-                <label>Interview Category</label>
-                <select id="typeSelect" class="interview-select">
-                  <option value="Technical">Technical & Architecture</option>
-                  <option value="Behavioral">Behavioral (STAR Method)</option>
-                  <option value="HR">HR & Cultural Fit</option>
-                  <option value="Aptitude">Aptitude & Estimation</option>
-                </select>
-              </div>
-
-              <div class="select-group">
-                <label>Seniority Level</label>
-                <select id="diffSelect" class="interview-select">
-                  <option value="junior">Junior / Graduate</option>
-                  <option value="medium" selected>Mid-Level</option>
-                  <option value="senior">Senior Engineer</option>
-                </select>
+              <div class="feedback-grid hidden" id="evaluationFeedback">
+                <section class="feedback-section"><h4>AI rubric</h4><div id="rubricScores"></div><p id="aiFeedback"></p></section>
+                <section class="feedback-section"><h4>Evidence & improvements</h4><div id="evidenceList"></div><p id="followUp"></p></section>
               </div>
             </div>
+            <div class="status-banner hidden" id="workspaceError" role="alert"></div>
+          </section>
 
-            <button id="btnStartInterview" class="btn-action btn-next" style="width:100%;padding:0.9rem;font-size:0.95rem;">
-              Start AI Mock Interview Chamber →
-            </button>
-          </div>
+          <section class="panel workspace hidden" id="summaryPanel" aria-live="polite">
+            <div class="panel-heading"><div><h2 id="summaryTitle">Practice complete</h2><p id="summarySubtitle"></p></div><strong style="font-size:1.7rem;color:#6ed9ed" id="summaryScore"></strong></div>
+            <div id="topicPerformance" class="history-grid"></div>
+            <video id="summaryPlayback" class="hidden" controls playsinline preload="metadata" aria-label="Local interview recording playback" style="width:100%;max-width:720px;margin:1rem 0;border-radius:12px;background:#050a12"></video>
+            <a class="action-button hidden" id="summaryDownload" download="careerhub-interview-practice.webm">Download local recording</a>
+            <h3 style="color:#f1f5fa;margin:1.2rem 0 .7rem">Review</h3>
+            <div class="review-list" id="reviewList"></div>
+            <div class="button-row" style="margin-top:1rem"><button class="action-button action-primary" id="newPractice" type="button">Start another practice</button></div>
+          </section>
 
-          <!-- Interview Chamber -->
-          <div class="chamber-card" id="chamberCard">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.25rem;">
-              <span class="role-tag-pill" id="chamberBadge" style="font-size:0.75rem;">Question 1 of 5</span>
-              <div class="speaker-wave" id="btnSpeakQuestion" title="Read Question Aloud">
-                <span>🔊 Read Aloud</span>
-              </div>
-            </div>
-
-            <div style="font-size:1.25rem;font-weight:700;color:#fff;line-height:1.5;margin-bottom:1.5rem;" id="chamberQuestionText">
-              Loading interview question...
-            </div>
-
-            <label style="display:block;font-size:0.8rem;color:var(--text-muted);font-weight:600;margin-bottom:0.5rem;text-transform:uppercase;">
-              Your Response (Speak or Type):
-            </label>
-            <textarea id="answerTextarea" class="answer-textarea" placeholder="Speak into microphone or type your complete answer here..."></textarea>
-
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <button class="mic-button" id="btnMic">
-                <span>🎙️</span> <span id="micStatusText">Voice Input (Click to Speak)</span>
-              </button>
-              <button class="btn-action btn-next" id="btnEvaluateAnswer">
-                Evaluate Response & Next →
-              </button>
-            </div>
-
-            <!-- Instant Rubric Feedback -->
-            <div class="feedback-box" id="feedbackBox">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.5rem;">
-                <span style="font-weight:700;color:#34d399;" id="fbScoreTitle">Rubric Score: 85/100</span>
-                <span style="font-size:0.75rem;color:var(--text-muted);">AI Rubric Evaluation</span>
-              </div>
-              <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.5;" id="fbContent"></p>
-            </div>
-          </div>
-
-          <!-- Final Scorecard Card -->
-          <div class="scorecard-card" id="scorecardCard">
-            <div style="font-size:3.5rem;font-weight:800;color:#00d2ff;margin-bottom:0.5rem;" id="finalScoreVal">--%</div>
-            <h2 style="font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:0.5rem;">Mock Interview Completed!</h2>
-            <p style="font-size:0.88rem;color:var(--text-secondary);max-width:550px;margin:0 auto 1.5rem;">
-              Session recorded in your interview history. Your placement readiness and mock interview KPIs have been updated.
-            </p>
-            <div style="display:flex;gap:1rem;justify-content:center;">
-              <a href="/dashboard" class="btn-action btn-next" style="text-decoration:none;">View Readiness Cockpit</a>
-              <button class="btn-action btn-prev" id="btnRestartInterview">Start Another Interview</button>
-            </div>
-          </div>
+          <section class="panel workspace" id="historyPanel">
+            <div class="panel-heading"><div><h2>Recent interview practice</h2><p>Saved sessions visible only to your account.</p></div><button class="action-button" id="refreshHistory" type="button">Refresh</button></div>
+            <div id="historyList" class="history-grid"><span class="source-banner">Sign in to load your interview history.</span></div>
+          </section>
         </div>
-
       </main>
     </div>
   </div>
-
   <script src="/assets/shared-nav.js"></script>
   <script>
-    let questions = [];
-    let currentIdx = 0;
-    let sessionAnswers = [];
-    let isRecording = false;
-    let recognition = null;
+    (() => {
+      const $ = id => document.getElementById(id);
+      const token = localStorage.getItem('token');
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const state = { mode: 'mcq', sessionId: null, role: '', profileRole: '', questions: [], sessionLength: 0, selectedAnswers: [], index: 0, responses: 0, stream: null, mediaRecorder: null, chunks: [], recordingUrl: null, timerId: null, startedAt: 0, elapsedBeforePause: 0, paused: false, recognition: null, recording: false, evaluated: false };
 
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-
-    // Speech Recognition initialization
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-      recognition = new SpeechRec();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-
-      recognition.onresult = (event) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+      function setBanner(element, message, kind = '') {
+        element.textContent = message;
+        element.classList.remove('hidden', 'error', 'success');
+        if (kind) element.classList.add(kind);
+      }
+      function clearBanner(element) { element.classList.add('hidden'); element.textContent = ''; }
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { ...authHeaders, ...(options.headers || {}) }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || `Request failed (${response.status}).`);
+          error.status = response.status;
+          error.code = data.code;
+          error.sessionId = data.sessionId;
+          error.role = data.role;
+          throw error;
         }
-        document.getElementById('answerTextarea').value = transcript;
-      };
-
-      recognition.onerror = (e) => {
-        console.warn('Speech error:', e.error);
-        stopRecording();
-      };
-    }
-
-    // Start Chamber
-    document.getElementById('btnStartInterview').addEventListener('click', async () => {
-      const role = document.getElementById('roleSelect').value;
-      const type = document.getElementById('typeSelect').value;
-      const diff = document.getElementById('diffSelect').value;
-
-      window.showToast('Generating AI interview session...', 'info');
-
-      try {
-        const res = await fetch('/api/interview/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ role, type, difficulty: diff })
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          questions = data.questions || [];
-          if (questions.length > 0) {
-            document.getElementById('setupCard').style.display = 'none';
-            document.getElementById('scorecardCard').style.display = 'none';
-            document.getElementById('chamberCard').style.display = 'block';
-            currentIdx = 0;
-            sessionAnswers = [];
-            renderChamberQuestion(0);
-          } else {
-            window.showToast('Failed to generate questions. Please try again.', 'error');
-          }
-        }
-      } catch (err) {
-        console.error(err);
-        window.showToast('Network error generating interview.', 'error');
+        return data;
       }
-    });
-
-    function renderChamberQuestion(idx) {
-      currentIdx = idx;
-      const q = questions[idx];
-      document.getElementById('chamberBadge').innerText = `Question ${idx + 1} of ${questions.length}`;
-      document.getElementById('chamberQuestionText').innerText = q.question || q;
-      document.getElementById('answerTextarea').value = '';
-      document.getElementById('feedbackBox').style.display = 'none';
-      document.getElementById('btnEvaluateAnswer').innerText = idx === questions.length - 1 ? 'Finish & Save Scorecard ✓' : 'Evaluate & Next Question →';
-
-      // Auto read question
-      speakText(q.question || q);
-    }
-
-    function speakText(text) {
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        window.speechSynthesis.speak(utterance);
+      function selectedMode() { return document.querySelector('input[name="practiceMode"]:checked')?.value || 'mcq'; }
+      function formatTime(seconds) { return `${String(Math.floor(seconds / 60)).padStart(2,'0')}:${String(seconds % 60).padStart(2,'0')}`; }
+      function elapsedSeconds() { return state.elapsedBeforePause + (state.paused ? 0 : Math.floor((Date.now() - state.startedAt) / 1000)); }
+      function updateTimer() { $('sessionTimer').textContent = formatTime(elapsedSeconds()); }
+      function startTimer() {
+        state.startedAt = Date.now();
+        state.elapsedBeforePause = 0;
+        state.paused = false;
+        clearInterval(state.timerId);
+        state.timerId = setInterval(updateTimer, 1000);
+        updateTimer();
       }
-    }
-
-    document.getElementById('btnSpeakQuestion').addEventListener('click', () => {
-      const q = questions[currentIdx];
-      speakText(q.question || q);
-    });
-
-    // Mic Toggle
-    document.getElementById('btnMic').addEventListener('click', () => {
-      if (!recognition) {
-        window.showToast('Speech Recognition not supported in this browser. Please type response.', 'error');
-        return;
-      }
-      if (isRecording) {
-        stopRecording();
-      } else {
-        startRecording();
-      }
-    });
-
-    function startRecording() {
-      try {
-        recognition.start();
-        isRecording = true;
-        document.getElementById('btnMic').classList.add('recording');
-        document.getElementById('micStatusText').innerText = 'Listening... (Click to Stop)';
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    function stopRecording() {
-      try {
-        recognition.stop();
-        isRecording = false;
-        document.getElementById('btnMic').classList.remove('recording');
-        document.getElementById('micStatusText').innerText = 'Voice Input (Click to Speak)';
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    // Evaluate Answer
-    document.getElementById('btnEvaluateAnswer').addEventListener('click', async () => {
-      const answer = document.getElementById('answerTextarea').value.trim();
-      if (!answer) {
-        window.showToast('Please provide an answer before continuing.', 'error');
-        return;
-      }
-
-      stopRecording();
-      const currentQ = questions[currentIdx];
-      window.showToast('AI evaluating your response...', 'info');
-
-      try {
-        const res = await fetch('/api/interview/evaluate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({
-            question: currentQ.question || currentQ,
-            answer,
-            role: document.getElementById('roleSelect').value
-          })
-        });
-
-        const evalData = res.ok ? await res.json() : { score: 8, feedback: 'Well structured response.' };
-        const score = typeof evalData.score === 'number' ? (evalData.score <= 10 ? evalData.score * 10 : evalData.score) : 80;
-
-        sessionAnswers.push({
-          question: currentQ.question || currentQ,
-          answer,
-          score,
-          feedback: evalData.feedback || ''
-        });
-
-        document.getElementById('feedbackBox').style.display = 'block';
-        document.getElementById('fbScoreTitle').innerText = `Rubric Score: ${score}/100`;
-        document.getElementById('fbContent').innerText = evalData.feedback || 'Good articulation of technical concepts and logical structure.';
-
-        setTimeout(() => {
-          if (currentIdx < questions.length - 1) {
-            renderChamberQuestion(currentIdx + 1);
-          } else {
-            finishInterview();
-          }
-        }, 1800);
-
-      } catch (err) {
-        console.error(err);
-        if (currentIdx < questions.length - 1) {
-          renderChamberQuestion(currentIdx + 1);
+      function togglePause() {
+        if (!state.paused) {
+          state.elapsedBeforePause += Math.floor((Date.now() - state.startedAt) / 1000);
+          state.paused = true;
+          $('pauseSession').textContent = 'Resume';
+          if (state.mediaRecorder?.state === 'recording') state.mediaRecorder.pause();
+          if (state.recognition) { try { state.recognition.stop(); } catch (_) {} state.recognition = null; }
+          $('speechToggle').textContent = 'Start speech transcription';
         } else {
-          finishInterview();
+          state.paused = false;
+          state.startedAt = Date.now();
+          $('pauseSession').textContent = 'Pause';
+          if (state.mediaRecorder?.state === 'paused') state.mediaRecorder.resume();
+        }
+        updateTimer();
+      }
+      function updateProgress() {
+        const total = (state.mode === 'mcq' ? state.questions.length : state.sessionLength) || 1;
+        const completed = state.mode === 'mcq' ? state.index : state.responses;
+        const percent = Math.round(completed / total * 100);
+        $('questionProgress').textContent = `Question ${Math.min(state.index + 1, total)} of ${total}`;
+        $('progressPercent').textContent = `${percent}%`;
+        $('progressFill').style.width = `${percent}%`;
+        document.querySelector('[role="progressbar"]').setAttribute('aria-valuenow', String(percent));
+      }
+      function clearSessionTimer() { clearInterval(state.timerId); state.timerId = null; }
+      function renderMcq() {
+        const question = state.questions[state.index];
+        if (!question) return;
+        $('mcqQuestion').textContent = question.question;
+        $('mcqQuestionNumber').textContent = `Question ${state.index + 1} of ${state.questions.length}`;
+        $('mcqQuestionTopic').textContent = question.topic || question.skill || 'Career assessment';
+        $('mcqOptions').replaceChildren();
+        question.options.forEach((option, index) => {
+          const label = document.createElement('label');
+          const checked = state.selectedAnswers[state.index] === index;
+          label.className = `mcq-option${checked ? ' selected' : ''}`;
+          const input = document.createElement('input');
+          input.type = 'radio';
+          input.name = 'mcqAnswer';
+          input.value = String(index);
+          input.checked = checked;
+          input.addEventListener('change', () => {
+            state.selectedAnswers[state.index] = index;
+            [...$('mcqOptions').children].forEach((row, rowIndex) =>
+              row.classList.toggle('selected', rowIndex === index));
+          });
+          const letter = document.createElement('span');
+          letter.className = 'mcq-option-letter';
+          letter.textContent = String.fromCharCode(65 + index);
+          const copy = document.createElement('span');
+          copy.className = 'mcq-option-copy';
+          copy.textContent = option;
+          label.append(input, letter, copy);
+          $('mcqOptions').append(label);
+        });
+        $('mcqPrevious').disabled = state.index === 0;
+        $('mcqNext').disabled = state.index === state.questions.length - 1;
+        updateProgress();
+      }
+      function renderSpokenQuestion() {
+        const question = state.questions[state.index];
+        if (!question) return;
+        $('spokenQuestion').textContent = question.question;
+        $('spokenTopic').textContent = `${state.role} · ${question.topic || 'Interview'} · ${question.difficulty || 'practice'}`;
+        $('spokenAnswer').value = '';
+        $('evaluationFeedback').classList.add('hidden');
+        $('evaluateSpoken').classList.remove('hidden');
+        $('nextSpoken').classList.add('hidden');
+        state.evaluated = false;
+        updateProgress();
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(question.question));
         }
       }
-    });
-
-    async function finishInterview() {
-      document.getElementById('chamberCard').style.display = 'none';
-      document.getElementById('scorecardCard').style.display = 'block';
-
-      const totalScore = sessionAnswers.length > 0
-        ? Math.round(sessionAnswers.reduce((a, c) => a + c.score, 0) / sessionAnswers.length)
-        : 82;
-
-      document.getElementById('finalScoreVal').innerText = `${totalScore}%`;
-
-      // Persist session to DB
-      try {
-        await fetch('/api/interview/submit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({
-            role: document.getElementById('roleSelect').value,
-            difficulty: document.getElementById('diffSelect').value,
-            totalScore,
-            answers: sessionAnswers
-          })
-        });
-        window.showToast(`Interview recorded! Total Score: ${totalScore}%`, 'success');
-      } catch (e) {
-        console.error('Submit interview error:', e);
+      function showWorkspace(data) {
+        state.sessionId = data.sessionId;
+        state.role = data.role;
+        state.questions = data.questions;
+        state.sessionLength = data.sessionLength || data.questions.length;
+        state.selectedAnswers = new Array(data.questions.length);
+        state.index = 0;
+        state.responses = 0;
+        $('workspace').classList.remove('hidden');
+        $('setupPanel').classList.add('hidden');
+        $('summaryPanel').classList.add('hidden');
+        $('mcqWorkspace').classList.toggle('hidden', state.mode !== 'mcq');
+        $('spokenWorkspace').classList.toggle('hidden', state.mode === 'mcq');
+        $('pauseSession').classList.toggle('hidden', state.mode === 'mcq');
+        const generatedByAI = data.generationSource === 'openrouter';
+        $('sessionSource').textContent = generatedByAI
+          ? 'Questions generated for this session'
+          : 'Curated practice · not AI-generated';
+        if (generatedByAI) {
+          $('providerStatus').dataset.state = 'ready';
+          $('providerStatus').textContent = 'AI Interview Coach ready';
+        } else {
+          $('providerStatus').dataset.state = 'unavailable';
+          $('providerStatus').textContent = 'AI generation unavailable for this session. Curated practice is active.';
+        }
+        clearBanner($('workspaceError'));
+        $('retryQuestionButton').classList.add('hidden');
+        startTimer();
+        if (state.mode === 'mcq') renderMcq();
+        else renderSpokenQuestion();
       }
-    }
+      async function retryQuestionGeneration() {
+        const button = $('retryQuestionButton');
+        button.disabled = true;
+        try {
+          const data = await api(`/api/interview/session/${encodeURIComponent(state.sessionId)}/retry-question`, {
+            method: 'POST'
+          });
+          showWorkspace({
+            ...data,
+            role: data.role || state.role,
+            topic: data.topic || $('topicSelect').value,
+            difficulty: data.difficulty || $('difficultySelect').value,
+            mode: data.mode || state.mode,
+            sessionLength: data.sessionLength || Number($('lengthSelect').value)
+          });
+          if (state.mode === 'video') await requestCamera();
+          $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) {
+          setBanner($('setupError'), error.message, 'error');
+        } finally {
+          button.disabled = false;
+        }
+      }
+      async function requestCamera() {
+        if (state.mode !== 'video') return;
+        try {
+          state.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          $('cameraPreview').srcObject = state.stream;
+          $('cameraPreview').classList.remove('hidden');
+          $('videoPlaceholder').classList.add('hidden');
+          $('cameraToggle').disabled = false;
+          $('microphoneToggle').disabled = false;
+          $('cameraToggle').textContent = 'Turn camera off';
+          $('microphoneToggle').textContent = 'Mute microphone';
+          $('recordToggle').disabled = !window.MediaRecorder;
+          $('recordConsentWrap').classList.remove('hidden');
+          setBanner($('cameraStatus'), 'Camera and microphone are active in this tab. Nothing is recorded unless you separately consent and start local recording.', 'success');
+        } catch (error) {
+          $('cameraPreview').classList.add('hidden');
+          $('videoPlaceholder').classList.remove('hidden');
+          $('recordConsentWrap').classList.add('hidden');
+          setBanner($('cameraStatus'), `Camera/microphone permission is unavailable (${error.name || 'permission denied'}). Continue with the text response option.`, 'error');
+        }
+      }
+      async function startPractice() {
+        clearBanner($('setupError'));
+        if (!token) {
+          setBanner($('setupError'), 'Sign in before starting an interview practice session.', 'error');
+          return;
+        }
+        state.mode = selectedMode();
+        state.sessionLength = Number($('lengthSelect').value);
+        $('retryQuestionButton').classList.add('hidden');
+        const button = $('startButton');
+        button.disabled = true;
+        button.textContent = 'Preparing your practice…';
+        try {
+          const data = await api('/api/interview/session/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              role: $('enableRoleOverride').checked ? $('overrideRoleInput').value.trim() || undefined : undefined,
+              topic: $('topicSelect').value,
+              difficulty: $('difficultySelect').value,
+              mode: state.mode,
+              sessionLength: Number($('lengthSelect').value)
+            })
+          });
+          showWorkspace(data);
+          if (state.mode === 'video') await requestCamera();
+          $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) {
+          setBanner($('setupError'), error.message, 'error');
+          if (error.sessionId && ['voice', 'video'].includes(state.mode)) {
+            state.sessionId = error.sessionId;
+            state.role = error.role || ($('enableRoleOverride').checked
+              ? $('overrideRoleInput').value.trim()
+              : state.profileRole);
+            $('retryQuestionButton').classList.remove('hidden');
+            $('retryQuestionButton').focus();
+          }
+        } finally {
+          button.disabled = false;
+          button.textContent = 'Start practice';
+        }
+      }
+      async function submitMcq() {
+        const missing = state.selectedAnswers.findIndex(answer => !Number.isInteger(answer));
+        if (missing !== -1) {
+          state.index = missing;
+          renderMcq();
+          setBanner($('workspaceError'), `Choose an answer for question ${missing + 1} before submitting.`, 'error');
+          return;
+        }
+        $('mcqSubmit').disabled = true;
+        try {
+          const result = await api(`/api/interview/session/${encodeURIComponent(state.sessionId)}/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers: state.selectedAnswers })
+          });
+          clearSessionTimer();
+          stopMedia();
+          renderSummary({
+            title: 'MCQ practice complete',
+            subtitle: `${result.correctCount} of ${result.totalQuestions} correct · ${result.xpEarned} XP saved`,
+            score: result.score,
+            topics: result.topicPerformance,
+            review: result.review
+          });
+        } catch (error) {
+          setBanner($('workspaceError'), error.message, 'error');
+          $('mcqSubmit').disabled = false;
+        }
+      }
+      async function evaluateSpoken() {
+        const answer = $('spokenAnswer').value.trim();
+        if (!answer) { setBanner($('workspaceError'), 'Write or transcribe a response before requesting evaluation.', 'error'); return; }
+        $('evaluateSpoken').disabled = true;
+        clearBanner($('workspaceError'));
+        try {
+          const result = await api(`/api/interview/session/${encodeURIComponent(state.sessionId)}/evaluate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ questionIndex: state.responses, answer })
+          });
+          state.responses++;
+          if (result.followUpQuestion && state.questions.length < 10) {
+            state.questions.push({
+              type: 'text',
+              question: result.followUpQuestion,
+              topic: state.questions[state.index].topic,
+              difficulty: result.nextDifficulty,
+              source: result.source,
+              model: result.model
+            });
+          }
+          $('rubricScores').textContent = Object.entries(result.rubric).map(([key,value]) => `${key}: ${value}/5`).join(' · ');
+          $('aiFeedback').textContent = result.feedback;
+          $('evidenceList').replaceChildren();
+          for (const [heading, items] of [['Evidence', result.evidence], ['Improvements', result.improvements]]) {
+            const title = document.createElement('strong'); title.textContent = `${heading}: `;
+            const list = document.createElement('ul');
+            for (const item of items) { const li = document.createElement('li'); li.textContent = item; list.append(li); }
+            $('evidenceList').append(title, list);
+          }
+          $('followUp').textContent = result.followUpQuestion
+            ? `Follow-up: ${result.followUpQuestion} · Next difficulty: ${result.nextDifficulty}`
+            : 'The requested session length is complete.';
+          $('evaluationFeedback').classList.remove('hidden');
+          $('evaluateSpoken').classList.add('hidden');
+          $('nextSpoken').classList.remove('hidden');
+          state.evaluated = true;
+          updateProgress();
+        } catch (error) {
+          const message = error.code?.startsWith('AI_')
+            ? 'AI evaluation is temporarily unavailable. Your answer was not scored. Please try again.'
+            : `${error.message} Your answer was not scored.`;
+          setBanner($('workspaceError'), message, 'error');
+        } finally {
+          $('evaluateSpoken').disabled = false;
+        }
+      }
+      async function finishSpoken() {
+        if (!state.responses) { setBanner($('workspaceError'), 'Evaluate at least one response before finishing.', 'error'); return; }
+        $('finishSpoken').disabled = true;
+        try {
+          const result = await api(`/api/interview/session/${encodeURIComponent(state.sessionId)}/finish`, { method: 'POST' });
+          clearSessionTimer();
+          stopMedia();
+          renderSummary({
+            title: 'Interview practice complete',
+            subtitle: `${result.answerCount} responses evaluated by the AI Interview Coach · ${result.xpEarned} XP saved`,
+            score: result.totalScore,
+            topics: [],
+            review: []
+          });
+        } catch (error) {
+          setBanner($('workspaceError'), error.message, 'error');
+          $('finishSpoken').disabled = false;
+        }
+      }
+      function renderSummary({ title, subtitle, score, topics, review }) {
+        $('workspace').classList.add('hidden');
+        $('summaryPanel').classList.remove('hidden');
+        $('summaryTitle').textContent = title;
+        $('summarySubtitle').textContent = subtitle;
+        $('summaryScore').textContent = `${score}%`;
+        $('topicPerformance').replaceChildren();
+        for (const item of topics) {
+          const card = document.createElement('div'); card.className = 'history-card';
+          const strong = document.createElement('strong'); strong.textContent = item.topic;
+          const small = document.createElement('small'); small.textContent = `${item.correct}/${item.total} correct · ${item.score}%`;
+          card.append(strong, small); $('topicPerformance').append(card);
+        }
+        $('reviewList').replaceChildren();
+        for (const [index, item] of review.entries()) {
+          const card = document.createElement('article'); card.className = 'review-item';
+          const titleNode = document.createElement('h4'); titleNode.textContent = `${index + 1}. ${item.question}`;
+          const answer = document.createElement('p'); answer.textContent = `Your answer: ${item.options[item.selectedIndex]}`;
+          const correct = document.createElement('p'); correct.textContent = `${item.correct ? 'Correct' : `Correct answer: ${item.options[item.correctIndex]}`} · ${item.topic}`;
+          const explanation = document.createElement('p'); explanation.textContent = item.explanation;
+          card.append(titleNode, answer, correct, explanation); $('reviewList').append(card);
+        }
+        loadHistory();
+      }
+      function stopMedia() {
+        if (state.recognition) { try { state.recognition.stop(); } catch (_) {} state.recognition = null; }
+        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') {
+          try { state.mediaRecorder.stop(); } catch (_) {}
+        }
+        if (state.stream) {
+          state.stream.getTracks().forEach(track => track.stop());
+          state.stream = null;
+        }
+        $('cameraPreview').srcObject = null;
+        $('cameraToggle').disabled = true;
+        $('microphoneToggle').disabled = true;
+        $('recordToggle').disabled = true;
+        $('recordingStatus').classList.add('hidden');
+        clearSessionTimer();
+      }
+      function startLocalRecording() {
+        if (!state.stream || !window.MediaRecorder) return;
+        if (!$('recordConsent').checked) {
+          setBanner($('cameraStatus'), 'Check the explicit local-recording consent box before recording.', 'error');
+          return;
+        }
+        try {
+          if (state.recordingUrl) URL.revokeObjectURL(state.recordingUrl);
+          state.recordingUrl = null;
+          $('summaryPlayback').removeAttribute('src');
+          $('summaryPlayback').classList.add('hidden');
+          $('summaryDownload').classList.add('hidden');
+          state.chunks = [];
+          state.mediaRecorder = new MediaRecorder(state.stream);
+          state.mediaRecorder.ondataavailable = event => { if (event.data.size) state.chunks.push(event.data); };
+          state.mediaRecorder.onstop = () => {
+            if (!state.chunks.length) return;
+            if (state.recordingUrl) URL.revokeObjectURL(state.recordingUrl);
+            state.recordingUrl = URL.createObjectURL(new Blob(state.chunks, { type: state.mediaRecorder.mimeType || 'video/webm' }));
+            $('downloadRecording').href = state.recordingUrl;
+            $('downloadRecording').classList.remove('hidden');
+            $('summaryPlayback').src = state.recordingUrl;
+            $('summaryPlayback').classList.remove('hidden');
+            $('summaryDownload').href = state.recordingUrl;
+            $('summaryDownload').classList.remove('hidden');
+          };
+          state.mediaRecorder.start();
+          $('recordingStatus').classList.remove('hidden');
+          $('recordToggle').textContent = 'Stop local recording';
+          state.recording = true;
+        } catch (error) {
+          setBanner($('cameraStatus'), `Browser recording could not start: ${error.message}`, 'error');
+        }
+      }
+      function stopLocalRecording() {
+        if (state.mediaRecorder && state.mediaRecorder.state !== 'inactive') state.mediaRecorder.stop();
+        state.recording = false;
+        $('recordingStatus').classList.add('hidden');
+        $('recordToggle').textContent = 'Start local recording';
+      }
+      function toggleSpeechRecognition() {
+        if (state.recognition) { state.recognition.stop(); state.recognition = null; $('speechToggle').textContent = 'Start speech transcription'; $('speechStatus').textContent = 'Transcription stopped. You can edit the text.'; return; }
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) { $('speechStatus').textContent = 'Speech recognition is not supported here. Type your response instead.'; return; }
+        const recognition = new SpeechRecognition();
+        recognition.lang = 'en-US'; recognition.interimResults = true; recognition.continuous = true;
+        recognition.onresult = event => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) transcript += event.results[i][0].transcript + ' ';
+          $('spokenAnswer').value = transcript.trim();
+        };
+        recognition.onerror = () => { $('speechStatus').textContent = 'Speech recognition stopped; manual text entry remains available.'; };
+        recognition.onend = () => { state.recognition = null; $('speechToggle').textContent = 'Start speech transcription'; };
+        state.recognition = recognition; recognition.start();
+        $('speechToggle').textContent = 'Stop speech transcription'; $('speechStatus').textContent = 'Browser speech transcription is active.';
+      }
+      async function loadHistory() {
+        if (!token) return;
+        try {
+          const history = await api('/api/interview/history');
+          $('historyList').replaceChildren();
+          if (!history.length) { $('historyList').textContent = 'No saved interview practice yet.'; return; }
+          for (const item of history.slice(0, 8)) {
+            const card = document.createElement('div'); card.className = 'history-card';
+            const strong = document.createElement('strong'); strong.textContent = item.role || 'Interview practice';
+            const small = document.createElement('small'); small.textContent = `${item.interviewType || 'Practice'} · ${item.totalScore ?? '—'}% · ${new Date(item.date).toLocaleDateString()}`;
+            card.append(strong, small); $('historyList').append(card);
+          }
+        } catch (error) { $('historyList').textContent = error.message; }
+      }
+      async function loadProfileAndProvider() {
+        if (token) {
+          try {
+            const profile = await api('/api/career/profile');
+            const user = profile.user || profile;
+            state.profileRole = typeof user.targetRole === 'string' ? user.targetRole.trim() : '';
+            $('savedRoleDisplay').textContent = state.profileRole || 'No target role saved';
+          } catch (error) {
+            $('savedRoleDisplay').textContent = 'Unable to load saved role';
+            setBanner($('setupError'), 'Your saved profile role could not be loaded. Refresh and try again.', 'error');
+          }
+          loadHistory();
+        }
+        try {
+          const status = await api('/api/career/assistant/status');
+          const ready = status.ready === true;
+          $('providerStatus').dataset.state = ready ? 'ready' : 'unavailable';
+          $('providerStatus').textContent = ready
+            ? 'AI Interview Coach ready'
+            : status.configured
+              ? 'AI availability has not yet been confirmed. It is checked again when you start a session.'
+              : 'AI temporarily unavailable. Curated questions are clearly labeled.';
+        } catch (_) {
+          $('providerStatus').dataset.state = 'unavailable';
+          $('providerStatus').textContent = 'AI availability could not be checked.';
+        }
+      }
 
-    document.getElementById('btnRestartInterview').addEventListener('click', () => {
-      document.getElementById('scorecardCard').style.display = 'none';
-      document.getElementById('setupCard').style.display = 'block';
-    });
+      $('startButton').addEventListener('click', startPractice);
+      $('retryQuestionButton').addEventListener('click', retryQuestionGeneration);
+      $('enableRoleOverride').addEventListener('change', () => {
+        const enabled = $('enableRoleOverride').checked;
+        $('overrideRoleInput').disabled = !enabled;
+        $('overrideRoleInput').value = enabled ? '' : '';
+        $('roleOverrideNote').textContent = enabled
+          ? 'This role applies only to this interview session; your saved profile role will not change.'
+          : 'Your saved profile role is used unless you enable a session-only override.';
+        if (enabled) $('overrideRoleInput').focus();
+      });
+      $('mcqPrevious').addEventListener('click', () => { if (state.index > 0) { state.index--; renderMcq(); } });
+      $('mcqNext').addEventListener('click', () => { if (state.index < state.questions.length - 1) { state.index++; renderMcq(); } });
+      $('mcqSubmit').addEventListener('click', submitMcq);
+      $('evaluateSpoken').addEventListener('click', evaluateSpoken);
+      $('finishSpoken').addEventListener('click', finishSpoken);
+      $('pauseSession').addEventListener('click', togglePause);
+      $('nextSpoken').addEventListener('click', () => {
+        if (state.index < state.questions.length - 1) { state.index++; renderSpokenQuestion(); }
+        else finishSpoken();
+      });
+      $('cameraToggle').addEventListener('click', () => {
+        const track = state.stream?.getVideoTracks()[0]; if (!track) return;
+        track.enabled = !track.enabled; $('cameraToggle').textContent = track.enabled ? 'Turn camera off' : 'Turn camera on';
+      });
+      $('microphoneToggle').addEventListener('click', () => {
+        const track = state.stream?.getAudioTracks()[0]; if (!track) return;
+        track.enabled = !track.enabled; $('microphoneToggle').textContent = track.enabled ? 'Mute microphone' : 'Unmute microphone';
+      });
+      $('recordToggle').addEventListener('click', () => state.recording ? stopLocalRecording() : startLocalRecording());
+      $('speechToggle').addEventListener('click', toggleSpeechRecognition);
+      $('speakQuestion').addEventListener('click', () => {
+        if ('speechSynthesis' in window) window.speechSynthesis.speak(new SpeechSynthesisUtterance(state.questions[state.index]?.question || ''));
+      });
+      $('newPractice').addEventListener('click', () => {
+        stopMedia(); state.sessionId = null;
+        $('summaryPanel').classList.add('hidden'); $('setupPanel').classList.remove('hidden');
+        $('mcqSubmit').disabled = false; $('finishSpoken').disabled = false;
+        $('recordConsent').checked = false; $('downloadRecording').classList.add('hidden');
+        $('summaryDownload').classList.add('hidden');
+        $('summaryPlayback').pause();
+        $('summaryPlayback').removeAttribute('src');
+        $('summaryPlayback').classList.add('hidden');
+        if (state.recordingUrl) URL.revokeObjectURL(state.recordingUrl);
+        state.recordingUrl = null;
+      });
+      $('refreshHistory').addEventListener('click', loadHistory);
+      window.addEventListener('pagehide', stopMedia);
+      window.addEventListener('beforeunload', () => {
+        stopMedia();
+        if (state.recordingUrl) URL.revokeObjectURL(state.recordingUrl);
+      });
+      loadProfileAndProvider();
+    })();
   </script>
 </body>
 </html>

@@ -17,6 +17,12 @@
       flex-wrap: wrap;
       gap: 1rem;
     }
+    .job-filter-controls {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.6fr) repeat(3, minmax(145px, 1fr));
+      gap: 0.65rem;
+      width: min(100%, 850px);
+    }
     .filter-tabs {
       display: flex;
       gap: 0.5rem;
@@ -35,35 +41,45 @@
       transition: all 0.2s ease;
     }
     .filter-tab.active {
-      background: rgba(0, 210, 255, 0.15);
-      color: #00d2ff;
-      border: 1px solid rgba(0, 210, 255, 0.3);
+      background: rgba(56, 189, 248, 0.12);
+      color: #8cddf3;
+      border: 1px solid rgba(56, 189, 248, 0.25);
     }
     .opportunities-grid {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 1.5rem;
+      min-width: 0;
     }
     .opp-card {
+      min-width: 0;
       background: var(--surface-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 1.75rem;
+      padding: 1.4rem;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      transition: var(--transition-smooth);
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
     }
     .opp-card:hover {
       border-color: var(--border-hover);
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-card);
+      box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
     }
     .opp-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+      gap: 0.75rem;
       margin-bottom: 0.75rem;
+    }
+    .opp-header > div:first-child {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    .opp-header > div:last-child {
+      flex: 0 1 165px;
+      min-width: 0;
     }
     .opp-match-pill {
       display: inline-flex;
@@ -73,9 +89,42 @@
       border-radius: var(--radius-full);
       font-size: 0.8rem;
       font-weight: 800;
-      background: rgba(0, 210, 255, 0.12);
-      border: 1px solid rgba(0, 210, 255, 0.35);
-      color: #00d2ff;
+      background: rgba(56, 189, 248, 0.09);
+      border: 1px solid rgba(56, 189, 248, 0.22);
+      color: #8cddf3;
+      max-width: 100%;
+      white-space: normal;
+      text-align: center;
+    }
+    .match-method {
+      margin-top: 0.3rem;
+      color: var(--text-muted);
+      font-size: 0.68rem;
+      text-align: right;
+    }
+    .opp-card h3 {
+      overflow-wrap: anywhere;
+    }
+    .opp-card > div,
+    .opp-card .opp-header > div,
+    .opp-card :is(p, .source-label) {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    .opp-card > div:last-child > * {
+      min-width: 0;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+    .source-label {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+    .source-label a {
+      color: #8cddf3;
+      text-decoration: underline;
+      text-underline-offset: 2px;
     }
     .pill-tag {
       font-size: 0.72rem;
@@ -87,12 +136,31 @@
     }
     .pill-match { background: rgba(16, 185, 129, 0.15); color: #34d399; }
     .pill-miss { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    @media (max-width: 900px) {
+    @media (max-width: 1050px) {
       .opportunities-grid { grid-template-columns: 1fr; }
+      .filter-bar { align-items: stretch; flex-direction: column; }
+      .job-filter-controls { width: 100%; }
+    }
+    @media (max-width: 720px) {
+      .job-filter-controls { grid-template-columns: 1fr 1fr; }
+      .job-filter-controls input { grid-column: 1 / -1; }
+      .opportunities-grid { gap: 0.9rem; }
+      .opp-card { padding: 1rem; }
+      .opp-header { gap: 0.6rem; }
+      .opp-match-pill { white-space: normal; text-align: center; }
+      .opp-card .source-label { overflow-wrap: anywhere; }
+      .opp-card > div:last-child { flex-direction: column; }
+      .opp-card > div:last-child > * { width: 100%; }
+    }
+    @media (max-width: 420px) {
+      .job-filter-controls { grid-template-columns: 1fr; }
+      .job-filter-controls input { grid-column: auto; }
+      .opp-header { flex-direction: column; }
+      .match-method { text-align: left; }
     }
   </style>
 </head>
-<body data-page-title="AI Job Matching" data-page-subtitle="Tailored Placement & Internship Opportunities Ranked by Profile Fit">
+<body data-page-title="Live Job Matching" data-page-subtitle="Current provider listings ranked by profile fit">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
@@ -102,16 +170,29 @@
         <!-- Filter Bar -->
         <div class="filter-bar">
           <div class="filter-tabs">
-            <div class="filter-tab active" data-type="all">All Opportunities</div>
-            <div class="filter-tab" data-type="job">Jobs</div>
-            <div class="filter-tab" data-type="internship">Internships</div>
-            <div class="filter-tab" data-type="hackathon">Hackathons</div>
+            <button class="filter-tab active" type="button" data-type="all">All jobs</button>
+            <button class="filter-tab" type="button" data-type="job">Jobs</button>
+            <button class="filter-tab" type="button" data-type="internship">Internships</button>
           </div>
 
-          <div style="min-width:280px;">
-            <input type="text" id="oppSearch" class="input-skill" placeholder="Search by company, role, or skill..." style="width:100%;">
+          <div class="job-filter-controls">
+            <input type="search" id="oppSearch" class="input-skill" placeholder="Search company, role, location, or tag..." aria-label="Search job listings">
+            <select id="categoryFilter" class="input-skill" aria-label="Filter by category">
+              <option value="">All categories</option>
+            </select>
+            <select id="locationFilter" class="input-skill" aria-label="Filter by work location">
+              <option value="all">All locations</option>
+              <option value="remote">Remote</option>
+              <option value="onsite">On-site / hybrid</option>
+            </select>
+            <select id="sortFilter" class="input-skill" aria-label="Sort jobs">
+              <option value="match">Best profile match</option>
+              <option value="newest">Newest postings</option>
+            </select>
           </div>
         </div>
+
+        <div id="jobsStatus" role="status" aria-live="polite" style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.85rem;"></div>
 
         <!-- Opportunities Grid -->
         <div class="opportunities-grid" id="oppGrid">
@@ -127,118 +208,240 @@
   <script src="/assets/shared-nav.js"></script>
   <script>
     let allOpportunities = [];
+    let trackedJobIds = new Set();
     let currentFilter = 'all';
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
     async function loadOpportunities() {
+      const grid = document.getElementById('oppGrid');
+      const status = document.getElementById('jobsStatus');
+      if (!token) {
+        grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Sign in to view profile-matched jobs and save listings.</div>';
+        status.innerHTML = 'Authentication is required. <a href="/login?next=%2Fjob-matching">Sign in</a>';
+        return;
+      }
+      grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Loading current provider listings...</div>';
       try {
-        const res = await fetch('/api/career/opportunities', { headers });
-        if (res.ok) {
-          const data = await res.json();
-          allOpportunities = data.opportunities || [];
-          renderGrid();
+        const [res, applicationsRes] = await Promise.all([
+          fetch('/api/career/opportunities', { headers, cache: 'no-store' }),
+          fetch('/api/career/applications', { headers })
+        ]);
+        if (res.status === 401 || res.status === 400) {
+          grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Your session is invalid. Sign in again to use Job Matching.</div>';
+          status.innerHTML = 'Authentication failed. <a href="/login?next=%2Fjob-matching">Sign in again</a>';
+          return;
         }
+        const data = await res.json();
+        if (!res.ok) {
+          grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Live job listings are unavailable right now. Please retry later.</div>';
+          status.textContent = data.message || 'Job provider is unavailable.';
+          return;
+        }
+        allOpportunities = Array.isArray(data.opportunities) ? data.opportunities : [];
+        if (applicationsRes.ok) {
+          const appData = await applicationsRes.json();
+          trackedJobIds = new Set((appData.applications || []).map(app => app.jobId).filter(Boolean));
+        }
+        const tags = [...new Set(allOpportunities.flatMap(job => job.tags || []))]
+          .filter(Boolean).sort((a, b) => a.localeCompare(b));
+        document.getElementById('categoryFilter').innerHTML = '<option value="">All categories</option>' +
+          tags.map(tag => `<option value="${escapeHtml(tag.toLowerCase())}">${escapeHtml(tag)}</option>`).join('');
+        status.textContent = `Current listings from ${data.source || 'the job provider'} · fetched ${new Date(data.retrievedAt).toLocaleString()}. Opening a listing does not submit an application.`;
+        if (!allOpportunities.length) {
+          grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">No current jobs match those filters. <a href="https://www.arbeitnow.com/jobs" target="_blank" rel="noopener noreferrer">Browse Arbeitnow listings</a>.</div>';
+          return;
+        }
+        renderGrid();
       } catch (err) {
         console.error(err);
+        grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Could not reach the live job provider. Please try again later.</div>';
+        status.textContent = 'Network error loading current job listings.';
       }
     }
 
     function renderGrid() {
       const q = document.getElementById('oppSearch').value.toLowerCase().trim();
-      let list = allOpportunities;
-
-      if (currentFilter !== 'all') {
-        list = list.filter(o => (o.type || '').toLowerCase() === currentFilter);
-      }
-
-      if (q) {
-        list = list.filter(o => 
-          (o.title || '').toLowerCase().includes(q) ||
-          (o.organization || '').toLowerCase().includes(q) ||
-          (o.requiredSkills || []).some(s => s.toLowerCase().includes(q))
-        );
-      }
+      const category = document.getElementById('categoryFilter').value;
+      const location = document.getElementById('locationFilter').value;
+      const sort = document.getElementById('sortFilter').value;
+      let list = allOpportunities.filter(job => {
+        if (currentFilter !== 'all' && job.type !== currentFilter) return false;
+        if (category && !(job.tags || []).some(tag => tag.toLowerCase() === category)) return false;
+        if (location === 'remote' && !job.remote) return false;
+        if (location === 'onsite' && job.remote) return false;
+        return !q || [job.title, job.organization, job.location, ...(job.tags || []), ...(job.sourceJobTypes || [])]
+          .some(value => String(value || '').toLowerCase().includes(q));
+      });
+      list = [...list].sort((a, b) => sort === 'newest'
+        ? Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0)
+        : (b.overallMatch ?? -1) - (a.overallMatch ?? -1));
 
       const grid = document.getElementById('oppGrid');
       if (list.length === 0) {
-        grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">No matching opportunities found.</div>';
+        grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">No listings match the selected filters.</div>';
         return;
       }
 
-      grid.innerHTML = list.map(opp => `
-        <div class="opp-card">
+      grid.innerHTML = list.map((opp, index) => {
+        const applicationLink = safeJobUrl(opp.applicationLink);
+        const tracked = trackedJobIds.has(opp.id);
+        return `
+        <article class="opp-card">
           <div>
             <div class="opp-header">
               <div>
-                <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">${opp.organization}</span>
-                <h3 style="font-size:1.15rem;font-weight:700;color:#fff;margin-top:0.2rem;">${opp.title}</h3>
+                <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">${escapeHtml(opp.organization)}</span>
+                <h3 style="font-size:1.15rem;font-weight:700;color:#fff;margin-top:0.2rem;">${escapeHtml(opp.title)}</h3>
               </div>
-              <div class="opp-match-pill">
-                <span>🎯</span> <span>${opp.overallMatch || 85}% Match</span>
+              <div>
+                <div class="opp-match-pill">
+                <span>🎯</span> <span>${opp.overallMatch == null ? 'Match unavailable' : `${opp.overallMatch}% profile match`}</span>
+                </div>
+                <div class="match-method">${opp.overallMatch == null ? 'Match score unavailable' : 'Calculated from your profile attributes'}</div>
               </div>
             </div>
 
             <div style="display:flex;gap:0.75rem;margin-bottom:1rem;flex-wrap:wrap;">
-              <span class="role-tag-pill" style="font-size:0.72rem;">📍 ${opp.location || 'Remote'}</span>
-              <span class="role-tag-pill" style="font-size:0.72rem;color:#34d399;border-color:rgba(16,185,129,0.3);">💰 ${opp.salaryOrStipend || 'Competitive'}</span>
-              <span class="role-tag-pill" style="font-size:0.72rem;text-transform:capitalize;">🏷️ ${opp.type || 'Job'}</span>
+              <span class="role-tag-pill" style="font-size:0.72rem;">📍 ${escapeHtml(opp.location || 'Not specified')}</span>
+              <span class="role-tag-pill" style="font-size:0.72rem;text-transform:capitalize;">🏷️ ${escapeHtml(opp.type || 'Job')}</span>
+              ${(opp.sourceJobTypes || []).map(type => `<span class="role-tag-pill" style="font-size:0.72rem;">${escapeHtml(type)}</span>`).join('')}
+              ${opp.remote ? '<span class="role-tag-pill" style="font-size:0.72rem;">Remote</span>' : ''}
+              ${opp.salaryOrStipend ? `<span class="role-tag-pill" style="font-size:0.72rem;">💰 ${escapeHtml(opp.salaryOrStipend)}</span>` : ''}
             </div>
 
             <p style="font-size:0.82rem;color:var(--text-secondary);line-height:1.5;margin-bottom:1.25rem;">
-              ${opp.description}
+              ${escapeHtml(plainText(opp.description || 'No description provided by the source.'))}
             </p>
 
-            <!-- Skills -->
-            <div style="margin-bottom:1.25rem;">
-              <div style="font-size:0.72rem;font-weight:700;color:var(--text-muted);margin-bottom:0.35rem;text-transform:uppercase;">Skills Match</div>
-              <div>
-                ${(opp.matchedSkills || []).map(s => `<span class="pill-tag pill-match">${s}</span>`).join('')}
-                ${(opp.missingSkills || []).map(s => `<span class="pill-tag pill-miss">${s}</span>`).join('')}
-              </div>
+            ${(opp.tags || []).length ? `<div style="margin-bottom:1rem;">${opp.tags.map(tag => `<span class="pill-tag ${(opp.matchedSkills || []).some(skill => skill.toLowerCase() === tag.toLowerCase()) ? 'pill-match' : 'pill-miss'}">${escapeHtml(tag)}</span>`).join('')}</div>` : ''}
+            <div class="source-label" style="margin-bottom:0.75rem;">
+              Source attribution: <a href="https://www.arbeitnow.com" target="_blank" rel="noopener noreferrer">${escapeHtml(opp.source || 'Arbeitnow Job Board API')}</a>
+              ${opp.createdAt ? ` · Posted ${escapeHtml(new Date(opp.createdAt).toLocaleDateString())}` : ''}
             </div>
+            <p class="ai-fit-explanation" data-fit-explanation="${index}" role="status" hidden></p>
           </div>
 
-          <!-- Actions -->
           <div style="display:flex;gap:0.75rem;padding-top:1rem;border-top:1px solid var(--border-subtle);">
-            <a href="${opp.applicationLink || '#'}" target="_blank" class="btn-action btn-next" style="flex:1;text-align:center;text-decoration:none;font-size:0.85rem;padding:0.65rem;">
-              Apply Official ↗
-            </a>
-            <button onclick="trackApplication('${opp.organization}', '${opp.title}', ${opp.overallMatch || 85})" class="btn-action btn-prev" style="font-size:0.85rem;padding:0.65rem;">
-              + Track in Pipeline
+            <button type="button" data-explain-index="${index}" class="btn-action btn-prev" style="font-size:0.82rem;padding:0.65rem;">Why this match?</button>
+            ${applicationLink ? `<a href="${escapeHtml(applicationLink)}" target="_blank" rel="noopener noreferrer" class="btn-action btn-next" style="flex:1;text-align:center;text-decoration:none;font-size:0.85rem;padding:0.65rem;" aria-label="Open official application listing for ${escapeHtml(opp.title)}">Official listing ↗</a>` : '<span role="status">No safe job link supplied by the source.</span>'}
+            <button type="button" data-job-index="${index}" class="btn-action btn-prev" style="font-size:0.85rem;padding:0.65rem;" ${tracked ? 'disabled' : ''}>
+              ${tracked ? '✓ Saved to pipeline' : '+ Track in Pipeline'}
             </button>
           </div>
-        </div>
-      `).join('');
+        </article>`;
+      }).join('');
+
+      grid.querySelectorAll('[data-job-index]').forEach(button => {
+        button.addEventListener('click', () => trackJob(list[Number(button.dataset.jobIndex)], button));
+      });
+      grid.querySelectorAll('[data-explain-index]').forEach(button => {
+        button.addEventListener('click', () => explainJobFit(list[Number(button.dataset.explainIndex)], button));
+      });
     }
 
-    // Track Application
-    window.trackApplication = async function (company, role, match) {
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+    }
+
+    function plainText(value) {
+      const decoder = document.createElement('textarea');
+      decoder.innerHTML = String(value ?? '');
+      const content = document.createElement('template');
+      content.innerHTML = decoder.value;
+      return (content.content.textContent || '').replace(/\s+/g, ' ').trim();
+    }
+
+    function safeJobUrl(value) {
       try {
-        window.showToast(`Tracking ${role} at ${company}...`, 'info');
+        const url = new URL(value);
+        return url.protocol === 'https:' &&
+          ['arbeitnow.com', 'www.arbeitnow.com', 'arbeitnow.co.uk', 'www.arbeitnow.co.uk'].includes(url.hostname)
+          ? url.href
+          : '';
+      } catch {
+        return '';
+      }
+    }
+
+    async function trackJob(job, button) {
+      if (!job) return;
+      button.disabled = true;
+      try {
         const res = await fetch('/api/career/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
           body: JSON.stringify({
-            company,
-            jobRole: role,
-            status: 'Applied',
-            matchPercentage: match,
-            notes: 'Applied through CareerHub AI Job Matching portal'
+            company: job.organization,
+            jobRole: job.title,
+            jobId: job.id,
+            sourceUrl: job.applicationLink,
+            source: job.source,
+            applicationMethod: 'tracked',
+            type: job.type,
+            location: job.location,
+            ...(job.salaryOrStipend ? { salaryOrStipend: job.salaryOrStipend } : {}),
+            status: 'Saved',
+            matchPercentage: job.overallMatch,
+            notes: 'Saved from Job Matching. The application has not been submitted.'
           })
         });
-
-        if (res.ok) {
-          window.showToast('Application tracked in pipeline!', 'success');
-        } else {
-          window.showToast('Failed to track application.', 'error');
+        const data = await res.json();
+        if (res.status === 409 && data.duplicate) {
+          trackedJobIds.add(job.id);
+          button.textContent = '✓ Already saved';
+          window.showToast('This job is already in your tracker.', 'info');
+          return;
         }
+
+        if (!res.ok) {
+          window.showToast(data.message || 'Could not save the job.', 'error');
+          button.disabled = false;
+          return;
+        }
+        trackedJobIds.add(job.id);
+        button.textContent = '✓ Saved to pipeline';
+        window.showToast('Job saved. You have not submitted an application.', 'success');
       } catch (e) {
         console.error(e);
-        window.showToast('Error tracking application.', 'error');
+        button.disabled = false;
+        window.showToast('Network error saving this job. Please retry.', 'error');
       }
-    };
+    }
+
+    async function explainJobFit(job, button) {
+      if (!job) return;
+      const card = button.closest('.opp-card');
+      const explanation = card?.querySelector('[data-fit-explanation]');
+      if (!explanation) return;
+      button.disabled = true;
+      button.textContent = 'Generating...';
+      explanation.hidden = false;
+      explanation.textContent = 'Generating an explanation for the calculated match…';
+      try {
+        const response = await fetch('/api/career/opportunities/explanation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify({ jobId: job.id })
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          explanation.textContent = data.message || 'AI job-fit explanation is unavailable.';
+          button.textContent = 'Try explanation again';
+          return;
+        }
+        explanation.textContent = `${data.explanation}${data.alignedSkills.length ? ` Aligned skills: ${data.alignedSkills.join(', ')}.` : ''}${data.skillsToBuild.length ? ` To build: ${data.skillsToBuild.join(', ')}.` : ''}`;
+        button.textContent = 'AI explanation ready';
+      } catch {
+        explanation.textContent = 'Could not reach the AI job-fit explanation service.';
+        button.textContent = 'Try explanation again';
+      } finally {
+        button.disabled = false;
+      }
+    }
 
     // Filter clicks
     document.querySelectorAll('.filter-tab').forEach(tab => {
@@ -250,7 +453,9 @@
       });
     });
 
-    document.getElementById('oppSearch').addEventListener('input', renderGrid);
+    ['oppSearch', 'categoryFilter', 'locationFilter', 'sortFilter'].forEach(id => {
+      document.getElementById(id).addEventListener(id === 'oppSearch' ? 'input' : 'change', renderGrid);
+    });
     document.addEventListener('DOMContentLoaded', loadOpportunities);
   </script>
 </body>

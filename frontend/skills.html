@@ -90,7 +90,7 @@
     }
   </style>
 </head>
-<body data-page-title="Skill Gap Analysis" data-page-subtitle="Real-Time Competency Alignment Against Role Standards">
+<body data-page-title="Skill Gap Analysis" data-page-subtitle="Self-reported skills compared with curated role standards">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
@@ -101,15 +101,24 @@
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem;">
           <div>
             <h2 style="font-size:1.25rem;font-weight:700;color:#fff;">Target Role Competency Benchmark</h2>
-            <p style="font-size:0.8rem;color:var(--text-muted);">Comparing your profile skills against tech industry hiring standards</p>
+            <p style="font-size:0.8rem;color:var(--text-muted);">Comparing skills listed in your profile against the selected CareerHub role benchmark</p>
+            <p id="skillGapSavedState" style="font-size:0.75rem;color:var(--text-muted);margin-top:0.35rem;">Loading saved benchmark...</p>
           </div>
-          <div style="display:flex;gap:0.75rem;align-items:center;">
-            <label style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">Benchmark Role:</label>
+          <div style="display:flex;flex-direction:column;gap:0.35rem;align-items:flex-start;">
+            <label for="roleSelect" style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">Benchmark role · temporary</label>
             <select id="roleSelect" style="padding:0.5rem 1rem;background:rgba(14,25,48,0.9);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+              <option value="">Choose a role for this benchmark</option>
               <option value="Full Stack Developer">Full Stack Developer</option>
               <option value="Frontend Engineer">Frontend Engineer</option>
               <option value="Backend Engineer">Backend Engineer</option>
+              <option value="Software Development Engineer 1 (SDE-1)">Software Development Engineer 1 (SDE-1)</option>
+              <option value="Data Analyst">Data Analyst</option>
+              <option value="Data Analyst / ML Engineer">Data Analyst / ML Engineer</option>
+              <option value="Machine Learning Engineer">Machine Learning Engineer</option>
+              <option value="Cloud Engineer">Cloud Engineer</option>
+              <option value="Cybersecurity Analyst">Cybersecurity Analyst</option>
             </select>
+            <small style="color:var(--text-muted);font-size:0.72rem;">Changing this benchmark does not change your saved profile role.</small>
           </div>
         </div>
 
@@ -124,7 +133,7 @@
           <div class="skill-kpi-card">
             <span style="font-size:0.75rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;">Acquired Skills</span>
             <div class="skill-kpi-val" id="acquiredCountVal" style="color:#34d399;">--</div>
-            <span style="font-size:0.75rem;color:var(--text-secondary);">Verified in candidate profile</span>
+            <span style="font-size:0.75rem;color:var(--text-secondary);">Listed in your profile</span>
           </div>
 
           <div class="skill-kpi-card">
@@ -171,6 +180,11 @@
             </div>
           </div>
         </div>
+        <section class="skill-card" aria-live="polite">
+          <h3 style="font-size:1rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Personalized AI guidance</h3>
+          <p id="skillAiStatus" style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;">Waiting for skill-gap analysis...</p>
+          <ul id="skillAiInsights" style="padding-left:1.25rem;color:var(--text-secondary);font-size:0.88rem;line-height:1.7;"></ul>
+        </section>
 
       </main>
     </div>
@@ -178,17 +192,62 @@
 
   <script src="/assets/shared-nav.js"></script>
   <script>
-    let currentRole = 'Full Stack Developer';
+    let currentRole = '';
     let userTechnicalSkills = [];
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+    function showSkillGapUnavailable(message) {
+      document.getElementById('skillGapSavedState').textContent = message;
+      document.getElementById('matchPercentVal').textContent = '--%';
+      document.getElementById('matchStatusText').textContent = 'Select a role and load profile data to calculate a match.';
+      document.getElementById('acquiredCountVal').textContent = '--';
+      document.getElementById('missingCountVal').textContent = '--';
+      document.getElementById('acquiredSubCount').textContent = `${userTechnicalSkills.length} skills`;
+      document.getElementById('missingSubCount').textContent = 'Unavailable';
+      document.getElementById('acquiredListContainer').textContent = userTechnicalSkills.length
+        ? 'Profile skills are available, but this benchmark could not be calculated.'
+        : 'No profile skills yet. Add your technical skills below to get started.';
+      document.getElementById('missingListContainer').textContent = 'Skill gaps are unavailable until a benchmark can be calculated.';
+      document.getElementById('skillAiStatus').textContent = 'Personalized guidance is unavailable until a skill-gap analysis completes.';
+      document.getElementById('skillAiInsights').replaceChildren();
+    }
+
     async function loadSkillGap(role) {
+      if (!role) {
+        showSkillGapUnavailable('Choose a role for this benchmark or set your target role in Profile.');
+        return;
+      }
+      document.getElementById('skillGapSavedState').textContent = 'Loading skill-gap analysis...';
       try {
-        const res = await fetch(`/api/career/skill-gap?role=${encodeURIComponent(role)}`, { headers });
+        const url = `/api/career/skill-gap?role=${encodeURIComponent(role)}`;
+        const res = await fetch(url, { headers });
         if (res.ok) {
           const data = await res.json();
+          const aiStatus = document.getElementById('skillAiStatus');
+          const aiInsights = document.getElementById('skillAiInsights');
+          aiInsights.replaceChildren();
+          const generatedInsights = Array.isArray(data.aiInsights) ? data.aiInsights : [];
+          if (data.aiAdviceStatus?.status === 'generated') {
+            aiStatus.textContent = 'AI-generated guidance is shown below. Match percentage and skill counts are calculated from your profile and curated role benchmarks.';
+            generatedInsights.forEach(insight => {
+              const item = document.createElement('li');
+              item.textContent = typeof insight === 'string'
+                ? insight
+                : `${insight.skill}: ${insight.whyImportant} Learning action: ${insight.learningAction} Project: ${insight.projectIdea} Completion: ${insight.completionCriteria}`;
+              aiInsights.appendChild(item);
+            });
+          } else if (data.aiAdviceStatus?.status === 'not_needed') {
+            aiStatus.textContent = 'No missing benchmark skills need additional AI guidance for this role.';
+          } else {
+            aiStatus.textContent = data.aiAdviceStatus?.status === 'unavailable'
+              ? 'AI guidance could not be generated. The calculated skill gaps below are still available.'
+              : 'Personalized AI guidance is temporarily unavailable. Skill gaps below are calculated from your profile.';
+          }
+          document.getElementById('skillGapSavedState').textContent = data.generatedAt
+            ? `Saved to your account ${new Date(data.generatedAt).toLocaleString()}`
+            : 'Saved to your account.';
           document.getElementById('matchPercentVal').innerText = `${data.matchPercentage || 0}%`;
           document.getElementById('matchStatusText').innerText = data.matchPercentage >= 75
             ? 'High competitive advantage for placements'
@@ -208,7 +267,7 @@
                   <div style="font-weight:600;color:#fff;font-size:0.88rem;">${s.skill}</div>
                   <div style="font-size:0.75rem;color:var(--text-muted);">${s.description || 'Verified competency'}</div>
                 </div>
-                <span style="font-size:0.75rem;color:#34d399;font-weight:700;">Verified ✓</span>
+                <span style="font-size:0.75rem;color:#34d399;font-weight:700;">Listed ✓</span>
               </div>
             `).join('');
 
@@ -228,9 +287,13 @@
                 <a href="/coding" class="role-tag-pill" style="font-size:0.72rem;padding:0.3rem 0.65rem;text-decoration:none;">Practice →</a>
               </div>
             `).join('');
+        } else {
+          const error = await res.json().catch(() => ({}));
+          showSkillGapUnavailable(error.message || 'Unable to load or save this benchmark.');
         }
       } catch (err) {
         console.error('Error loading skill gap:', err);
+        showSkillGapUnavailable('Network error loading skill-gap data. Please retry.');
       }
     }
 
@@ -238,19 +301,28 @@
     document.getElementById('btnAddSkill').addEventListener('click', async () => {
       const input = document.getElementById('newSkillInput');
       const skillName = input.value.trim();
-      if (!skillName) return;
+      if (!skillName) {
+        window.showToast('Enter a skill name first.', 'error');
+        return;
+      }
+      if (skillName.length > 60) {
+        window.showToast('Skill names must be 60 characters or fewer.', 'error');
+        return;
+      }
 
       try {
         window.showToast(`Adding ${skillName} to profile...`, 'info');
         // Fetch current profile
         const profRes = await fetch('/api/career/profile', { headers });
-        let currentSkills = [];
-        if (profRes.ok) {
-          const profData = await profRes.json();
-          currentSkills = profData.user?.technicalSkills || [];
+        if (!profRes.ok) {
+          const error = await profRes.json().catch(() => ({}));
+          window.showToast(error.message || 'Could not load your profile.', 'error');
+          return;
         }
+        const profData = await profRes.json();
+        const currentSkills = profData.user?.technicalSkills || [];
 
-        if (!currentSkills.includes(skillName)) {
+        if (!currentSkills.some(skill => skill.toLowerCase() === skillName.toLowerCase())) {
           currentSkills.push(skillName);
         }
 
@@ -261,9 +333,13 @@
         });
 
         if (updateRes.ok) {
+          userTechnicalSkills = currentSkills;
           input.value = '';
           window.showToast(`Added ${skillName} successfully!`, 'success');
           loadSkillGap(currentRole);
+        } else {
+          const error = await updateRes.json().catch(() => ({}));
+          window.showToast(error.message || 'Failed to add skill.', 'error');
         }
       } catch (e) {
         console.error(e);
@@ -276,8 +352,31 @@
       loadSkillGap(currentRole);
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-      loadSkillGap(currentRole);
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const response = await fetch('/api/career/profile', { headers });
+        if (!response.ok) {
+          showSkillGapUnavailable('Sign in to load your saved target role and skill profile.');
+          return;
+        }
+        const profile = await response.json();
+        userTechnicalSkills = Array.isArray(profile.user?.technicalSkills)
+          ? profile.user.technicalSkills.filter(skill => typeof skill === 'string' && skill.trim())
+          : [];
+        currentRole = profile.user?.targetRole || '';
+        const roleSelect = document.getElementById('roleSelect');
+        if (currentRole && !Array.from(roleSelect.options).some(option => option.value === currentRole)) {
+          roleSelect.add(new Option(currentRole, currentRole));
+        }
+        roleSelect.value = currentRole;
+        if (!currentRole) {
+          showSkillGapUnavailable('Choose a role for this benchmark or set your target role in Profile.');
+          return;
+        }
+        loadSkillGap(currentRole);
+      } catch (error) {
+        showSkillGapUnavailable('Could not load your profile role. Please retry.');
+      }
     });
   </script>
 </body>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Learning Resources</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .resource-groups { display: grid; gap: 1.5rem; max-width: 1100px; margin: 0 auto; }
+    .resource-group { padding: 1.5rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-card); }
+    .resource-group h2 { margin: 0 0 1rem; color: #fff; font-size: 1.15rem; }
+    .resource-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 0.85rem; }
+    .resource-card { display: block; padding: 1rem; border: 1px solid var(--border-subtle); border-radius: 10px; color: var(--text-secondary); text-decoration: none; }
+    .resource-card:hover { border-color: var(--border-glow); background: rgba(0, 210, 255, 0.05); }
+    .resource-card strong { display: block; color: #fff; margin-bottom: 0.35rem; }
+    .resource-card span { font-size: 0.82rem; line-height: 1.5; }
+    .resource-note { color: var(--text-muted); font-size: 0.82rem; margin: 0 0 1rem; }
+    .ai-resource-panel { margin-bottom: 1.25rem; padding: 1.2rem; border: 1px solid var(--border-subtle); border-radius: 10px; background: linear-gradient(120deg, rgba(18, 39, 55, 0.72), rgba(15, 25, 39, 0.92)); }
+    .ai-resource-panel h2 { margin-bottom: 0.35rem; font-size: 1rem; }
+    .ai-resource-status { color: var(--text-muted); font-size: 0.8rem; }
+    .ai-resource-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.7rem; margin-top: 0.8rem; }
+  </style>
+</head>
+<body data-page-title="Learning Resources" data-page-subtitle="Curated links to official documentation and established practice platforms">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        <div class="resource-groups">
+          <section class="ai-resource-panel" aria-labelledby="aiResourceTitle">
+            <h2 id="aiResourceTitle">Recommended for your skill gaps</h2>
+            <p id="aiResourceStatus" class="ai-resource-status" role="status" aria-live="polite">Loading recommendations based on your saved skills...</p>
+            <div class="ai-resource-list" id="aiResourceList"></div>
+          </section>
+          <p class="resource-note">These links open third-party sites. CareerHub does not host or endorse their content; check each provider's terms and current availability.</p>
+          <section class="resource-group">
+            <h2>Software Engineering Foundations</h2>
+            <div class="resource-grid">
+              <a class="resource-card" href="https://developer.mozilla.org/en-US/docs/Web" target="_blank" rel="noopener noreferrer"><strong>MDN Web Docs</strong><span>Reference and guides for web standards, HTML, CSS, and JavaScript.</span></a>
+              <a class="resource-card" href="https://react.dev/learn" target="_blank" rel="noopener noreferrer"><strong>React Learn</strong><span>Official React documentation and interactive learning material.</span></a>
+              <a class="resource-card" href="https://nodejs.org/en/learn" target="_blank" rel="noopener noreferrer"><strong>Node.js Learn</strong><span>Official guides for Node.js fundamentals and APIs.</span></a>
+              <a class="resource-card" href="https://www.mongodb.com/docs/" target="_blank" rel="noopener noreferrer"><strong>MongoDB Documentation</strong><span>Official documentation for MongoDB and its data model.</span></a>
+            </div>
+          </section>
+          <section class="resource-group">
+            <h2>Coding Practice and System Design</h2>
+            <div class="resource-grid">
+              <a class="resource-card" href="https://leetcode.com/problemset/" target="_blank" rel="noopener noreferrer"><strong>LeetCode Problem Set</strong><span>Browse coding problems by topic and difficulty.</span></a>
+              <a class="resource-card" href="https://www.hackerrank.com/interview/preparation-kits" target="_blank" rel="noopener noreferrer"><strong>HackerRank Interview Preparation</strong><span>Structured practice kits for common interview topics.</span></a>
+              <a class="resource-card" href="https://github.com/donnemartin/system-design-primer" target="_blank" rel="noopener noreferrer"><strong>System Design Primer</strong><span>Open-source study notes and examples for system design interviews.</span></a>
+              <a class="resource-card" href="https://docs.python.org/3/tutorial/" target="_blank" rel="noopener noreferrer"><strong>Python Tutorial</strong><span>Official tutorial for Python syntax and core language concepts.</span></a>
+            </div>
+          </section>
+          <section class="resource-group">
+            <h2>Career Preparation</h2>
+            <div class="resource-grid">
+              <a class="resource-card" href="https://www.careeronestop.org/JobSearch/Resumes/resumes.aspx" target="_blank" rel="noopener noreferrer"><strong>CareerOneStop Resume Guide</strong><span>U.S. Department of Labor guidance for writing and organizing a resume.</span></a>
+              <a class="resource-card" href="https://www.careeronestop.org/JobSearch/Interviews/interviews.aspx" target="_blank" rel="noopener noreferrer"><strong>CareerOneStop Interview Guide</strong><span>Interview preparation guidance from a U.S. Department of Labor resource.</span></a>
+              <a class="resource-card" href="https://docs.github.com/en/get-started" target="_blank" rel="noopener noreferrer"><strong>GitHub Get Started</strong><span>Official guides to repositories, collaboration, and version control workflows.</span></a>
+            </div>
+          </section>
+        </div>
+      </main>
+    </div>
+  </div>
+  <script src="/careerhub.js"></script>
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    (async function loadPersonalizedResources() {
+      const status = document.getElementById('aiResourceStatus');
+      const list = document.getElementById('aiResourceList');
+      const token = localStorage.getItem('token');
+      if (!token) {
+        status.textContent = 'Sign in to receive recommendations based on your saved skill gaps.';
+        return;
+      }
+      try {
+        const response = await fetch('/api/career/resources/recommendations', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          status.textContent = data.message || 'AI resource recommendations are currently unavailable.';
+          return;
+        }
+        if (!Array.isArray(data.resources) || data.resources.length === 0) {
+          status.textContent = 'No verified resources were selected for your current skill gaps.';
+          return;
+        }
+        status.textContent = `AI-selected for: ${(data.basedOnSkills || []).join(', ') || 'your target role'}. Links come from CareerHub’s verified resource catalog.`;
+        data.resources.forEach(resource => {
+          const card = document.createElement('a');
+          card.className = 'resource-card';
+          card.href = resource.url;
+          card.target = '_blank';
+          card.rel = 'noopener noreferrer';
+          const title = document.createElement('strong');
+          title.textContent = resource.title;
+          const detail = document.createElement('span');
+          detail.textContent = 'Verified learning resource selected with AI.';
+          card.append(title, detail);
+          list.appendChild(card);
+        });
+      } catch {
+        status.textContent = 'Could not reach the AI resource recommendation service.';
+      }
+    })();
+  </script>
+</body>
+</html>

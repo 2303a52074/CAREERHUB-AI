@@ -1,24 +1,33 @@
 // CareerHub AI - Frontend Service & Interaction Controller
+function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+    })[character]);
+}
+
+function safeArbeitnowLink(value) {
+    try {
+        const url = new URL(value);
+        return url.protocol === 'https:' &&
+            ['arbeitnow.com', 'www.arbeitnow.com', 'arbeitnow.co.uk', 'www.arbeitnow.co.uk'].includes(url.hostname)
+            ? url.href
+            : '';
+    } catch {
+        return '';
+    }
+}
+
 const CareerHub = {
     user: null,
     profileCompletion: 0,
     missingFields: [],
 
     async getHeaders() {
-        let token = localStorage.getItem("token");
-        if (!token) {
-            // Auto-acquire demo token for seamless experience
-            try {
-                const res = await fetch('/api/auth/demo', { method: 'POST' });
-                const data = await res.json();
-                if (data.token) {
-                    token = data.token;
-                    localStorage.setItem("token", token);
-                }
-            } catch (e) {
-                console.warn('Demo login fetch failed:', e);
-            }
-        }
+        const token = localStorage.getItem("token");
         return {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': 'Bearer ' + token } : {})
@@ -38,13 +47,17 @@ const CareerHub = {
             const profileData = await profileRes.json();
             const appsData = await appsRes.json();
             const assessmentData = await assessmentRes.json();
+            if (!profileRes.ok || !appsRes.ok || !assessmentRes.ok) {
+                throw new Error(profileData.message || appsData.message || assessmentData.message || 'Dashboard data could not be loaded.');
+            }
 
             this.user = profileData.user;
-            this.profileCompletion = profileData.completionPercentage || 85;
+            this.profileCompletion = profileData.completionPercentage ?? 0;
             this.missingFields = profileData.missingFields || [];
 
             // Update Readiness Score
-            const readiness = assessmentData.overallReadiness || this.user.careerReadinessScore || 82;
+            const readiness = assessmentData.assessment?.scores?.overallReadiness ??
+                assessmentData.overallReadiness ?? this.user.careerReadinessScore ?? 0;
             const readinessEl = document.getElementById('dashReadinessScore');
             if (readinessEl) readinessEl.innerText = readiness + '%';
 
@@ -89,7 +102,7 @@ const CareerHub = {
 
             // Target Role indicator
             const targetRoleEl = document.getElementById('dashTargetRole');
-            if (targetRoleEl) targetRoleEl.innerText = this.user.targetRole || 'Full Stack Developer';
+            if (targetRoleEl) targetRoleEl.innerText = this.user.targetRole || 'Not set';
 
             // Candidate Name greeting
             const candidateNameEl = document.getElementById('dashCandidateName');
@@ -134,7 +147,8 @@ const CareerHub = {
                 })
             });
             const data = await res.json();
-            const reply = data.reply || "I am analyzing your profile. How else can I assist your placement preparation?";
+            if (!res.ok) throw new Error(data.message || 'Career assistant request failed.');
+            const reply = data.reply;
             this.chatHistory.push({ role: 'assistant', content: reply });
 
             typingDiv.remove();
@@ -142,12 +156,13 @@ const CareerHub = {
             const aiMsgDiv = document.createElement('div');
             aiMsgDiv.className = 'chat-message ai';
             // Format markdown-like bold and line breaks
-            const formattedReply = reply
+            const formattedReply = escapeHtml(reply)
                 .replace(/\n\n/g, '<br><br>')
                 .replace(/\n/g, '<br>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-            aiMsgDiv.innerHTML = `<div class="message-bubble"><strong>🤖 CareerHub AI Mentor</strong><div style="margin-top:8px; line-height:1.6;">${formattedReply}</div></div>`;
+            const responseSource = data.source === 'rule-based' ? 'Offline guidance' : 'AI-generated';
+            aiMsgDiv.innerHTML = `<div class="message-bubble"><strong>🤖 CareerHub AI Mentor</strong><span style="font-size:11px;color:rgba(255,255,255,0.55);margin-left:8px;">${responseSource}</span><div style="margin-top:8px; line-height:1.6;">${formattedReply}</div></div>`;
             chatContainer.appendChild(aiMsgDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -170,7 +185,7 @@ const CareerHub = {
             document.getElementById('profileCollege').value = u.college || '';
             document.getElementById('profileGradYear').value = u.graduationYear || '';
             document.getElementById('profileCgpa').value = u.cgpa || '';
-            document.getElementById('profileTargetRole').value = u.targetRole || 'Full Stack Developer';
+            document.getElementById('profileTargetRole').value = u.targetRole || '';
             document.getElementById('profileCareerGoals').value = u.careerGoals || '';
             document.getElementById('profileTechSkills').value = (u.technicalSkills || []).join(', ');
             document.getElementById('profileSoftSkills').value = (u.softSkills || []).join(', ');
@@ -234,13 +249,28 @@ const CareerHub = {
     assessmentQuestions: [],
     assessmentAnswers: [],
     currentAssessmentIdx: 0,
+    assessmentSessionId: null,
 
     async startAssessment() {
         try {
             const headers = await this.getHeaders();
-            const res = await fetch('/api/career/assessment/questions', { headers });
+            const res = await fetch('/api/career/assessment/start', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ category: 'Mixed', difficulty: 'medium', count: 5 })
+            });
             const data = await res.json();
-            this.assessmentQuestions = data.questions || [];
+            if (!res.ok) {
+                showToast(data.message || 'Assessment generation is unavailable. Please try again.', 'error');
+                return;
+            }
+            if (!['openrouter', 'gemini', 'groq'].includes(data.source) ||
+                !data.sessionId || !Array.isArray(data.questions) || !data.questions.length) {
+                showToast('The AI provider did not return a usable assessment. Please try again.', 'error');
+                return;
+            }
+            this.assessmentSessionId = data.sessionId;
+            this.assessmentQuestions = data.questions;
             this.assessmentAnswers = new Array(this.assessmentQuestions.length).fill(null);
             this.currentAssessmentIdx = 0;
 
@@ -248,9 +278,11 @@ const CareerHub = {
             document.getElementById('assessmentReportCard').style.display = 'none';
             document.getElementById('assessmentActiveCard').style.display = 'block';
 
+            showToast('Assessment questions are ready.', 'success');
             this.renderAssessmentQuestion();
         } catch (e) {
-            showToast('Failed to start assessment.', 'error');
+            console.error('Assessment start failed:', e);
+            showToast('Failed to start the assessment. Check your connection and try again.', 'error');
         }
     },
 
@@ -276,15 +308,18 @@ const CareerHub = {
 
     nextAssessmentQuestion() {
         const selected = document.querySelector('input[name="assessmentOpt"]:checked');
-        if (selected) {
-            this.assessmentAnswers[this.currentAssessmentIdx] = parseInt(selected.value);
+        if (!selected) {
+            showToast('Select an answer before continuing.', 'error');
+            return;
         }
+        this.assessmentAnswers[this.currentAssessmentIdx] = parseInt(selected.value, 10);
         this.currentAssessmentIdx++;
         this.renderAssessmentQuestion();
     },
 
     async submitAssessment() {
-        document.getElementById('assessmentActiveCard').innerHTML = '<div class="spinner"></div><p style="text-align:center;">Evaluating readiness responses and calculating diagnostic scores...</p>';
+        const progressText = document.getElementById('assessmentProgressText');
+        progressText.innerText = 'Evaluating readiness responses...';
 
         try {
             const headers = await this.getHeaders();
@@ -292,11 +327,20 @@ const CareerHub = {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    answers: this.assessmentAnswers,
-                    targetRole: document.getElementById('profileTargetRole')?.value || 'Full Stack Developer'
+                    sessionId: this.assessmentSessionId,
+                    answers: this.assessmentAnswers.map((answer, index) => ({
+                        questionId: index + 1,
+                        answer
+                    }))
                 })
             });
             const report = await res.json();
+            if (!res.ok) {
+                progressText.innerText = report.message || 'Assessment submission failed. Please retry.';
+                this.currentAssessmentIdx = this.assessmentQuestions.length - 1;
+                showToast(report.message || 'Assessment submission failed.', 'error');
+                return;
+            }
 
             document.getElementById('assessmentActiveCard').style.display = 'none';
             const reportCard = document.getElementById('assessmentReportCard');
@@ -314,9 +358,13 @@ const CareerHub = {
             document.getElementById('reportRecommendedSkills').innerHTML = (report.recommendedSkills || []).map(r => `<span class="badge" style="background:rgba(0,210,255,0.2);">${escapeHtml(r)}</span>`).join(' ');
 
             showToast('Readiness Assessment evaluated and saved!', 'success');
+            this.assessmentSessionId = null;
             this.loadOverview();
         } catch (e) {
-            showToast('Assessment submission failed.', 'error');
+            console.error('Assessment submission failed:', e);
+            progressText.innerText = 'Assessment submission failed. Select Continue to retry.';
+            this.currentAssessmentIdx = this.assessmentQuestions.length - 1;
+            showToast('Assessment submission failed. Please retry.', 'error');
         }
     },
 
@@ -325,10 +373,10 @@ const CareerHub = {
         try {
             const headers = await this.getHeaders();
             const roleSelect = document.getElementById('skillGapRoleSelect');
-            const targetRole = roleSelect ? roleSelect.value : 'Full Stack Developer';
+            const targetRole = roleSelect?.value || '';
 
             const [gapRes, roadmapRes] = await Promise.all([
-                fetch(`/api/career/skill-gap?role=${encodeURIComponent(targetRole)}`, { headers }),
+                fetch(targetRole ? `/api/career/skill-gap?role=${encodeURIComponent(targetRole)}` : '/api/career/skill-gap', { headers }),
                 fetch('/api/career/roadmap', { headers })
             ]);
 
@@ -410,18 +458,22 @@ const CareerHub = {
             const data = await res.json();
             const listEl = document.getElementById('opportunitiesContainer');
             if (!listEl) return;
-
-            if (!data.opportunities || data.opportunities.length === 0) {
-                listEl.innerHTML = '<p style="text-align:center; padding:40px;">No opportunities found matching this filter.</p>';
+            if (!res.ok) {
+                listEl.textContent = data.message || 'Live job listings are unavailable.';
                 return;
             }
 
-            listEl.innerHTML = data.opportunities.map(opp => `
+            if (!data.opportunities || data.opportunities.length === 0) {
+                listEl.innerHTML = '<p style="text-align:center; padding:40px;">No current listings match this filter.</p>';
+                return;
+            }
+
+            listEl.innerHTML = data.opportunities.map((opp, index) => `
                 <div class="job-card" style="border-left: 4px solid ${opp.overallMatch >= 80 ? '#10b981' : opp.overallMatch >= 65 ? '#00d2ff' : '#f59e0b'};">
                     <div style="flex:1; min-width:280px;">
                         <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap;">
                             <span class="badge" style="text-transform:uppercase; font-size:10px;">${opp.type}</span>
-                            <span class="badge" style="background:rgba(56,189,248,0.12); color:#38bdf8; border-color:rgba(56,189,248,0.3); font-size:10px;"><i class="fas fa-check-circle"></i> Official Career Portal</span>
+                            <span class="badge" style="background:rgba(56,189,248,0.12); color:#38bdf8; border-color:rgba(56,189,248,0.3); font-size:10px;">${escapeHtml(opp.source)}</span>
                             <h4 style="font-size:18px; margin:0; color:#ffffff;">${escapeHtml(opp.title)}</h4>
                         </div>
                         <p style="color:#00d2ff; font-weight:700; font-size:14px; margin-bottom:4px;">
@@ -429,52 +481,71 @@ const CareerHub = {
                         </p>
                         <p style="font-size:12px; color:rgba(255,255,255,0.7); margin-bottom:10px; line-height:1.5;">${escapeHtml(opp.description)}</p>
                         <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
-                            ${(opp.matchedSkills || []).map(s => `<span class="badge" style="background:rgba(16,185,129,0.15); color:#10b981; border-color:#10b981; font-size:11px;">✓ ${escapeHtml(s)}</span>`).join('')}
-                            ${(opp.missingSkills || []).map(s => `<span class="badge" style="background:rgba(239,68,68,0.1); color:#f87171; border-color:#f87171; font-size:11px;">Missing: ${escapeHtml(s)}</span>`).join('')}
+                            ${(opp.tags || []).map(tag => `<span class="badge" style="font-size:11px;">${escapeHtml(tag)}</span>`).join('')}
                         </div>
-                        <p style="font-size:11px; color:rgba(255,255,255,0.45); margin:0;"><i class="fas fa-user-graduate"></i> Eligibility: ${escapeHtml(opp.eligibility || 'All batches')}</p>
                     </div>
                     <div style="text-align:right; min-width:190px; display:flex; flex-direction:column; justify-content:space-between; align-items:flex-end;">
                         <div>
-                            <div style="font-size:28px; font-weight:800; color:${opp.overallMatch >= 80 ? '#10b981' : '#00d2ff'};">${opp.overallMatch}% Match</div>
-                            <div class="job-salary" style="margin:4px 0 12px 0;">${escapeHtml(opp.salaryOrStipend)}</div>
+                            <div style="font-size:28px; font-weight:800; color:${opp.overallMatch >= 80 ? '#10b981' : '#00d2ff'};">${opp.overallMatch == null ? 'Profile incomplete' : `${opp.overallMatch}% Match`}</div>
+                            ${opp.salaryOrStipend ? `<div class="job-salary" style="margin:4px 0 12px 0;">${escapeHtml(opp.salaryOrStipend)}</div>` : ''}
                         </div>
                         <div style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap;">
-                            <button class="btn-secondary" style="padding:7px 14px; font-size:12px;" onclick="CareerHub.trackOpportunity('${escapeHtml(opp.organization)}', '${escapeHtml(opp.title)}', '${escapeHtml(opp.salaryOrStipend)}', '${opp.type}', ${opp.overallMatch})">
+                            <button class="btn-secondary" data-job-index="${index}" style="padding:7px 14px; font-size:12px;">
                                 <i class="fas fa-bookmark"></i> Track
                             </button>
-                            <a href="${opp.applicationLink}" target="_blank" rel="noopener noreferrer" class="btn-primary" style="padding:7px 18px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, #00d2ff, #0055ff);">
-                                <i class="fas fa-bolt"></i> Direct Apply ↗
+                            ${safeArbeitnowLink(opp.applicationLink) ? `<a href="${escapeHtml(safeArbeitnowLink(opp.applicationLink))}" target="_blank" rel="noopener noreferrer" class="btn-primary" style="padding:7px 18px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:6px; background:linear-gradient(135deg, #00d2ff, #0055ff);">View listing ↗</a>` : ''}
                             </a>
                         </div>
                     </div>
                 </div>
             `).join('');
+            listEl.querySelectorAll('[data-job-index]').forEach(button => {
+                button.addEventListener('click', () => this.trackOpportunity(data.opportunities[Number(button.dataset.jobIndex)], button));
+            });
 
         } catch (e) {
             console.error('Failed to load opportunities:', e);
         }
     },
 
-    async trackOpportunity(company, role, salary, type, match) {
+    async trackOpportunity(job, button) {
+        if (!job || !button) return;
+        button.disabled = true;
         try {
             const headers = await this.getHeaders();
             const res = await fetch('/api/career/applications', {
                 method: 'POST',
                 headers,
                 body: JSON.stringify({
-                    company,
-                    jobRole: role,
-                    salaryOrStipend: salary,
-                    type: type === 'hackathon' || type === 'course' ? 'job' : type,
-                    matchPercentage: match,
-                    status: 'Applied'
+                    company: job.organization,
+                    jobRole: job.title,
+                    jobId: job.id,
+                    sourceUrl: job.applicationLink,
+                    source: job.source,
+                    applicationMethod: 'tracked',
+                    type: job.type,
+                    location: job.location,
+                    ...(job.salaryOrStipend ? { salaryOrStipend: job.salaryOrStipend } : {}),
+                    matchPercentage: job.overallMatch,
+                    status: 'Saved'
                 })
             });
-            showToast(`Added ${company} to your Application Tracker!`, 'success');
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                if (res.status === 409 && error.duplicate) {
+                    button.textContent = 'Already saved';
+                    showToast('This job is already in your tracker.', 'info');
+                    return;
+                }
+                throw new Error(error.message || `Request failed (${res.status})`);
+            }
+            button.textContent = 'Saved to pipeline';
+            showToast('Job saved. You have not submitted an application.', 'success');
             this.loadApplications();
         } catch (e) {
-            showToast('Failed to track application', 'error');
+            console.error('Failed to track opportunity:', e);
+            button.disabled = false;
+            showToast(e.message || 'Failed to track application', 'error');
         }
     },
 
@@ -496,7 +567,7 @@ const CareerHub = {
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                     <td style="padding:14px;"><strong>${escapeHtml(app.company)}</strong></td>
                     <td style="padding:14px;">${escapeHtml(app.jobRole)}</td>
-                    <td style="padding:14px;"><span class="badge" style="color:#00d2ff;">${app.matchPercentage || 85}%</span></td>
+                    <td style="padding:14px;"><span class="badge" style="color:#00d2ff;">${app.matchPercentage == null ? 'Not calculated' : `${app.matchPercentage}%`}</span></td>
                     <td style="padding:14px;">
                         <select onchange="CareerHub.updateApplicationStatus('${app._id}', this.value)" style="padding:6px 12px; font-size:12px;">
                             <option value="Applied" ${app.status === 'Applied' ? 'selected' : ''}>Applied</option>
@@ -566,7 +637,6 @@ const CareerHub = {
                     jobRole,
                     salaryOrStipend: salary,
                     status: 'Applied',
-                    matchPercentage: 88
                 })
             });
             showToast('New application tracked!', 'success');
@@ -585,7 +655,7 @@ const CareerHub = {
             return;
         }
 
-        const targetRole = document.getElementById('resumeTargetRole')?.value || 'Full Stack Developer';
+        const targetRole = document.getElementById('resumeTargetRole')?.value || '';
         const resultContainer = document.getElementById('resumeAnalysis');
         resultContainer.style.display = 'block';
         resultContainer.innerHTML = '<div class="spinner"></div><p style="text-align:center;">Analyzing resume with CareerHub ATS AI...</p>';
@@ -609,7 +679,7 @@ const CareerHub = {
         const file = fileInput.files[0];
         if (!file) return;
 
-        const targetRole = document.getElementById('resumeTargetRole')?.value || 'Full Stack Developer';
+        const targetRole = document.getElementById('resumeTargetRole')?.value || '';
         const formData = new FormData();
         formData.append('resume', file);
         formData.append('targetRole', targetRole);
@@ -634,19 +704,21 @@ const CareerHub = {
 
     renderResumeAnalysis(data) {
         const resultContainer = document.getElementById('resumeAnalysis');
+        const score = Number.isFinite(data.score) ? data.score : null;
         resultContainer.style.display = 'block';
         resultContainer.innerHTML = `
             <div style="background:rgba(0,210,255,0.06); border:1px solid rgba(0,210,255,0.25); border-radius:18px; padding:28px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:20px;">
                     <div>
-                        <h3 style="font-size:22px; color:#fff;">ATS Compatibility Score</h3>
-                        <p style="color:rgba(255,255,255,0.6); font-size:13px;">${escapeHtml(data.summary || 'Resume analyzed successfully.')}</p>
+                        <h3 style="font-size:22px; color:#fff;">Resume Match Score</h3>
+                        <p style="color:rgba(255,255,255,0.6); font-size:13px;">${escapeHtml(data.summary || 'Resume analysis complete.')}</p>
+                        <p style="color:rgba(255,255,255,0.55);font-size:11px;">Method: ${escapeHtml(data.analysisMethod || 'not reported')}. Document layout is not evaluated from extracted text.</p>
                     </div>
                     <div style="font-size:42px; font-weight:800; color:${data.score >= 80 ? '#10b981' : '#00d2ff'};">
-                        ${data.score}%
+                        ${score === null ? '—' : `${score}%`}
                     </div>
                 </div>
-                <div class="progress-bar"><div class="progress-fill" style="width:${data.score}%;"></div></div>
+                ${score === null ? '' : `<div class="progress-bar"><div class="progress-fill" style="width:${score}%;"></div></div>`}
 
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; margin:24px 0;">
                     <div>
@@ -671,7 +743,7 @@ const CareerHub = {
                 </div>
 
                 <button class="btn-primary" onclick="showSection('jobs')" style="margin-top:24px; width:100%;">
-                    🔍 View Matching Placement Opportunities (${data.suggestedJobs?.length || 5}+ openings) →
+                    🔍 Explore Opportunities →
                 </button>
             </div>
         `;

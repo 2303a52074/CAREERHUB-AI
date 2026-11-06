@@ -3,106 +3,235 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CareerHub AI — Opportunities Board</title>
+  <title>CareerHub AI — Jobs & Internships</title>
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/assets/shared-nav.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    .jobs-layout {
-      max-width: 1050px;
-      margin: 0 auto;
-    }
-    .jobs-filter-panel {
+    .jobs-layout { max-width: 1100px; margin: 0 auto; }
+    .filter-bar {
       background: var(--surface-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 1.5rem;
-      margin-bottom: 2rem;
-      display: grid;
-      grid-template-columns: 2fr 1fr 1fr;
-      gap: 1rem;
-    }
-    .job-list-container {
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.75rem;
       display: flex;
-      flex-direction: column;
-      gap: 1.25rem;
+      gap: 1rem;
+      align-items: flex-end;
+      flex-wrap: wrap;
     }
-    .job-item-card {
+    .filter-group { display: flex; flex-direction: column; gap: 0.35rem; flex: 1; min-width: 160px; }
+    .filter-group label { font-size: 0.7rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+    .filter-group input, .filter-group select {
+      padding: 0.65rem 0.9rem;
+      background: rgba(6,11,23,0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .filter-group input::placeholder { color: var(--text-muted); }
+    .filter-group input:focus, .filter-group select:focus { border-color: var(--border-glow); }
+    .filter-group.wide { flex: 2; min-width: 240px; }
+    .jobs-grid { display: flex; flex-direction: column; gap: 1.25rem; }
+    .job-card {
       background: var(--surface-card);
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       padding: 1.75rem;
-      transition: var(--transition-smooth);
+      transition: all 0.2s;
     }
-    .job-item-card:hover {
-      border-color: var(--border-hover);
-      box-shadow: var(--shadow-card);
-    }
-    .job-main-header {
+    .job-card:hover { border-color: var(--border-hover); box-shadow: var(--shadow-card); }
+    .job-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; gap: 1rem; }
+    .job-card-left h3 { font-size: 1.15rem; font-weight: 700; color: #fff; margin-bottom: 0.2rem; }
+    .job-company { font-size: 0.88rem; color: var(--text-cyan); font-weight: 600; }
+    .match-badge {
       display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 0.75rem;
-    }
-    .company-title-box h3 {
-      font-size: 1.25rem;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-full);
+      font-size: 0.8rem;
       font-weight: 700;
+      flex-shrink: 0;
+    }
+    .match-high { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .match-med { background: rgba(0,210,255,0.1); color: #00d2ff; border: 1px solid rgba(0,210,255,0.25); }
+    .match-low { background: rgba(245,158,11,0.1); color: #fbbf24; border: 1px solid rgba(245,158,11,0.25); }
+    .job-meta-row { display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .job-meta-pill { font-size: 0.75rem; padding: 0.25rem 0.65rem; border-radius: var(--radius-full); background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid rgba(255,255,255,0.08); }
+    .job-desc { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem; }
+    .job-skills { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1.25rem; }
+    .skill-chip { font-size: 0.73rem; padding: 0.2rem 0.55rem; border-radius: 4px; font-weight: 600; }
+    .skill-match { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.25); }
+    .skill-missing { background: rgba(248,113,113,0.1); color: #f87171; border: 1px solid rgba(248,113,113,0.25); }
+    .skill-neutral { background: rgba(56,189,248,0.1); color: #38bdf8; border: 1px solid rgba(56,189,248,0.2); }
+    .job-actions { display: flex; gap: 0.75rem; padding-top: 1.25rem; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }
+    .btn-apply {
+      padding: 0.65rem 1.5rem;
+      background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+      border: none;
+      border-radius: 8px;
       color: #fff;
+      font-size: 0.88rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s;
     }
-    .company-name-text {
+    .btn-apply:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(0,210,255,0.3); }
+    .btn-apply:disabled { opacity: 0.7; transform: none; cursor: not-allowed; }
+    .btn-apply.applied { background: rgba(16,185,129,0.2); border: 1px solid rgba(16,185,129,0.4); color: #34d399; }
+    .btn-save-job {
+      padding: 0.65rem 1.25rem;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-secondary);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-save-job:hover { background: rgba(0,210,255,0.07); color: #00d2ff; border-color: rgba(0,210,255,0.3); }
+    .btn-ext-link {
+      padding: 0.65rem 1.25rem;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: var(--text-muted);
       font-size: 0.85rem;
-      color: var(--text-cyan);
-      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
     }
-    .job-tags-row {
+    .btn-ext-link:hover { color: #fff; border-color: var(--border-hover); }
+    .demo-notice {
       display: flex;
-      gap: 0.6rem;
-      margin-bottom: 1rem;
-      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      background: rgba(245,158,11,0.08);
+      border: 1px solid rgba(245,158,11,0.2);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.83rem;
+      color: #fbbf24;
     }
-    @media (max-width: 800px) {
-      .jobs-filter-panel { grid-template-columns: 1fr; }
+    .source-label { font-size: 0.7rem; color: var(--text-muted); }
+    /* Modal */
+    .apply-modal {
+      position: fixed; inset: 0;
+      background: rgba(6,11,23,0.85);
+      backdrop-filter: blur(8px);
+      z-index: 9999;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .apply-modal.open { display: flex; }
+    .apply-modal-body {
+      background: rgba(14,25,48,0.98);
+      border: 1px solid var(--border-glow);
+      border-radius: var(--radius-md);
+      padding: 2.25rem;
+      width: 90%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+    @media (max-width: 640px) {
+      .job-card-header { flex-direction: column; }
+      .filter-group.wide { min-width: 100%; }
+      .filter-bar { flex-direction: column; }
     }
   </style>
 </head>
-<body data-page-title="Opportunities Board" data-page-subtitle="Comprehensive Directory of Software Engineering Openings & Hackathons">
+<body data-page-title="Jobs & Internships" data-page-subtitle="Explore curated opportunities matched to your profile">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
       <div id="header-container"></div>
       <main class="page-container">
-        
         <div class="jobs-layout">
+
+          <div class="demo-notice">
+            <span style="font-size:1.1rem;">ℹ️</span>
+            <span>Current listings are fetched from the Arbeitnow Job Board API and link to the specific source listing. Source fields do not provide verified salary for these results. Opening a listing does not submit an application.</span>
+          </div>
+
           <!-- Filters -->
-          <div class="jobs-filter-panel">
-            <div>
-              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Search Opportunities</label>
-              <input type="text" id="jobsSearchInput" class="input-skill" placeholder="Search title, company, skills..." style="width:100%;">
+          <div class="filter-bar">
+            <div class="filter-group wide">
+              <label>Search</label>
+              <input type="search" id="searchInput" placeholder="Search title, company, location, or tag...">
             </div>
-            <div>
-              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Type</label>
-              <select id="typeFilter" style="width:100%;padding:0.7rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
-                <option value="all">All Types</option>
-                <option value="job">Full-Time Jobs</option>
-                <option value="internship">Internships</option>
-                <option value="hackathon">Hackathons</option>
+            <div class="filter-group">
+              <label>Type</label>
+              <select id="typeFilter">
+                <option value="">All Types</option>
+                <option value="job">Jobs</option>
+                <option value="internship">Internship</option>
               </select>
             </div>
-            <div>
-              <label style="display:block;font-size:0.75rem;color:var(--text-muted);font-weight:600;margin-bottom:0.35rem;text-transform:uppercase;">Location</label>
-              <select id="locationFilter" style="width:100%;padding:0.7rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
-                <option value="all">All Locations</option>
+            <div class="filter-group">
+              <label>Location</label>
+              <select id="locationFilter">
+                <option value="">All Locations</option>
                 <option value="remote">Remote</option>
-                <option value="bengaluru">Bengaluru</option>
-                <option value="hyderabad">Hyderabad</option>
+                <option value="germany">Germany</option>
+                <option value="united kingdom">United Kingdom</option>
+                <option value="berlin">Berlin</option>
+                <option value="london">London</option>
+                <option value="munich">Munich</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Sort By</label>
+              <select id="sortFilter">
+                <option value="match">Best Match</option>
+                <option value="recent">Most Recent</option>
               </select>
             </div>
           </div>
 
-          <!-- Opportunities List -->
-          <div class="job-list-container" id="jobsListContainer">
-            <div style="padding:3rem;text-align:center;color:var(--text-muted);">Loading opportunities directory...</div>
+          <!-- Job List -->
+          <div class="jobs-grid" id="jobsGrid">
+            <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+              <div style="font-size:2rem;margin-bottom:0.75rem;">🔍</div>
+              Loading opportunities...
+            </div>
+          </div>
+        </div>
+
+        <!-- Apply Modal -->
+        <div class="apply-modal" id="applyModal">
+          <div class="apply-modal-body">
+            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.5rem;" id="modalJobTitle">Apply for Role</h3>
+            <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.5rem;" id="modalCompany">Company Name</p>
+
+            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:1rem;margin-bottom:1.5rem;font-size:0.83rem;color:#fbbf24;line-height:1.5;">
+              <strong>Important:</strong> This opens the specific Arbeitnow source listing; it does not submit an application. CareerHub records "Application Started" only because you chose to continue to the external listing. Confirm your actual submission status yourself in the tracker.
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:0.85rem;margin-bottom:1.5rem;">
+              <div class="form-group-inline">
+                <label style="font-size:0.75rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;display:block;margin-bottom:0.35rem;">Notes (optional)</label>
+                <textarea id="modalNotes" style="width:100%;padding:0.75rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;font-family:inherit;outline:none;resize:vertical;min-height:70px;" placeholder="Any notes about this application..."></textarea>
+              </div>
+            </div>
+
+            <div style="display:flex;gap:0.75rem;flex-wrap:wrap;">
+              <button id="btnGoToSite" class="btn-apply" style="flex:1;">
+                🌐 Open Source Listing ↗
+              </button>
+              <button id="btnTrackOnly" class="btn-save-job" style="flex:1;">
+                📌 Save to Track
+              </button>
+            </div>
+            <button onclick="closeApplyModal()" style="width:100%;margin-top:0.75rem;padding:0.6rem;background:transparent;border:1px solid var(--border-subtle);border-radius:8px;color:var(--text-muted);cursor:pointer;font-size:0.85rem;">Cancel</button>
           </div>
         </div>
 
@@ -112,128 +241,249 @@
 
   <script src="/assets/shared-nav.js"></script>
   <script>
-    let allJobs = [];
-
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+    let allJobs = [];
+    let appliedJobIds = new Set();
+    let currentJobForModal = null;
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character]);
+    }
+
+    function safeExternalUrl(value) {
+      try {
+        const url = new URL(value);
+        return url.protocol === 'https:' &&
+          ['arbeitnow.com', 'www.arbeitnow.com', 'arbeitnow.co.uk', 'www.arbeitnow.co.uk'].includes(url.hostname) ? url.href : '';
+      } catch {
+        return '';
+      }
+    }
+
     async function loadJobs() {
       try {
-        const res = await fetch('/api/career/opportunities', { headers });
-        if (res.ok) {
-          const data = await res.json();
-          allJobs = data.opportunities || [];
-          renderJobs();
+        const [jobsRes, appsRes] = await Promise.all([
+          fetch('/api/career/opportunities', { headers }),
+          fetch('/api/career/applications', { headers })
+        ]);
+        const jobsData = await jobsRes.json();
+        const appsData = await appsRes.json();
+        if (!jobsRes.ok || !appsRes.ok) {
+          throw new Error(jobsData.message || appsData.message || 'Could not load opportunities.');
         }
+        allJobs = jobsData.opportunities || [];
+        (appsData.applications || []).forEach(a => {
+          if (a.jobId) appliedJobIds.add(a.jobId);
+          appliedJobIds.add(`${a.company}-${a.jobRole}`);
+        });
+        renderJobs();
       } catch (err) {
         console.error(err);
+        document.getElementById('jobsGrid').innerHTML = `<div style="text-align:center;padding:3rem;color:var(--text-muted);">${escapeHtml(err.message || 'Failed to load opportunities. Please refresh.')}</div>`;
       }
     }
 
     function renderJobs() {
-      const q = document.getElementById('jobsSearchInput').value.toLowerCase().trim();
+      const q = document.getElementById('searchInput').value.toLowerCase().trim();
       const type = document.getElementById('typeFilter').value;
       const loc = document.getElementById('locationFilter').value;
+      const sort = document.getElementById('sortFilter').value;
 
-      let filtered = allJobs;
+      let jobs = [...allJobs];
 
-      if (type !== 'all') {
-        filtered = filtered.filter(j => (j.type || '').toLowerCase() === type);
-      }
+      if (type) jobs = jobs.filter(j => (j.type || '').toLowerCase() === type);
+      if (loc) jobs = jobs.filter(j => (j.location || '').toLowerCase().includes(loc));
+      if (q) jobs = jobs.filter(j =>
+        (j.title || '').toLowerCase().includes(q) ||
+        (j.organization || '').toLowerCase().includes(q) ||
+        (j.location || '').toLowerCase().includes(q) ||
+        [...(j.tags || []), ...(j.sourceJobTypes || [])].some(s => s.toLowerCase().includes(q))
+      );
 
-      if (loc !== 'all') {
-        filtered = filtered.filter(j => (j.location || '').toLowerCase().includes(loc));
-      }
+      if (sort === 'match') jobs.sort((a, b) => (b.overallMatch ?? -1) - (a.overallMatch ?? -1));
+      else if (sort === 'recent') jobs.sort((a, b) => Date.parse(b.createdAt || 0) - Date.parse(a.createdAt || 0));
 
-      if (q) {
-        filtered = filtered.filter(j =>
-          (j.title || '').toLowerCase().includes(q) ||
-          (j.organization || '').toLowerCase().includes(q) ||
-          (j.requiredSkills || []).some(s => s.toLowerCase().includes(q))
-        );
-      }
-
-      const container = document.getElementById('jobsListContainer');
-      if (filtered.length === 0) {
-        container.innerHTML = '<div style="padding:3rem;text-align:center;color:var(--text-muted);">No matching opportunities found.</div>';
+      const grid = document.getElementById('jobsGrid');
+      if (jobs.length === 0) {
+        grid.innerHTML = `
+          <div style="text-align:center;padding:3rem;color:var(--text-muted);">
+            <div style="font-size:2rem;margin-bottom:0.75rem;">🔍</div>
+            No opportunities match your current filters.
+          </div>`;
         return;
       }
 
-      container.innerHTML = filtered.map(job => `
-        <div class="job-item-card">
-          <div class="job-main-header">
-            <div class="company-title-box">
-              <div class="company-name-text">${job.organization}</div>
-              <h3>${job.title}</h3>
-            </div>
-            <span class="role-tag-pill" style="font-weight:700;color:#00d2ff;border-color:rgba(0,210,255,0.3);">
-              ${job.overallMatch || 85}% Alignment
-            </span>
-          </div>
-
-          <div class="job-tags-row">
-            <span class="role-tag-pill" style="font-size:0.75rem;">📍 ${job.location || 'Remote'}</span>
-            <span class="role-tag-pill" style="font-size:0.75rem;color:#34d399;border-color:rgba(16,185,129,0.3);">💰 ${job.salaryOrStipend || 'Competitive'}</span>
-            <span class="role-tag-pill" style="font-size:0.75rem;">👥 ${job.openings || 'Multiple'} Openings</span>
-            <span class="role-tag-pill" style="font-size:0.75rem;">⏳ Deadline: ${job.deadline || 'Rolling'}</span>
-          </div>
-
-          <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.5;margin-bottom:1rem;">
-            ${job.description}
-          </p>
-
-          <div style="font-size:0.78rem;color:var(--text-muted);background:rgba(0,0,0,0.2);padding:0.65rem 0.85rem;border-radius:6px;margin-bottom:1.25rem;">
-            <strong style="color:#fff;">Eligibility:</strong> ${job.eligibility || 'All engineering batches eligible.'}
-          </div>
-
-          <!-- Skills Required -->
-          <div style="margin-bottom:1.25rem;">
-            <strong style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Required Skills: </strong>
-            ${(job.requiredSkills || []).map(s => `<span class="pill-tag pill-match" style="background:rgba(56,189,248,0.12);color:#38bdf8;">${s}</span>`).join('')}
-          </div>
-
-          <!-- Controls -->
-          <div style="display:flex;gap:0.75rem;padding-top:1rem;border-top:1px solid var(--border-subtle);">
-            <a href="${job.applicationLink || '#'}" target="_blank" class="btn-action btn-next" style="text-decoration:none;font-size:0.85rem;padding:0.6rem 1.25rem;">
-              Direct Apply ↗
-            </a>
-            <button onclick="trackApplication('${job.organization}', '${job.title}', ${job.overallMatch || 85})" class="btn-action btn-prev" style="font-size:0.85rem;padding:0.6rem 1.25rem;">
-              + Save to Applications
-            </button>
-          </div>
-        </div>
-      `).join('');
+      grid.innerHTML = jobs.map((job, index) => renderJobCard(job, index)).join('');
+      grid.querySelectorAll('[data-job-index]').forEach(button => {
+        button.addEventListener('click', () => openApplyModal(jobs[Number(button.dataset.jobIndex)]));
+      });
     }
 
-    window.trackApplication = async function (company, role, match) {
+    function renderJobCard(job, index) {
+      const match = job.overallMatch;
+      const matchClass = match == null ? 'match-low' : match >= 80 ? 'match-high' : match >= 60 ? 'match-med' : 'match-low';
+      const matchIcon = match >= 80 ? '✅' : match >= 60 ? '🔵' : '⚠️';
+      const alreadyApplied = appliedJobIds.has(job.id) || appliedJobIds.has(`${job.organization}-${job.title}`);
+      const typeLabel = job.sourceJobTypes?.length ? job.sourceJobTypes.join(', ') : job.type;
+      const applicationUrl = safeExternalUrl(job.applicationLink);
+
+      const matchedSkills = job.matchedSkills || [];
+      const allSkills = job.tags || [];
+
+      const skillHtml = allSkills.map(s => {
+        const ml = String(s).toLowerCase();
+        const isMatch = matchedSkills.some(m => String(m).toLowerCase() === ml);
+        const cls = isMatch ? 'skill-match' : 'skill-neutral';
+        return `<span class="skill-chip ${cls}">${escapeHtml(s)}</span>`;
+      }).join('');
+
+      return `
+        <div class="job-card">
+          <div class="job-card-header">
+            <div class="job-card-left">
+              <div class="job-company">${escapeHtml(job.organization)}</div>
+              <h3>${escapeHtml(job.title)}</h3>
+            </div>
+            <span class="match-badge ${matchClass}">${match == null ? 'Match unavailable' : `${matchIcon} ${match}% Match`}</span>
+          </div>
+
+          <div class="job-meta-row">
+            <span class="job-meta-pill">📍 ${escapeHtml(job.location || 'Not specified')}</span>
+            <span class="job-meta-pill">${typeLabel}</span>
+            ${job.salaryOrStipend ? `<span class="job-meta-pill">💰 ${escapeHtml(job.salaryOrStipend)}</span>` : ''}
+          </div>
+
+          <p class="job-desc">${escapeHtml((job.description || '').substring(0, 200))}${(job.description || '').length > 200 ? '...' : ''}</p>
+
+          ${allSkills.length > 0 ? `
+            <div style="margin-bottom:0.5rem;">
+              <span style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Source categories</span>
+            </div>
+            <div class="job-skills">${skillHtml}</div>
+          ` : ''}
+
+          <div class="source-label" style="margin-bottom:1rem;">
+            🔗 Source: ${escapeHtml(job.source || 'Arbeitnow Job Board API')} · Verify current availability on the source listing
+          </div>
+
+          <div class="job-actions">
+            ${alreadyApplied
+              ? `<button class="btn-apply applied" disabled>✅ Tracked in Pipeline</button>`
+              : `<button class="btn-apply" type="button" data-job-index="${index}">Apply / Track ↗</button>`
+            }
+            ${applicationUrl ? `<a href="${escapeHtml(applicationUrl)}" target="_blank" class="btn-ext-link" rel="noopener noreferrer">View source listing ↗</a>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function openApplyModal(job) {
+      currentJobForModal = job;
+      document.getElementById('modalJobTitle').textContent = job.title;
+      document.getElementById('modalCompany').textContent = `${job.organization} · ${job.location || 'Not specified'}`;
+      document.getElementById('modalNotes').value = '';
+      document.getElementById('applyModal').classList.add('open');
+    }
+
+    window.closeApplyModal = function() {
+      document.getElementById('applyModal').classList.remove('open');
+      currentJobForModal = null;
+    };
+
+    document.getElementById('applyModal').addEventListener('click', (e) => {
+      if (e.target === document.getElementById('applyModal')) closeApplyModal();
+    });
+
+    document.getElementById('btnGoToSite').addEventListener('click', async () => {
+      if (!currentJobForModal) return;
+      const job = currentJobForModal;
+      const notes = document.getElementById('modalNotes').value.trim();
+      const applicationUrl = safeExternalUrl(job.applicationLink);
+      if (!applicationUrl) {
+        window.showToast('No safe source listing URL is available.', 'error');
+        return;
+      }
+      const openedWindow = window.open('about:blank', '_blank');
+      if (!openedWindow) {
+        window.showToast('Allow pop-ups to open the source listing, or use the listing link on the job card.', 'error');
+        return;
+      }
+      openedWindow.opener = null;
+      const saved = await createApplicationRecord(job, 'Application Started', notes);
+      if (saved) {
+        openedWindow.location.replace(applicationUrl);
+        window.showToast('Saved as "Application Started". No application was submitted.', 'success');
+      } else {
+        openedWindow.close();
+      }
+      closeApplyModal();
+    });
+
+    document.getElementById('btnTrackOnly').addEventListener('click', async () => {
+      if (!currentJobForModal) return;
+      const job = currentJobForModal;
+      const notes = document.getElementById('modalNotes').value.trim();
+      if (await createApplicationRecord(job, 'Saved', notes)) closeApplyModal();
+    });
+
+    async function createApplicationRecord(job, status, notes) {
       try {
-        window.showToast(`Tracking ${role} at ${company}...`, 'info');
         const res = await fetch('/api/career/applications', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
           body: JSON.stringify({
-            company,
-            jobRole: role,
-            status: 'Applied',
-            matchPercentage: match,
-            notes: 'Saved from Opportunities Board'
+            company: job.organization,
+            jobRole: job.title,
+            jobId: job.id,
+            type: job.type || 'job',
+            location: job.location || 'Not specified',
+            ...(job.salaryOrStipend ? { salaryOrStipend: job.salaryOrStipend } : {}),
+            status,
+            matchPercentage: job.overallMatch ?? null,
+            notes: notes || `${status} from Opportunities Board`,
+            sourceUrl: job.applicationLink || '',
+            source: job.source || 'Arbeitnow Job Board API',
+            applicationMethod: status === 'Application Started' ? 'external' : 'tracked'
           })
         });
 
         if (res.ok) {
-          window.showToast('Application tracked in pipeline!', 'success');
+          appliedJobIds.add(job.id);
+          appliedJobIds.add(`${job.organization}-${job.title}`);
+          renderJobs(); // refresh to show "Tracked" state
+          if (status === 'Saved') window.showToast(`"${job.title}" saved to your tracker!`, 'success');
+          return true;
         } else {
-          window.showToast('Failed to track application.', 'error');
+          const err = await res.json();
+          if (err.duplicate) {
+            window.showToast('Already in your applications tracker!', 'info');
+            appliedJobIds.add(job.id);
+            appliedJobIds.add(`${job.organization}-${job.title}`);
+            renderJobs();
+            return true;
+          } else {
+            window.showToast(err.message || 'Failed to track application.', 'error');
+          }
         }
       } catch (e) {
         console.error(e);
-        window.showToast('Error tracking application.', 'error');
+        window.showToast('Network error. Please try again.', 'error');
       }
-    };
+      return false;
+    }
 
-    document.getElementById('jobsSearchInput').addEventListener('input', renderJobs);
-    document.getElementById('typeFilter').addEventListener('change', renderJobs);
-    document.getElementById('locationFilter').addEventListener('change', renderJobs);
+    // Event listeners for filters
+    ['searchInput', 'typeFilter', 'locationFilter', 'sortFilter'].forEach(id => {
+      document.getElementById(id).addEventListener('input', renderJobs);
+      document.getElementById(id).addEventListener('change', renderJobs);
+    });
 
     document.addEventListener('DOMContentLoaded', loadJobs);
   </script>

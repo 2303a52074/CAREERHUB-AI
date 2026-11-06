@@ -11,7 +11,8 @@ const CodingProblemSchema = new mongoose.Schema({
     title: { type: String, required: true },
     description: { type: String, required: true },
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
-    category: { type: String, enum: ['arrays', 'strings', 'linked-lists', 'trees', 'dp', 'graphs', 'sorting'], required: true },
+    category: { type: String, enum: ['arrays', 'strings', 'linked-lists', 'trees', 'dp', 'dynamic-programming', 'math', 'graphs', 'sorting'], required: true },
+    seedKey: { type: String, unique: true, sparse: true },
     testCases: [TestCaseSchema],
     solutionTemplate: { type: String, required: true },
     solutionCode: { type: String }, // reference solution

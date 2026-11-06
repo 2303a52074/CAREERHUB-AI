@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./utils/loadEnv')();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -14,6 +14,16 @@ const challengeRoutes = require('./routes/challengeRoutes');
 const codingRoutes = require('./routes/codingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const careerRoutes = require('./routes/careerRoutes');
+const CodingProblem = require('./models/CodingProblem');
+const { codingProblems, seedPromise } = require('./utils/inMemoryDB');
+const seedCodingProblems = require('./utils/seedCodingProblems');
+const authMiddleware = require('./middleware/authMiddleware');
+const {
+    verifyAIProviderConnectivity,
+    getOpenRouterConfiguration,
+    getGeminiConfiguration
+} = require('./utils/aiService');
+const { providerErrorMessage } = require('./utils/providerErrors');
 
 // Ensure upload directories exist
 const uploadDir = path.join(__dirname, 'uploads', 'videos');
@@ -39,15 +49,42 @@ console.log(`📁 Serving frontend static files from: ${frontendDir}`);
 
 // Serve static frontend files
 app.use(express.static(frontendDir));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-    res.json({
-        status: 'ok',
+    const databaseConnected = mongoose.connection.readyState === 1;
+    res.status(databaseConnected ? 200 : 503).json({
+        status: databaseConnected ? 'ok' : 'unavailable',
         service: 'CareerHub AI Backend',
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'in-memory-fallback',
+        database: databaseConnected ? 'connected' : 'unavailable',
         timestamp: new Date().toISOString()
+    });
+});
+
+app.locals.mongo = mongoose.connection;
+app.use('/api', require('./utils/requireMongo'));
+
+app.post('/api/health/ai', authMiddleware, async (req, res) => {
+    const result = await verifyAIProviderConnectivity();
+    const configuration = process.env.AI_PROVIDER?.trim().toLowerCase() === 'gemini'
+        ? getGeminiConfiguration()
+        : getOpenRouterConfiguration();
+    return res.status(result.httpStatus).json({
+        status: result.status,
+        provider: result.provider,
+        configured: result.configured,
+        verified: result.ok,
+        model: result.model,
+        configuration: {
+            apiKeyConfigured: configuration.apiKeyConfigured,
+            provider: configuration.provider,
+            requiredConfiguration: configuration.requiredConfiguration,
+            optionalConfiguration: configuration.optionalConfiguration
+        },
+        code: result.code,
+        message: result.code
+            ? providerErrorMessage(result.code, `${result.provider} connectivity check`)
+            : `${result.provider} generated and returned a valid connectivity response.`
     });
 });
 
@@ -68,26 +105,28 @@ const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
 
 if (mongoUri) {
     mongoose.connect(mongoUri)
-        .then(() => console.log("✅ MongoDB Connected successfully"))
-        .catch(err => console.warn('⚠️ MongoDB not reachable — using robust in-memory fallback:', err.message));
+        .then(async () => {
+            console.log("✅ MongoDB Connected successfully");
+            await seedPromise;
+            await seedCodingProblems(CodingProblem, codingProblems);
+            console.log(`✅ Curated coding problem seed is ready (${codingProblems.length} definitions).`);
+        })
+        .catch(err => console.error('⚠️ MongoDB initialization failed:', err.message));
 } else {
-    console.log("ℹ️ [CareerHub AI] Running with high-performance in-memory database store");
+    console.warn('MongoDB is not configured. Persistent API operations are disabled.');
 }
 
 // Error middleware for graceful database handling
 app.use((err, req, res, next) => {
     if (err.name === 'MongooseError' || err.name === 'MongoNetworkError' || (err.message && err.message.includes('buffering timed out'))) {
-        console.warn('[CareerHub AI] Database operation timed out — returning fallback response');
-        if (req.method === 'GET') {
-            return res.json(req.path.endsWith('s') || req.path.endsWith('s/') ? [] : {});
-        }
-        return res.status(503).json({ error: 'Service temporarily unavailable (database offline)' });
+        console.warn('[CareerHub AI] Database is unavailable:', err.message);
+        return res.status(503).json({ error: 'Database temporarily unavailable. Please retry.' });
     }
     console.error('Server error:', err);
-    res.status(500).json({ error: err.message || 'Internal Server Error' });
+    res.status(500).json({ error: 'Internal server error.' });
 });
 
-// Explicit clean routes for all 14 dedicated pages and auth views
+// Explicit clean routes for dedicated pages and auth views
 const pageRoutes = [
     { route: '/dashboard', file: 'dashboard.html' },
     { route: '/assessment', file: 'assessment.html' },
@@ -102,12 +141,15 @@ const pageRoutes = [
     { route: '/jobs', file: 'jobs.html' },
     { route: '/applications', file: 'applications.html' },
     { route: '/analytics', file: 'analytics.html' },
+    { route: '/resources', file: 'resources.html' },
     { route: '/assistant', file: 'assistant.html' },
     { route: '/login', file: 'login.html' },
     { route: '/register', file: 'register.html' },
     { route: '/admin', file: 'admin.html' },
     { route: '/problems', file: 'problems.html' },
-    { route: '/editor', file: 'editor.html' }
+    { route: '/editor', file: 'editor.html' },
+    { route: '/profile', file: 'profile.html' },
+    { route: '/recommendations', file: 'recommendations.html' }
 ];
 
 pageRoutes.forEach(({ route, file }) => {

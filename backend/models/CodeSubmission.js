@@ -7,7 +7,7 @@ const CodeSubmissionSchema = new mongoose.Schema({
     problemId: { type: mongoose.Schema.Types.ObjectId, ref: 'CodingProblem', required: true },
     code: { type: String, required: true },
     language: { type: String, default: 'javascript' },
-    status: { type: String, enum: ['accepted', 'wrong_answer', 'time_limit', 'memory_limit', 'runtime_error', 'pending'], default: 'pending' },
+    status: { type: String, enum: ['accepted', 'wrong_answer', 'time_limit', 'memory_limit', 'compilation_error', 'runtime_error', 'runner_error', 'pending'], default: 'pending' },
     score: { type: Number, default: 0 },
     executionTime: Number,
     memoryUsed: Number,

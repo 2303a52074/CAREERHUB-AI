@@ -1,38 +1,42 @@
-require('dotenv').config();
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+require('./utils/loadEnv')();
 
 async function listModels() {
-    console.log('🔍 Checking available models...');
-    console.log('=================================');
-    
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-        console.log('❌ GEMINI_API_KEY not found!');
+    const key = process.env.OPENROUTER_API_KEY?.trim();
+    if (!key) {
+        console.error('OPENROUTER_API_KEY is missing from the backend environment.');
+        process.exitCode = 1;
         return;
     }
-    
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // Try different model names
-    const modelsToTry = [
-        "gemini-2.0-flash-exp",
-        "gemini-2.0-pro-exp",
-        "gemini-1.5-pro",
-        "gemini-1.5-flash",
-        "gemini-pro",
-        "gemini-1.0-pro"
-    ];
-    
-    for (const modelName of modelsToTry) {
-        try {
-            const model = genAI.getGenerativeModel({ model: modelName });
-            const result = await model.generateContent("Say 'OK'");
-            await result.response;
-            console.log(`✅ WORKING: ${modelName}`);
-        } catch (error) {
-            console.log(`❌ FAILED: ${modelName} - ${error.message.substring(0, 50)}`);
-        }
+
+    const response = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+            Authorization: `Bearer ${key}`,
+            'HTTP-Referer': process.env.OPENROUTER_SITE_URL?.trim() || 'http://localhost',
+            'X-Title': process.env.OPENROUTER_APP_NAME?.trim() || 'CareerHub AI'
+        },
+        signal: AbortSignal.timeout(15000)
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !Array.isArray(data?.data)) {
+        console.error(`OpenRouter model lookup failed with HTTP ${response.status}.`);
+        process.exitCode = 1;
+        return;
     }
+
+    const modelIds = data.data
+        .map(model => model?.id)
+        .filter(modelId => typeof modelId === 'string')
+        .sort();
+    if (!modelIds.length) {
+        console.log('OpenRouter returned no models.');
+        return;
+    }
+
+    console.log(modelIds.join('\n'));
+    console.log(`\nTotal available models: ${modelIds.length}`);
 }
 
-listModels();
+listModels().catch(error => {
+    console.error(`OpenRouter model lookup failed: ${error.name === 'TimeoutError' ? 'request timed out' : 'network error'}.`);
+    process.exitCode = 1;
+});

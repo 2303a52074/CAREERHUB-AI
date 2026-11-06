@@ -2,407 +2,342 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CareerHub AI — Coding Practice & IDE</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <title>LeetCode Progress — CareerHub AI</title>
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/assets/shared-nav.css">
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
-    .workspace-grid {
-      display: grid;
-      grid-template-columns: 380px 1fr;
-      gap: 1.5rem;
-      height: calc(100vh - var(--header-height) - 4rem);
-      min-height: 650px;
-    }
-    .problem-panel {
-      background: var(--surface-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .problem-selector-bar {
-      padding: 1rem 1.25rem;
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .problem-content {
-      padding: 1.5rem;
-      overflow-y: auto;
-      flex: 1;
-    }
-    .problem-title-text {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: #fff;
-      margin-bottom: 0.5rem;
-    }
-    .badge-diff {
-      font-size: 0.72rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      padding: 0.2rem 0.6rem;
-      border-radius: var(--radius-full);
-    }
-    .diff-easy { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-    .diff-medium { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-    .diff-hard { background: rgba(239, 68, 68, 0.15); color: #f87171; }
-    .company-pill {
-      font-size: 0.7rem;
-      padding: 0.15rem 0.5rem;
-      border-radius: 4px;
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text-secondary);
-      display: inline-block;
-      margin-right: 0.35rem;
-    }
-    .ide-panel {
-      background: var(--surface-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-    .ide-toolbar {
-      padding: 0.75rem 1.25rem;
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      background: rgba(6, 11, 23, 0.6);
-    }
-    .code-editor-area {
-      flex: 1;
-      position: relative;
-      background: #090e1c;
-    }
-    .code-textarea {
-      width: 100%;
-      height: 100%;
-      padding: 1.25rem;
-      background: transparent;
-      border: none;
-      color: #38bdf8;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.92rem;
-      line-height: 1.6;
-      resize: none;
-      outline: none;
-      white-space: pre;
-    }
-    .console-panel {
-      height: 180px;
-      border-top: 1px solid var(--border-subtle);
-      background: rgba(6, 11, 23, 0.95);
-      display: flex;
-      flex-direction: column;
-    }
-    .console-tabs {
-      display: flex;
-      border-bottom: 1px solid var(--border-subtle);
-      background: rgba(0, 0, 0, 0.2);
-    }
-    .console-tab {
-      padding: 0.5rem 1rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-muted);
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-    }
-    .console-tab.active {
-      color: #00d2ff;
-      border-bottom-color: #00d2ff;
-    }
-    .console-body {
-      flex: 1;
-      padding: 0.85rem 1.25rem;
-      overflow-y: auto;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.82rem;
-      color: var(--text-secondary);
-    }
-    @media (max-width: 950px) {
-      .workspace-grid { grid-template-columns: 1fr; height: auto; }
-      .problem-panel { height: 400px; }
-      .ide-panel { height: 550px; }
-    }
+    .leetcode-page { max-width:1180px; margin:0 auto; display:grid; gap:1rem; }
+    .lc-card { border:1px solid var(--border-subtle); border-radius:14px; padding:clamp(1rem,2.4vw,1.5rem); background:var(--surface-card); }
+    .lc-card h2,.lc-card h3 { margin:0; color:#f5f8ff; }
+    .lc-muted { color:var(--text-muted); line-height:1.55; }
+    .lc-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.8rem; }
+    .lc-stat { border:1px solid var(--border-subtle); background:rgba(7,17,31,.6); border-radius:10px; padding:.9rem; }
+    .lc-stat strong { display:block; font-size:1.35rem; color:#f5f8ff; }
+    .lc-stat span { color:var(--text-muted); font-size:.78rem; }
+    .lc-profile-form { display:flex; flex-wrap:wrap; gap:.6rem; margin-top:.8rem; }
+    .lc-profile-form input { flex:1 1 220px; min-height:42px; border:1px solid var(--border-subtle); border-radius:8px; padding:.6rem .75rem; background:#081523; color:#fff; }
+    .lc-button { min-height:40px; border:1px solid #287b9b; border-radius:8px; padding:.55rem .85rem; background:#0b4560; color:#eefaff; cursor:pointer; font:600 .84rem Inter,sans-serif; }
+    .lc-button:hover:not(:disabled) { background:#126283; }
+    .lc-button:disabled { opacity:.55; cursor:not-allowed; }
+    .lc-message { margin-top:.75rem; min-height:1.2em; font-size:.85rem; }
+    .lc-message[data-kind="error"] { color:#ffb4b4; }
+    .lc-message[data-kind="success"] { color:#91e7ca; }
+    .lc-list { display:grid; gap:.65rem; margin-top:.8rem; }
+    .lc-row { display:flex; justify-content:space-between; align-items:center; gap:1rem; border:1px solid var(--border-subtle); border-radius:9px; padding:.8rem; background:rgba(7,17,31,.45); }
+    .lc-row strong { color:#eef5ff; }
+    .lc-row small { display:block; margin-top:.2rem; color:var(--text-muted); }
+    .lc-row a,.lc-link { color:#79d8f1; font-weight:650; }
+    .lc-row a:focus-visible,.lc-link:focus-visible,.lc-button:focus-visible,.lc-profile-form input:focus-visible { outline:3px solid rgba(56,189,248,.55); outline-offset:2px; }
+    .lc-note { border-left:3px solid #d5a750; padding:.75rem .9rem; background:rgba(114,77,18,.16); color:#e7d2a4; font-size:.84rem; line-height:1.55; }
+    @media (max-width:680px) { .lc-grid { grid-template-columns:1fr; } .lc-row { align-items:flex-start; } }
   </style>
 </head>
-<body data-page-title="Coding Practice" data-page-subtitle="Sandboxed Code Execution, Test Case Runner & Big-O Analyzer">
+<body data-page-title="LeetCode Progress" data-page-subtitle="Verified external links and honest practice history">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
       <div id="header-container"></div>
-      <main class="page-container" style="padding:1.25rem 2rem;">
-        
-        <div class="workspace-grid">
-          <!-- Left: Problem Description & Test Cases -->
-          <div class="problem-panel">
-            <div class="problem-selector-bar">
-              <label style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Problem:</label>
-              <select id="problemDropdown" style="flex:1;padding:0.4rem 0.75rem;background:rgba(14,25,48,0.9);border:1px solid var(--border-subtle);border-radius:6px;color:#fff;font-size:0.85rem;outline:none;">
-                <option value="">Loading problems...</option>
-              </select>
-            </div>
+      <main class="page-container leetcode-page">
+        <section class="lc-card">
+          <h2>LeetCode public profile</h2>
+          <p class="lc-muted">Save a public profile link to keep it handy. We do not request LeetCode credentials, scrape profile pages, or claim that a username has been verified.</p>
+          <div class="lc-note" role="note">LeetCode has no documented public statistics API, and no authorized data provider is configured. Automatic statistics, topic breakdowns, and recent LeetCode submissions are unavailable; sync will report this rather than invent data.</div>
+          <form id="profileForm" class="lc-profile-form">
+            <label for="leetcodeUsername" class="hidden">LeetCode username</label>
+            <input id="leetcodeUsername" name="username" maxlength="39" autocomplete="off" placeholder="LeetCode username" pattern="[A-Za-z0-9_\-]{1,39}">
+            <button type="submit" class="lc-button" id="saveProfileButton">Save profile link</button>
+            <button type="button" class="lc-button" id="syncButton">Sync progress</button>
+            <button type="button" class="lc-button" id="disconnectButton">Remove link</button>
+          </form>
+          <p id="profileMessage" class="lc-message" role="status" aria-live="polite"></p>
+          <a id="officialProfileLink" class="lc-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open saved LeetCode profile ↗</a>
+        </section>
 
-            <div class="problem-content" id="problemContent">
-              <div style="display:flex;align-items:center;gap:0.75rem;margin-bottom:0.75rem;">
-                <span class="badge-diff diff-easy" id="probDifficulty">Easy</span>
-                <span style="font-size:0.8rem;color:var(--text-accent);font-weight:700;" id="probPoints">+10 XP</span>
-              </div>
-              <h2 class="problem-title-text" id="probTitle">Two Sum</h2>
-              <div style="margin-bottom:1rem;" id="probCompanies">
-                <!-- Companies tags -->
-              </div>
-              <div style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.5rem;" id="probDesc">
-                Given an array of integers nums and an integer target, return indices of the two numbers that add up to target.
-              </div>
-
-              <div style="font-size:0.8rem;font-weight:700;color:#fff;text-transform:uppercase;margin-bottom:0.5rem;">Constraints</div>
-              <div style="font-size:0.8rem;color:var(--text-muted);font-family:'JetBrains Mono',monospace;background:rgba(0,0,0,0.2);padding:0.6rem 0.85rem;border-radius:6px;margin-bottom:1.5rem;" id="probConstraints">
-                2 <= nums.length <= 10^4
-              </div>
-
-              <div style="font-size:0.8rem;font-weight:700;color:#fff;text-transform:uppercase;margin-bottom:0.5rem;">Example Test Cases</div>
-              <div id="probTestCases" style="display:flex;flex-direction:column;gap:0.6rem;">
-                <!-- Test cases -->
-              </div>
-            </div>
+        <section class="lc-card" aria-labelledby="careerHubStatsHeading">
+          <h2>LeetCode account statistics</h2>
+          <p class="lc-muted">Not available: no verified public statistics source is configured.</p>
+          <div class="lc-grid">
+            <div class="lc-stat"><strong>—</strong><span>Easy solved · unavailable</span></div>
+            <div class="lc-stat"><strong>—</strong><span>Medium solved · unavailable</span></div>
+            <div class="lc-stat"><strong>—</strong><span>Hard solved · unavailable</span></div>
           </div>
+        </section>
 
-          <!-- Right: Code Editor & Execution Console -->
-          <div class="ide-panel">
-            <div class="ide-toolbar">
-              <div style="display:flex;align-items:center;gap:0.75rem;">
-                <span style="font-size:0.82rem;font-weight:600;color:#fff;">Language:</span>
-                <span class="role-tag-pill" style="padding:0.25rem 0.65rem;font-size:0.75rem;">JavaScript (ES6+)</span>
-              </div>
-              <div style="display:flex;gap:0.5rem;">
-                <button id="btnAiAnalyze" class="role-tag-pill" style="border-color:rgba(99,102,241,0.4);color:#a5b4fc;" title="Get AI hint & Big-O complexity">
-                  🤖 AI Hint & Big-O
-                </button>
-                <button id="btnRunCode" class="role-tag-pill" style="border-color:rgba(56,189,248,0.4);color:#38bdf8;">
-                  ▶ Run Code
-                </button>
-                <button id="btnSubmitSolution" class="btn-action btn-next" style="padding:0.4rem 1rem;font-size:0.82rem;">
-                  Submit Solution ✓
-                </button>
-              </div>
-            </div>
-
-            <!-- Code Textarea -->
-            <div class="code-editor-area">
-              <textarea id="codeEditor" class="code-textarea" spellcheck="false"></textarea>
-            </div>
-
-            <!-- Console Output Panel -->
-            <div class="console-panel">
-              <div class="console-tabs">
-                <div class="console-tab active" id="tabOutput" onclick="switchConsoleTab('output')">Test Results</div>
-                <div class="console-tab" id="tabAi" onclick="switchConsoleTab('ai')">AI Complexity & Hint</div>
-              </div>
-              <div class="console-body" id="consoleBody">
-                <span style="color:var(--text-muted);">Press "Run Code" or "Submit Solution" to test your code against sandbox test cases.</span>
-              </div>
-            </div>
+        <section class="lc-card" aria-labelledby="careerHubStatsHeading">
+          <h2 id="careerHubStatsHeading">CareerHub coding history</h2>
+          <p class="lc-muted" id="targetRoleContext">Loading saved practice history…</p>
+          <div class="lc-grid" aria-live="polite">
+            <div class="lc-stat"><strong id="solvedCount">—</strong><span>Unique accepted CareerHub problems</span></div>
+            <div class="lc-stat"><strong id="practiceCount">—</strong><span>Saved CareerHub attempts</span></div>
+            <div class="lc-stat"><strong id="topicCount">—</strong><span>Topics with enough practice evidence</span></div>
           </div>
-        </div>
+          <p class="lc-muted">These figures come only from CareerHub's saved coding submissions. They are not LeetCode account statistics.</p>
+        </section>
 
+        <section class="lc-card">
+          <h2>Practice recommendations</h2>
+          <p class="lc-muted" id="recommendationContext">Recommendations use official problem links and CareerHub practice evidence only; they do not infer LeetCode progress.</p>
+          <div class="lc-list" id="recommendationList" aria-live="polite">
+            <div class="lc-muted" role="status">Loading verified problem links…</div>
+          </div>
+        </section>
+
+        <section class="lc-card">
+          <h2>Recent accepted CareerHub submissions</h2>
+          <p class="lc-muted">External LeetCode submissions are not available without an authorized statistics source.</p>
+          <div class="lc-list" id="recentSubmissions" aria-live="polite">
+            <div class="lc-muted" role="status">Loading saved submissions…</div>
+          </div>
+        </section>
+
+        <section class="lc-card">
+          <h2>LeetCode topic statistics and practice history</h2>
+          <p class="lc-muted">Unavailable until an authorized source can verify topic-wise progress and submission history. We do not infer external account weaknesses from CareerHub records.</p>
+        </section>
       </main>
     </div>
   </div>
-
   <script src="/assets/shared-nav.js"></script>
   <script>
-    let problemsList = [];
-    let currentProblem = null;
+    (() => {
+      const token = localStorage.getItem('token');
+      const authHeaders = token ? { Authorization: `Bearer ${token}` } : {};
+      const $ = id => document.getElementById(id);
+      let profileLink = null;
+      let busy = false;
+      let savedProfile = false;
 
-    const token = localStorage.getItem('token');
-    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
-
-    async function loadProblems() {
-      try {
-        const res = await fetch('/api/coding/problems', { headers });
-        if (res.ok) {
-          problemsList = await res.json();
-          renderDropdown();
-          
-          // Check query param for problemId
-          const urlParams = new URLSearchParams(window.location.search);
-          const qId = urlParams.get('problemId');
-          const target = problemsList.find(p => String(p._id) === qId || String(p.id) === qId) || problemsList[0];
-          if (target) selectProblem(target._id || target.id);
-        }
-      } catch (err) {
-        console.error(err);
+      function setMessage(message, kind = '') {
+        $('profileMessage').textContent = message;
+        $('profileMessage').dataset.kind = kind;
       }
-    }
 
-    function renderDropdown() {
-      const select = document.getElementById('problemDropdown');
-      select.innerHTML = problemsList.map(p => `
-        <option value="${p._id || p.id}">${p.title} (${p.difficulty})</option>
-      `).join('');
-
-      select.onchange = (e) => selectProblem(e.target.value);
-    }
-
-    function selectProblem(id) {
-      currentProblem = problemsList.find(p => String(p._id) === String(id) || String(p.id) === String(id));
-      if (!currentProblem) return;
-
-      document.getElementById('problemDropdown').value = currentProblem._id || currentProblem.id;
-      document.getElementById('probTitle').innerText = currentProblem.title;
-      document.getElementById('probDesc').innerText = currentProblem.description;
-      document.getElementById('probPoints').innerText = `+${currentProblem.points || 10} XP`;
-      document.getElementById('probConstraints').innerText = currentProblem.constraints || 'Standard memory & runtime limits';
-
-      const diffEl = document.getElementById('probDifficulty');
-      diffEl.innerText = (currentProblem.difficulty || 'Easy').toUpperCase();
-      diffEl.className = `badge-diff diff-${(currentProblem.difficulty || 'easy').toLowerCase()}`;
-
-      // Companies
-      const compContainer = document.getElementById('probCompanies');
-      compContainer.innerHTML = (currentProblem.companies || ['Google', 'Amazon']).map(c => `
-        <span class="company-pill">${c}</span>
-      `).join('');
-
-      // Test cases preview
-      const tcContainer = document.getElementById('probTestCases');
-      tcContainer.innerHTML = (currentProblem.testCases || []).slice(0, 2).map((tc, idx) => `
-        <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.05);padding:0.6rem 0.85rem;border-radius:6px;font-family:'JetBrains Mono',monospace;font-size:0.75rem;">
-          <div><span style="color:var(--text-muted);">Input:</span> ${tc.input}</div>
-          <div><span style="color:var(--text-muted);">Expected:</span> ${tc.expectedOutput}</div>
-        </div>
-      `).join('');
-
-      // Code template
-      document.getElementById('codeEditor').value = currentProblem.solutionTemplate || `function solution(nums) {\n    // Write your solution here\n    \n}`;
-    }
-
-    // Run Code
-    document.getElementById('btnRunCode').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
-      const firstInput = currentProblem?.testCases?.[0]?.input || '';
-      
-      switchConsoleTab('output');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Running sandboxed code...</span>';
-
-      try {
-        const res = await fetch('/api/coding/run', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ code, testInput: firstInput })
+      async function api(url, options = {}) {
+        const response = await fetch(url, {
+          ...options,
+          headers: { ...authHeaders, ...(options.headers || {}) }
         });
-        const data = await res.json();
-        if (data.success) {
-          document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#34d399;font-weight:700;margin-bottom:0.4rem;">Execution Succeeded:</div>
-            <pre style="color:#cbd5e1;white-space:pre-wrap;">${data.output || 'No output'}</pre>
-          `;
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          const error = new Error(data.message || `Request failed (${response.status}).`);
+          error.status = response.status;
+          error.code = data.code;
+          throw error;
+        }
+        return data;
+      }
+
+      function updateProfileControls() {
+        $('syncButton').disabled = busy || !savedProfile;
+        $('disconnectButton').disabled = busy || !savedProfile;
+        $('saveProfileButton').disabled = busy;
+      }
+
+      function renderProfile(profile) {
+        profileLink = profile.profileUrl || null;
+        savedProfile = Boolean(profile.username);
+        $('leetcodeUsername').value = profile.username || '';
+        const link = $('officialProfileLink');
+        if (profileLink && /^https:\/\/leetcode\.com\/u\/[A-Za-z0-9_-]+\/$/.test(profileLink)) {
+          link.href = profileLink;
+          link.hidden = false;
+          setMessage('Profile link saved; username and profile availability are not verified.', '');
         } else {
-          document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#f87171;font-weight:700;margin-bottom:0.4rem;">Runtime Error:</div>
-            <pre style="color:#fca5a5;white-space:pre-wrap;">${data.error || 'Execution failed'}</pre>
-          `;
+          link.hidden = true;
+          link.removeAttribute('href');
+          setMessage('No LeetCode profile link saved.', '');
         }
-      } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Execution error: ${e.message}</span>`;
+        updateProfileControls();
       }
-    });
 
-    // AI Analyze
-    document.getElementById('btnAiAnalyze').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
-      switchConsoleTab('ai');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#a5b4fc;">🤖 Gemini analyzing code complexity & Big-O...</span>';
-
-      try {
-        const res = await fetch('/api/coding/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({
-            code,
-            problemTitle: currentProblem?.title,
-            problemDescription: currentProblem?.description
-          })
-        });
-        const data = await res.json();
-        document.getElementById('consoleBody').innerHTML = `
-          <div style="color:#a5b4fc;font-weight:700;margin-bottom:0.4rem;">AI Code Review & Big-O Complexity:</div>
-          <pre style="color:#e0e7ff;white-space:pre-wrap;font-family:inherit;">${data.analysis || 'Analysis complete'}</pre>
-        `;
-      } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Analysis error: ${e.message}</span>`;
-      }
-    });
-
-    // Submit Solution
-    document.getElementById('btnSubmitSolution').addEventListener('click', async () => {
-      const code = document.getElementById('codeEditor').value;
-      if (!currentProblem) return;
-
-      switchConsoleTab('output');
-      document.getElementById('consoleBody').innerHTML = '<span style="color:#00d2ff;">Evaluating test cases in sandbox...</span>';
-
-      try {
-        const res = await fetch(`/api/coding/submit/${currentProblem._id || currentProblem.id}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ code, language: 'javascript' })
-        });
-        const data = await res.json();
-
-        if (data.status === 'accepted') {
-          window.showToast(`🎉 Accepted! +${data.score || 10} XP awarded`, 'success');
-          document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#34d399;font-weight:700;font-size:1rem;margin-bottom:0.5rem;">✅ Accepted! All test cases passed.</div>
-            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Score: +${data.score} XP awarded to candidate profile.</div>
-            ${(data.results || []).map((r, i) => `
-              <div style="font-size:0.78rem;color:#34d399;margin-bottom:0.25rem;">Test Case ${i+1}: Passed ✓</div>
-            `).join('')}
-          `;
-        } else {
-          window.showToast('Failed some test cases. Check console output.', 'error');
-          document.getElementById('consoleBody').innerHTML = `
-            <div style="color:#f87171;font-weight:700;font-size:1rem;margin-bottom:0.5rem;">❌ Wrong Answer</div>
-            <div style="color:#cbd5e1;font-size:0.85rem;margin-bottom:0.75rem;">Some test cases did not match expected output.</div>
-            ${(data.results || []).map((r, i) => `
-              <div style="font-size:0.78rem;color:${r.passed ? '#34d399' : '#f87171'};margin-bottom:0.25rem;">
-                Test Case ${i+1}: ${r.passed ? 'Passed ✓' : `Failed ❌ (Expected: ${r.expectedOutput}, Got: ${r.actualOutput || r.error})`}
-              </div>
-            `).join('')}
-          `;
+      function renderRecommendations(problems, attempts, targetRole) {
+        const list = $('recommendationList');
+        const topicAttempts = new Map();
+        const problemById = new Map(problems.map(problem => [String(problem._id || problem.id), problem]));
+        for (const submission of attempts) {
+          const problem = problemById.get(String(submission.problemId?._id || submission.problemId));
+          if (!problem?.category) continue;
+          const stats = topicAttempts.get(problem.category) || { attempts: 0, accepted: 0 };
+          stats.attempts++;
+          if (submission.status === 'accepted') stats.accepted++;
+          topicAttempts.set(problem.category, stats);
         }
-      } catch (e) {
-        document.getElementById('consoleBody').innerHTML = `<span style="color:#f87171;">Submission error: ${e.message}</span>`;
+        const evidencedTopics = [...topicAttempts.entries()]
+          .filter(([, stats]) => stats.attempts >= 3)
+          .map(([topic, stats]) => ({ topic, ...stats, rate: stats.accepted / stats.attempts }))
+          .sort((left, right) => left.rate - right.rate);
+        const officialProblems = problems.filter(problem =>
+          problem.officialSource === 'LeetCode' &&
+          /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(problem.officialUrl || '')
+        );
+        $('recommendationContext').textContent = targetRole
+          ? `Target role: ${targetRole}. Links below are real LeetCode problems; recommendations are not based on synchronized LeetCode statistics.`
+          : 'Add a target role in your profile to contextualize future recommendations. Links below are verified official problem URLs.';
+        if (!officialProblems.length) {
+          list.innerHTML = '<div class="lc-muted" role="status">No verified LeetCode problem links are available in the local catalog.</div>';
+          $('topicCount').textContent = String(evidencedTopics.length);
+          return;
+        }
+        const ordered = [...officialProblems].sort((a, b) => {
+          const left = evidencedTopics.findIndex(item => item.topic === a.category && item.rate < 0.5);
+          const right = evidencedTopics.findIndex(item => item.topic === b.category && item.rate < 0.5);
+          return (left < 0 ? Number.MAX_SAFE_INTEGER : left) -
+            (right < 0 ? Number.MAX_SAFE_INTEGER : right);
+        });
+        $('topicCount').textContent = String(evidencedTopics.length);
+        list.replaceChildren(...ordered.slice(0, 8).map(problem => {
+          const row = document.createElement('article');
+          row.className = 'lc-row';
+          const copy = document.createElement('div');
+          const title = document.createElement('strong');
+          title.textContent = problem.title;
+          const details = document.createElement('small');
+          const evidence = evidencedTopics.find(item => item.topic === problem.category);
+          details.textContent = `${problem.difficulty || 'Difficulty unavailable'} · ${problem.category || 'Topic unavailable'}` +
+            (evidence && evidence.rate < 0.5
+              ? ` · CareerHub evidence: ${evidence.accepted}/${evidence.attempts} accepted`
+              : '');
+          copy.append(title, details);
+          const anchor = document.createElement('a');
+          anchor.href = problem.officialUrl;
+          anchor.target = '_blank';
+          anchor.rel = 'noopener noreferrer';
+          anchor.textContent = 'Open problem ↗';
+          row.append(copy, anchor);
+          return row;
+        }));
       }
-    });
 
-    window.switchConsoleTab = function (tab) {
-      document.getElementById('tabOutput').classList.toggle('active', tab === 'output');
-      document.getElementById('tabAi').classList.toggle('active', tab === 'ai');
-    };
-
-    // Tab key support in textarea
-    document.getElementById('codeEditor').addEventListener('keydown', function(e) {
-      if (e.key === 'Tab') {
-        e.preventDefault();
-        const start = this.selectionStart;
-        const end = this.selectionEnd;
-        this.value = this.value.substring(0, start) + "    " + this.value.substring(end);
-        this.selectionStart = this.selectionEnd = start + 4;
+      function renderRecent(submissions, problems) {
+        const list = $('recentSubmissions');
+        const problemById = new Map(problems.map(problem => [String(problem._id || problem.id), problem]));
+        const recent = submissions.filter(item => item.status === 'accepted').slice(0, 8);
+        if (!recent.length) {
+          list.innerHTML = '<div class="lc-muted" role="status">No accepted CareerHub coding submissions are saved yet.</div>';
+          return;
+        }
+        list.replaceChildren(...recent.map(submission => {
+          const row = document.createElement('article');
+          row.className = 'lc-row';
+          const problem = problemById.get(String(submission.problemId?._id || submission.problemId));
+          const copy = document.createElement('div');
+          const title = document.createElement('strong');
+          title.textContent = problem?.title || 'Saved coding problem';
+          const details = document.createElement('small');
+          const date = submission.submittedAt ? new Date(submission.submittedAt) : null;
+          details.textContent = `${problem?.difficulty || 'Difficulty unavailable'} · ${problem?.category || 'Topic unavailable'}` +
+            (date && !Number.isNaN(date.valueOf()) ? ` · ${date.toLocaleDateString()}` : '');
+          copy.append(title, details);
+          row.append(copy);
+          list.append(row);
+        }));
       }
-    });
 
-    document.addEventListener('DOMContentLoaded', loadProblems);
+      async function loadPage() {
+        if (!token) {
+          setMessage('Sign in to save your profile link and view private CareerHub practice history.', 'error');
+          $('targetRoleContext').textContent = 'Sign in to load saved coding practice history.';
+          $('recommendationList').textContent = 'Sign in to load the problem catalog.';
+          $('recentSubmissions').textContent = 'Sign in to load saved submissions.';
+          updateProfileControls();
+          return;
+        }
+        try {
+          const profile = await api('/api/coding/leetcode/profile');
+          renderProfile(profile);
+        } catch (error) {
+          setMessage(error.message, 'error');
+        }
+        let stats = null;
+        let submissions = [];
+        let problems = [];
+        let targetRole = '';
+        try {
+          stats = await api('/api/coding/stats');
+          submissions = await api('/api/coding/submissions');
+          problems = await api('/api/coding/problems');
+          const profile = await api('/api/career/profile');
+          targetRole = profile.user?.targetRole || '';
+          $('solvedCount').textContent = String(stats.totalSolved ?? 0);
+          $('practiceCount').textContent = String(submissions.length);
+          $('targetRoleContext').textContent = targetRole
+            ? `Saved CareerHub practice for your ${targetRole} target role.`
+            : 'CareerHub practice history is not connected to a saved target role yet.';
+          renderRecommendations(problems, submissions, targetRole);
+          renderRecent(submissions, problems);
+        } catch (error) {
+          $('targetRoleContext').textContent = error.status === 401
+            ? 'Your session expired. Sign in again to view saved coding practice.'
+            : 'Could not load CareerHub practice history. Please refresh to retry.';
+          $('recommendationList').textContent = 'Problem recommendations are unavailable until the catalog loads.';
+          $('recentSubmissions').textContent = 'Saved submissions could not be loaded.';
+        }
+      }
+
+      $('profileForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        if (busy) return;
+        const username = $('leetcodeUsername').value.trim();
+        if (!/^[A-Za-z0-9_-]{1,39}$/.test(username)) {
+          setMessage('Enter a username containing only letters, numbers, underscores, or hyphens.', 'error');
+          return;
+        }
+        busy = true;
+        updateProfileControls();
+        setMessage('Saving your public profile link…');
+        try {
+          const profile = await api('/api/coding/leetcode/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username })
+          });
+          renderProfile(profile);
+          setMessage(profile.message, '');
+        } catch (error) {
+          setMessage(error.message, 'error');
+        } finally {
+          busy = false;
+          updateProfileControls();
+        }
+      });
+
+      $('syncButton').addEventListener('click', async () => {
+        if (busy || !savedProfile) return;
+        busy = true;
+        updateProfileControls();
+        setMessage('Checking whether an authorized synchronization provider is available…');
+        try {
+          await api('/api/coding/leetcode/sync', { method: 'POST' });
+          setMessage('LeetCode synchronization completed.', 'success');
+        } catch (error) {
+          setMessage(error.message, 'error');
+        } finally {
+          busy = false;
+          updateProfileControls();
+        }
+      });
+
+      $('disconnectButton').addEventListener('click', async () => {
+        if (busy || !savedProfile) return;
+        busy = true;
+        updateProfileControls();
+        try {
+          const result = await api('/api/coding/leetcode/profile', { method: 'DELETE' });
+          renderProfile({ username: null, profileUrl: null });
+          setMessage(result.message, 'success');
+        } catch (error) {
+          setMessage(error.message, 'error');
+        } finally {
+          busy = false;
+          updateProfileControls();
+        }
+      });
+
+      loadPage();
+    })();
   </script>
 </body>
 </html>

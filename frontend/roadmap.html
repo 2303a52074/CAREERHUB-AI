@@ -72,7 +72,6 @@
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid rgba(255, 255, 255, 0.04);
-      cursor: pointer;
       transition: var(--transition-smooth);
     }
     .milestone-item:hover {
@@ -83,6 +82,9 @@
       height: 20px;
       border-radius: 6px;
       border: 2px solid var(--text-muted);
+      padding: 0;
+      background: transparent;
+      font: inherit;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -127,7 +129,7 @@
           <div>
             <span style="font-size:0.75rem;font-weight:700;color:var(--text-accent);text-transform:uppercase;">Custom Career Pathway</span>
             <h2 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0.25rem 0 0.5rem;" id="roadmapRoleTitle">
-              Full Stack Developer Pathway
+              Career Pathway
             </h2>
             <p style="font-size:0.85rem;color:var(--text-muted);">
               Track and conquer each technical milestone to achieve comprehensive placement readiness.
@@ -135,6 +137,8 @@
           </div>
 
           <div class="overall-progress-box">
+            <button type="button" class="btn-action btn-next" id="regenerateRoadmapButton"
+              style="margin-bottom:.8rem;padding:.45rem .8rem;font-size:.8rem;">Regenerate roadmap</button>
             <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
               <span style="font-size:0.82rem;font-weight:600;color:#fff;">Overall Progress</span>
               <span style="font-size:0.82rem;font-weight:700;color:var(--text-accent);" id="roadmapPercentText">--%</span>
@@ -142,12 +146,13 @@
             <div style="height:10px;background:rgba(255,255,255,0.06);border-radius:5px;overflow:hidden;">
               <div id="roadmapProgressBar" style="width:0%;height:100%;background:var(--gradient-primary);transition:width 0.6s ease;"></div>
             </div>
+            <p id="roadmapSourceStatus" style="font-size:0.72rem;color:var(--text-muted);margin-top:0.7rem;"></p>
           </div>
         </div>
 
         <!-- 5 Phased Milestone Sections -->
         <div class="phases-container" id="phasesContainer">
-          <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading career roadmap...</div>
+          <div role="status" style="padding:2rem;text-align:center;color:var(--text-muted);">Loading your saved career roadmap…</div>
         </div>
 
       </main>
@@ -158,29 +163,57 @@
   <script>
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+    const roadmapContainer = document.getElementById('phasesContainer');
+    const regenerateButton = document.getElementById('regenerateRoadmapButton');
+    const pendingMilestoneUpdates = new Set();
+
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, character => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[character]);
 
     async function loadRoadmap() {
+      roadmapContainer.innerHTML =
+        '<div role="status" style="padding:2rem;text-align:center;color:var(--text-muted);">Loading your saved career roadmap…</div>';
       try {
-        const res = await fetch('/api/career/roadmap', { headers });
+        const res = await fetch('/api/career/roadmap', {
+          headers,
+          signal: AbortSignal.timeout(45000)
+        });
         if (res.ok) {
           const roadmap = await res.json();
           renderRoadmap(roadmap);
         } else {
-          document.getElementById('phasesContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load roadmap.</div>';
+          const error = await res.json().catch(() => ({}));
+          const message = escapeHtml(error.message || 'Unable to load roadmap.');
+          const action = error.actionUrl === '/profile'
+            ? ' <a href="/profile">Choose a target role</a>.'
+            : '';
+          roadmapContainer.innerHTML =
+            `<div role="alert" style="padding:2rem;text-align:center;color:var(--text-muted);">${message}${action} Use “Regenerate roadmap” to retry when AI is available.</div>`;
         }
       } catch (e) {
         console.error('Roadmap fetch error:', e);
+        roadmapContainer.innerHTML =
+          '<div role="alert" style="padding:2rem;text-align:center;color:var(--text-muted);">Could not load your career roadmap. Check your connection, then retry with “Regenerate roadmap”.</div>';
+      } finally {
+        regenerateButton.disabled = false;
+        regenerateButton.textContent = 'Regenerate roadmap';
       }
     }
 
     function renderRoadmap(data) {
-      document.getElementById('roadmapRoleTitle').innerText = `${data.targetRole || 'Full Stack Developer'} Pathway`;
+      document.getElementById('roadmapRoleTitle').innerText = `${data.targetRole || 'Career'} Pathway`;
       const progress = data.progressPercentage || 0;
       document.getElementById('roadmapPercentText').innerText = `${progress}% Complete`;
       document.getElementById('roadmapProgressBar').style.width = `${progress}%`;
+      document.getElementById('roadmapSourceStatus').textContent = data.generationSource === 'openrouter'
+        ? 'AI-personalized roadmap. Progress is based on saved milestone completion.'
+        : data.aiGenerationStatus && data.aiGenerationStatus !== 'not_configured' && data.aiGenerationStatus !== 'generated'
+          ? 'AI roadmap generation was unavailable when this roadmap was created; the curated starter pathway is shown.'
+          : 'Curated starter pathway. AI-personalized milestones are temporarily unavailable.';
 
       const phases = data.phases || [];
-      const container = document.getElementById('phasesContainer');
+      const container = roadmapContainer;
 
       container.innerHTML = phases.map(phase => {
         const isAllDone = phase.status === 'completed';
@@ -188,48 +221,91 @@
         return `
           <div class="phase-card ${isAllDone ? 'phase-completed' : ''}">
             <div class="phase-header">
-              <h3 class="phase-title">${phase.title}</h3>
+              <h3 class="phase-title">${escapeHtml(phase.title)}</h3>
               <span class="phase-status-badge ${statusClass}">${phase.status || 'Pending'}</span>
             </div>
-            <p class="phase-desc">${phase.description}</p>
+            <p class="phase-desc">${escapeHtml(phase.description)}</p>
 
             <div class="milestones-list">
               ${(phase.milestones || []).map(m => `
-                <div class="milestone-item ${m.completed ? 'completed' : ''}" onclick="toggleMilestone('${m.id}', ${!m.completed})">
-                  <div class="milestone-checkbox">
+                <div class="milestone-item ${m.completed ? 'completed' : ''}">
+                  <button type="button" class="milestone-checkbox"
+                    data-milestone-id="${escapeHtml(m.id)}" data-completed="${!m.completed}"
+                    aria-pressed="${Boolean(m.completed)}"
+                    aria-label="${m.completed ? 'Mark milestone incomplete' : 'Mark milestone complete'}">
                     ${m.completed ? '✓' : ''}
-                  </div>
-                  <span class="milestone-text">${m.title}</span>
-                  <span style="font-size:0.7rem;color:var(--text-accent);font-weight:600;">+25 XP</span>
+                  </button>
+                  <span class="milestone-text">${escapeHtml(m.title)}${m.completionCriteria ? `<small style="display:block;color:var(--text-muted);margin-top:0.2rem;">Done when: ${escapeHtml(m.completionCriteria)}</small>` : ''}</span>
+                  <span style="font-size:0.7rem;color:var(--text-accent);font-weight:600;">${Number.isFinite(m.estimatedHours) ? `${m.estimatedHours}h` : 'Progress'}</span>
                 </div>
               `).join('')}
             </div>
           </div>
         `;
       }).join('');
+      container.querySelectorAll('.milestone-checkbox').forEach(button => {
+        button.addEventListener('click', () =>
+          window.toggleMilestone(button.dataset.milestoneId, button.dataset.completed === 'true'));
+      });
     }
 
     window.toggleMilestone = async function (milestoneId, completed) {
+      if (pendingMilestoneUpdates.size > 0) return;
+      pendingMilestoneUpdates.add(milestoneId);
+      roadmapContainer.querySelectorAll('.milestone-checkbox').forEach(control => { control.disabled = true; });
       try {
         window.showToast('Updating milestone status...', 'info');
         const res = await fetch('/api/career/roadmap/milestone', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...headers },
-          body: JSON.stringify({ milestoneId, completed })
+          body: JSON.stringify({ milestoneId, completed }),
+          signal: AbortSignal.timeout(15000)
         });
 
         if (res.ok) {
           const data = await res.json();
-          window.showToast(completed ? 'Milestone completed! +25 XP awarded' : 'Milestone marked incomplete', 'success');
+          window.showToast(completed ? 'Milestone completed' : 'Milestone marked incomplete', 'success');
           renderRoadmap(data.roadmap);
         } else {
           window.showToast('Failed to update milestone', 'error');
         }
       } catch (e) {
-        console.error(e);
-        window.showToast('Network error updating milestone', 'error');
+        window.showToast(
+          e.name === 'TimeoutError'
+            ? 'Milestone update timed out. Please retry.'
+            : 'Network error updating milestone',
+          'error'
+        );
+      } finally {
+        pendingMilestoneUpdates.delete(milestoneId);
+        roadmapContainer.querySelectorAll('.milestone-checkbox').forEach(control => { control.disabled = false; });
       }
     };
+
+    regenerateButton.addEventListener('click', async () => {
+      if (regenerateButton.disabled) return;
+      regenerateButton.disabled = true;
+      regenerateButton.textContent = 'Regenerating…';
+      roadmapContainer.innerHTML =
+        '<div role="status" style="padding:2rem;text-align:center;color:var(--text-muted);">Generating a new roadmap. Your saved progress remains intact.</div>';
+      try {
+        const res = await fetch('/api/career/roadmap/regenerate', {
+          method: 'POST',
+          headers,
+          signal: AbortSignal.timeout(45000)
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(result.message || 'Roadmap regeneration failed.');
+        renderRoadmap(result.roadmap);
+        window.showToast('Roadmap regenerated. Completed milestones were preserved.', 'success');
+      } catch (error) {
+        roadmapContainer.innerHTML =
+          `<div role="alert" style="padding:2rem;text-align:center;color:var(--text-muted);">${escapeHtml(error.message)} Your current roadmap remains saved. You can retry when ready.</div>`;
+      } finally {
+        regenerateButton.disabled = false;
+        regenerateButton.textContent = 'Regenerate roadmap';
+      }
+    });
 
     document.addEventListener('DOMContentLoaded', loadRoadmap);
   </script>

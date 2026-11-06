@@ -3,18 +3,26 @@
   "version": "1.0.0",
   "description": "CareerHub AI - AI-Powered Career & Placement Assistant",
   "main": "server.js",
+  "engines": {
+    "node": ">=20.16.0 <21 || >=22.3.0"
+  },
   "scripts": {
     "dev": "node backend/server.js",
     "start": "node backend/server.js",
     "backend": "node backend/server.js",
-    "frontend": "npx serve frontend -p 3001",
+    "frontend": "node frontend/server.js",
     "seed": "node backend/seed-problems.js",
-    "lint": "node --check backend/server.js backend/routes/*.js backend/utils/*.js frontend/careerhub.js",
-    "build": "node -e \"const fs = require('fs'); fs.mkdirSync('backend/uploads/videos', { recursive: true }); console.log('Build complete');\""
+    "lint": "node backend/build-check.js",
+    "test": "npm run test:unit",
+    "test:unit": "node backend/test-env-loading.js && node backend/test-job-provider.js && node backend/test-profile-validation.js && node backend/test-role-resolution.js && node backend/test-assessment-evaluation.js && node backend/test-leetcode-catalog.js && node backend/test-provider-errors.js && node backend/test-resume-pdf.js && node backend/test-provider-selection.js && node backend/test-interview-workflows.js && node backend/test-code-execution.js && node backend/test-require-mongo.js && node backend/test-assistant-markdown.js && node backend/test-challenge-security.js",
+    "test:api": "node backend/run-api-tests.js",
+    "migrate:daily-plan-index": "node backend/migrations/ensure-daily-plan-unique-index.js",
+    "test:qualified-fallbacks": "node backend/test-qualified-fallbacks.js",
+    "test:groq-qualification": "node backend/test-groq-qualification.js",
+    "test:gemini-qualification": "node backend/test-gemini-qualification.js",
+    "build": "node backend/build-check.js"
   },
   "dependencies": {
-    "@google/genai": "^2.22.0",
-    "@google/generative-ai": "^0.24.1",
     "@huggingface/inference": "^4.13.14",
     "@xenova/transformers": "^2.17.2",
     "axios": "^1.13.6",
@@ -22,13 +30,12 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.0",
     "express": "^4.18.2",
-    "groq-sdk": "^1.1.2",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
+    "mammoth": "^1.13.0",
     "mongoose": "^8.0.3",
     "multer": "^2.1.0",
     "natural": "^8.1.1",
-    "pdf-parse": "^1.1.1",
-    "vm2": "^3.10.5"
+    "pdf-parse": "^2.4.5"
   }
 }

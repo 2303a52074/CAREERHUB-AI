@@ -156,16 +156,27 @@
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
     async function loadDailyPlan() {
+      const dateDisplay = document.getElementById('dailyDateDisplay');
+      const container = document.getElementById('dailyTasksContainer');
       try {
         const res = await fetch('/api/career/daily-plan', { headers });
         if (res.ok) {
           const data = await res.json();
           renderDailyPlan(data);
         } else {
-          document.getElementById('dailyTasksContainer').innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load daily plan.</div>';
+          const error = await res.json().catch(() => ({}));
+          const message = error.message || 'Unable to load daily plan.';
+          dateDisplay.textContent = error.code === 'TARGET_ROLE_REQUIRED'
+            ? 'Complete your profile to generate a personalized plan.'
+            : 'Daily plan unavailable.';
+          container.innerHTML =
+            `<div style="padding:2rem;text-align:center;color:var(--text-muted);">${escapeHtml(message)}${error.actionUrl ? ` <a href="${safeInternalUrl(error.actionUrl)}">Choose a target role</a>.` : ''}</div>`;
         }
       } catch (err) {
         console.error('Daily plan error:', err);
+        dateDisplay.textContent = 'Daily plan unavailable.';
+        container.innerHTML =
+          '<div style="padding:2rem;text-align:center;color:var(--text-muted);">Unable to load the daily plan. Check your connection and retry.</div>';
       }
     }
 
@@ -177,6 +188,13 @@
 
       document.getElementById('dailyStreakBadge').innerText = `🔥 ${streak} Day Streak`;
       document.getElementById('dailyDateDisplay').innerText = data.date ? `Target Date: ${data.date}` : new Date().toDateString();
+      if (data.roleMismatch) {
+        const notice = document.createElement('p');
+        notice.className = 'status-banner';
+        notice.setAttribute('role', 'status');
+        notice.textContent = `Today's saved plan targets ${plan.targetRole}; your current profile targets ${data.profileTargetRole}. This existing plan is preserved until tomorrow.`;
+        document.getElementById('dailyTasksContainer').prepend(notice);
+      }
       document.getElementById('dailyPercentText').innerText = `${percent}%`;
       document.getElementById('dailyProgressBar').style.width = `${percent}%`;
 
@@ -200,14 +218,14 @@
           </div>
           <div class="task-details">
             <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
-              <span class="task-category-pill">${task.category}</span>
-              <span style="font-size:0.75rem;color:var(--text-accent);font-weight:700;">+${task.xpReward} XP</span>
+              <span class="task-category-pill">${escapeHtml(task.category)}</span>
+              <span style="font-size:0.75rem;color:var(--text-accent);font-weight:700;">+${Number(task.xpReward) || 0} XP</span>
             </div>
-            <div class="task-title">${task.title}</div>
-            <div class="task-desc">${task.description}</div>
+            <div class="task-title">${escapeHtml(task.title)}</div>
+            <div class="task-desc">${escapeHtml(task.description)}</div>
           </div>
-          <a href="${task.actionUrl}" class="role-tag-pill" style="text-decoration:none;padding:0.4rem 0.85rem;background:${task.completed ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.1)'};color:${task.completed ? '#34d399' : '#00d2ff'};">
-            ${task.completed ? 'Review' : (task.actionText || 'Start')} →
+          <a href="${safeInternalUrl(task.actionUrl)}" class="role-tag-pill" style="text-decoration:none;padding:0.4rem 0.85rem;background:${task.completed ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.1)'};color:${task.completed ? '#34d399' : '#00d2ff'};">
+            ${task.completed ? 'Review' : escapeHtml(task.actionText || 'Start')} →
           </a>
         </div>
       `).join('');
@@ -234,6 +252,23 @@
         window.showToast('Network error updating task.', 'error');
       }
     };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+    }
+
+    function safeInternalUrl(value) {
+      try {
+        const url = new URL(value, window.location.origin);
+        return url.origin === window.location.origin && String(value).startsWith('/')
+          ? `${url.pathname}${url.search}${url.hash}`
+          : '/dashboard';
+      } catch {
+        return '/dashboard';
+      }
+    }
 
     document.addEventListener('DOMContentLoaded', loadDailyPlan);
   </script>

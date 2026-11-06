@@ -1,229 +1,194 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Coding Problems Arena — CareerHub AI</title>
-    <link rel="icon" type="image/png" href="assets/logo.png">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <link rel="stylesheet" href="style.css">
-
-    <style>
-        .arena-container {
-            max-width: 1100px;
-            margin: 40px auto;
-            padding: 0 24px;
-        }
-
-        .arena-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding-bottom: 24px;
-            border-bottom: 1px solid rgba(56, 189, 248, 0.15);
-            margin-bottom: 36px;
-            flex-wrap: wrap;
-            gap: 20px;
-        }
-
-        .problem-card {
-            background: rgba(14, 25, 48, 0.75);
-            border: 1px solid rgba(56, 189, 248, 0.16);
-            border-radius: 18px;
-            padding: 22px 28px;
-            margin-bottom: 16px;
-            cursor: pointer;
-            transition: var(--transition-smooth);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            backdrop-filter: blur(12px);
-        }
-
-        .problem-card:hover {
-            border-color: rgba(56, 189, 248, 0.5);
-            transform: translateX(6px);
-            box-shadow: 0 10px 30px rgba(0, 210, 255, 0.12);
-            background: rgba(18, 33, 64, 0.85);
-        }
-
-        .problem-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .problem-icon {
-            width: 42px;
-            height: 42px;
-            border-radius: 12px;
-            background: rgba(0, 210, 255, 0.1);
-            border: 1px solid rgba(56, 189, 248, 0.25);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #00d2ff;
-            font-size: 16px;
-        }
-
-        .problem-title {
-            font-size: 16px;
-            font-weight: 700;
-            color: #ffffff;
-        }
-
-        .problem-tags {
-            display: flex;
-            gap: 8px;
-            margin-top: 4px;
-        }
-
-        .tag-pill {
-            font-size: 11px;
-            color: #8da4c4;
-            background: rgba(255, 255, 255, 0.05);
-            padding: 2px 8px;
-            border-radius: 6px;
-        }
-
-        .difficulty-badge {
-            font-size: 12px;
-            font-weight: 700;
-            padding: 6px 14px;
-            border-radius: 999px;
-            letter-spacing: 0.03em;
-        }
-
-        .difficulty-badge.easy {
-            background: rgba(16, 185, 129, 0.12);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.3);
-        }
-
-        .difficulty-badge.medium {
-            background: rgba(245, 158, 11, 0.12);
-            color: #fbbf24;
-            border: 1px solid rgba(245, 158, 11, 0.3);
-        }
-
-        .difficulty-badge.hard {
-            background: rgba(239, 68, 68, 0.12);
-            color: #f87171;
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Coding Problems — CareerHub AI</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    .problems-page { max-width: 1100px; margin: 0 auto; }
+    .problems-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .filter-row { display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center; }
+    .filter-select, .search-input { padding: 0.6rem 0.9rem; background: rgba(14,25,48,0.9); border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none; }
+    .search-input { min-width: 220px; }
+    .search-input:focus, .filter-select:focus { border-color: var(--text-accent); }
+    .problem-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .problem-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.1rem 1.35rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      cursor: pointer;
+      transition: var(--transition-smooth);
+      text-decoration: none;
+    }
+    .problem-card:hover { border-color: var(--border-hover); background: rgba(18,33,64,0.85); transform: translateX(4px); }
+    .problem-info { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+    .problem-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(0,210,255,0.08); border: 1px solid rgba(56,189,248,0.2); display: flex; align-items: center; justify-content: center; color: #00d2ff; flex-shrink: 0; font-size: 1.1rem; }
+    .problem-meta { min-width: 0; }
+    .problem-title { font-size: 0.95rem; font-weight: 700; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .problem-tags { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: 0.3rem; }
+    .tag-pill { font-size: 0.7rem; color: #8da4c4; background: rgba(255,255,255,0.05); padding: 0.15rem 0.5rem; border-radius: 5px; }
+    .difficulty-badge { font-size: 0.72rem; font-weight: 700; padding: 0.3rem 0.75rem; border-radius: 999px; letter-spacing: 0.03em; white-space: nowrap; flex-shrink: 0; }
+    .difficulty-badge.easy { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
+    .difficulty-badge.medium { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+    .difficulty-badge.hard { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .kpi-pill { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.82rem; color: var(--text-secondary); }
+    .kpi-pill strong { color: #fff; font-size: 1.1rem; display: block; }
+    #statusMsg { color: var(--text-muted); font-size: 0.88rem; padding: 2rem; text-align: center; }
+    @media (max-width: 700px) { .problems-header { flex-direction: column; align-items: flex-start; } }
+  </style>
 </head>
+<body data-page-title="Coding Problems" data-page-subtitle="Curated placement preparation problems from the live problem catalog">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        <div class="problems-page">
 
-<body>
-    <div class="ambient-glow"></div>
-
-    <div class="arena-container">
-        <div class="arena-header">
-            <a href="index.html" class="brand-logo-container">
-                <img src="assets/logo.png" alt="CareerHub AI" class="brand-logo-img">
-                <div class="brand-logo-text">
-                    <div class="brand-title">CareerHub <span>AI</span></div>
-                    <div class="brand-subtitle">Coding Challenges Arena</div>
-                </div>
-            </a>
-
-            <div style="display: flex; gap: 12px;">
-                <button class="btn btn-outline" onclick="location.href='index.html'">
-                    <i class="fas fa-home"></i> Home
-                </button>
-                <button class="btn btn-primary" onclick="location.href='dashboard.html'">
-                    <i class="fas fa-rocket"></i> Placement Cockpit
-                </button>
+          <div class="problems-header">
+            <div>
+              <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0;">Coding Problem Catalog</h2>
+              <p style="color:var(--text-muted);font-size:0.83rem;margin:0.3rem 0 0;">Click any problem to open it in the interactive coding IDE.</p>
             </div>
-        </div>
-
-        <div style="margin-bottom: 28px;">
-            <h1 style="font-size: 28px; margin-bottom: 8px;">Curated Placement Coding Problems</h1>
-            <p style="color: #8da4c4; font-size: 14px;">Select a problem to launch the interactive code editor in the Placement Cockpit.</p>
-        </div>
-
-        <div class="problem-card" onclick="openProblem('Two Sum')">
-            <div class="problem-info">
-                <div class="problem-icon"><i class="fas fa-code"></i></div>
-                <div>
-                    <div class="problem-title">Two Sum</div>
-                    <div class="problem-tags">
-                        <span class="tag-pill">Arrays</span>
-                        <span class="tag-pill">Hash Table</span>
-                        <span class="tag-pill">Amazon • Google</span>
-                    </div>
-                </div>
+            <div class="filter-row">
+              <input type="text" id="searchInput" class="search-input" placeholder="Search problems…" autocomplete="off">
+              <select id="difficultyFilter" class="filter-select">
+                <option value="">All difficulties</option>
+                <option value="Easy">Easy</option>
+                <option value="Medium">Medium</option>
+                <option value="Hard">Hard</option>
+              </select>
+              <select id="topicFilter" class="filter-select">
+                <option value="">All topics</option>
+              </select>
+              <a href="/coding" class="btn btn-primary" style="font-size:0.82rem;padding:0.6rem 1rem;border-radius:8px;text-decoration:none;white-space:nowrap;">Open IDE</a>
             </div>
-            <span class="difficulty-badge easy">Easy</span>
-        </div>
+          </div>
 
-        <div class="problem-card" onclick="openProblem('Palindrome')">
-            <div class="problem-info">
-                <div class="problem-icon"><i class="fas fa-font"></i></div>
-                <div>
-                    <div class="problem-title">Palindrome Check</div>
-                    <div class="problem-tags">
-                        <span class="tag-pill">Two Pointers</span>
-                        <span class="tag-pill">Strings</span>
-                        <span class="tag-pill">Microsoft • TCS</span>
-                    </div>
-                </div>
-            </div>
-            <span class="difficulty-badge medium">Medium</span>
-        </div>
+          <div class="kpi-row" id="kpiRow">
+            <div class="kpi-pill"><strong id="kpiTotal">--</strong>Total Problems</div>
+            <div class="kpi-pill"><strong id="kpiEasy" style="color:#34d399;">--</strong>Easy</div>
+            <div class="kpi-pill"><strong id="kpiMedium" style="color:#fbbf24;">--</strong>Medium</div>
+            <div class="kpi-pill"><strong id="kpiHard" style="color:#f87171;">--</strong>Hard</div>
+          </div>
 
-        <div class="problem-card" onclick="openProblem('Fibonacci')">
-            <div class="problem-info">
-                <div class="problem-icon"><i class="fas fa-calculator"></i></div>
-                <div>
-                    <div class="problem-title">Fibonacci Series (Dynamic Programming)</div>
-                    <div class="problem-tags">
-                        <span class="tag-pill">Dynamic Programming</span>
-                        <span class="tag-pill">Recursion</span>
-                        <span class="tag-pill">Deloitte • Infosys</span>
-                    </div>
-                </div>
-            </div>
-            <span class="difficulty-badge hard">Hard</span>
-        </div>
+          <div class="problem-list" id="problemList">
+            <div id="statusMsg">Loading problems…</div>
+          </div>
 
-        <div class="problem-card" onclick="openProblem('Valid Parentheses')">
-            <div class="problem-info">
-                <div class="problem-icon"><i class="fas fa-layer-group"></i></div>
-                <div>
-                    <div class="problem-title">Valid Parentheses</div>
-                    <div class="problem-tags">
-                        <span class="tag-pill">Stack</span>
-                        <span class="tag-pill">Strings</span>
-                        <span class="tag-pill">IBM • Accenture</span>
-                    </div>
-                </div>
-            </div>
-            <span class="difficulty-badge easy">Easy</span>
         </div>
-
-        <div class="problem-card" onclick="openProblem('Reverse Linked List')">
-            <div class="problem-info">
-                <div class="problem-icon"><i class="fas fa-link"></i></div>
-                <div>
-                    <div class="problem-title">Reverse Linked List</div>
-                    <div class="problem-tags">
-                        <span class="tag-pill">Linked List</span>
-                        <span class="tag-pill">Pointers</span>
-                        <span class="tag-pill">Google • Microsoft</span>
-                    </div>
-                </div>
-            </div>
-            <span class="difficulty-badge medium">Medium</span>
-        </div>
+      </main>
     </div>
+  </div>
 
-    <script>
-        function openProblem(name) {
-            localStorage.setItem("problem", name);
-            window.location.href = "dashboard.html";
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    const escapeHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    const ICONS = {
+      Easy: '⚡', Medium: '🧩', Hard: '🔥', default: '💻'
+    };
+
+    let allProblems = [];
+
+    async function loadProblems() {
+      const list = document.getElementById('problemList');
+      const msg = document.getElementById('statusMsg');
+      try {
+        const res = await fetch('/api/coding/problems', { headers });
+        if (!res.ok) {
+          msg.textContent = res.status === 401
+            ? 'Sign in to view the problem catalog.'
+            : 'Could not load problems. Please retry.';
+          return;
         }
-    </script>
+        allProblems = await res.json();
+        if (!Array.isArray(allProblems) || allProblems.length === 0) {
+          msg.textContent = 'No coding problems are available yet. Check back soon.';
+          return;
+        }
+        msg.style.display = 'none';
+
+        // Populate topic filter
+        const topics = [...new Set(allProblems.flatMap(p => p.topics || []))].sort();
+        const topicSel = document.getElementById('topicFilter');
+        topics.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t; opt.textContent = t;
+          topicSel.appendChild(opt);
+        });
+
+        // Update KPIs
+        document.getElementById('kpiTotal').textContent = allProblems.length;
+        document.getElementById('kpiEasy').textContent = allProblems.filter(p => p.difficulty === 'Easy').length;
+        document.getElementById('kpiMedium').textContent = allProblems.filter(p => p.difficulty === 'Medium').length;
+        document.getElementById('kpiHard').textContent = allProblems.filter(p => p.difficulty === 'Hard').length;
+
+        renderList(allProblems);
+      } catch (err) {
+        console.error(err);
+        msg.textContent = 'Network error loading problems. Please retry.';
+      }
+    }
+
+    function renderList(problems) {
+      const list = document.getElementById('problemList');
+      if (!problems.length) {
+        list.innerHTML = '<div style="color:var(--text-muted);padding:2rem;text-align:center;">No problems match your filters.</div>';
+        return;
+      }
+      list.innerHTML = problems.map(p => {
+        const id = p._id || p.id;
+        const diff = (p.difficulty || 'Easy');
+        const diffClass = diff.toLowerCase();
+        const icon = ICONS[diff] || ICONS.default;
+        const tags = (p.topics || []).map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('');
+        return `
+          <a class="problem-card" href="/coding?problemId=${encodeURIComponent(id)}" title="Open ${escapeHtml(p.title)} in IDE">
+            <div class="problem-info">
+              <div class="problem-icon">${icon}</div>
+              <div class="problem-meta">
+                <div class="problem-title">${escapeHtml(p.title)}</div>
+                <div class="problem-tags">${tags}</div>
+              </div>
+            </div>
+            <span class="difficulty-badge ${diffClass}">${escapeHtml(diff)}</span>
+          </a>
+        `;
+      }).join('');
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('searchInput').value.trim().toLowerCase();
+      const diff = document.getElementById('difficultyFilter').value;
+      const topic = document.getElementById('topicFilter').value;
+      const filtered = allProblems.filter(p => {
+        if (diff && p.difficulty !== diff) return false;
+        if (topic && !(p.topics || []).includes(topic)) return false;
+        if (!search) return true;
+        return [p.title, ...(p.topics || [])].some(v => String(v).toLowerCase().includes(search));
+      });
+      renderList(filtered);
+    }
+
+    document.getElementById('searchInput').addEventListener('input', applyFilters);
+    document.getElementById('difficultyFilter').addEventListener('change', applyFilters);
+    document.getElementById('topicFilter').addEventListener('change', applyFilters);
+
+    document.addEventListener('DOMContentLoaded', loadProblems);
+  </script>
 </body>
 </html>

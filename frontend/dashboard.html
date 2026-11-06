@@ -11,9 +11,35 @@
   <style>
     .cockpit-grid {
       display: grid;
-      grid-template-columns: repeat(4, 1fr);
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
+    }
+    .dashboard-welcome {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1.25rem;
+      margin-bottom: 1.35rem;
+      padding: 1.35rem 1.5rem;
+      background: linear-gradient(110deg, rgba(19, 40, 66, 0.92), rgba(14, 25, 43, 0.96));
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+    .dashboard-welcome .eyebrow {
+      color: var(--text-cyan);
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+    .dashboard-welcome h2 {
+      margin: 0.25rem 0;
+      font-size: clamp(1.15rem, 2vw, 1.5rem);
+    }
+    .dashboard-welcome p {
+      color: var(--text-muted);
+      font-size: 0.84rem;
     }
     .kpi-card {
       background: var(--surface-card);
@@ -36,7 +62,7 @@
       left: 0;
       right: 0;
       height: 2px;
-      background: var(--gradient-primary);
+      background: #48b8df;
     }
     .kpi-header {
       display: flex;
@@ -211,6 +237,11 @@
     @media (max-width: 650px) {
       .cockpit-grid { grid-template-columns: 1fr; }
       .action-grid { grid-template-columns: 1fr; }
+      .dashboard-welcome {
+        align-items: stretch;
+        flex-direction: column;
+        padding: 1.1rem;
+      }
     }
   </style>
 </head>
@@ -220,7 +251,15 @@
     <div class="main-wrapper">
       <div id="header-container"></div>
       <main class="page-container">
-        
+        <section class="dashboard-welcome" aria-labelledby="dashboardWelcome">
+          <div>
+            <span class="eyebrow">Career workspace</span>
+            <h2 id="dashboardWelcome">Your preparation at a glance</h2>
+            <p id="dashboardWelcomeSubtitle">Progress and recommendations from your saved activity.</p>
+          </div>
+          <a id="dashboardNextAction" href="/assessment" class="btn btn-primary" style="text-decoration:none;">Start career assessment</a>
+        </section>
+
         <!-- Top 4 KPIs -->
         <div class="cockpit-grid">
           <div class="kpi-card">
@@ -311,19 +350,19 @@
           <a href="/assessment" class="action-card">
             <div class="action-card-icon" style="background:rgba(0,210,255,0.1);color:#00d2ff;">📋</div>
             <div class="action-card-title">Take Career Assessment</div>
-            <div class="action-card-desc">Evaluate aptitude, technical foundations, and domain readiness with instant AI scoring.</div>
+            <div class="action-card-desc">Evaluate aptitude, technical foundations, and domain readiness with instant score breakdowns.</div>
           </a>
 
           <a href="/coding" class="action-card">
             <div class="action-card-icon" style="background:rgba(99,102,241,0.1);color:#818cf8;">💻</div>
             <div class="action-card-title">Practice Coding (IDE)</div>
-            <div class="action-card-desc">Solve real algorithmic problems with sandboxed code execution, test cases, and Big-O analysis.</div>
+            <div class="action-card-desc">Solve curated algorithmic problems with isolated code execution, test cases, and AI-assisted review.</div>
           </a>
 
           <a href="/interviews" class="action-card">
             <div class="action-card-icon" style="background:rgba(236,72,153,0.1);color:#f472b6;">🎙️</div>
-            <div class="action-card-title">AI Mock Interview</div>
-            <div class="action-card-desc">Simulate live technical & behavioral interviews in Voice Mode with speech recognition.</div>
+            <div class="action-card-title">Mock Interview Practice</div>
+            <div class="action-card-desc">Practice technical and behavioral interviews; AI features use the configured provider when available.</div>
           </a>
 
           <a href="/resume" class="action-card">
@@ -340,7 +379,7 @@
 
           <a href="/job-matching" class="action-card">
             <div class="action-card-icon" style="background:rgba(14,165,233,0.1);color:#38bdf8;">🎯</div>
-            <div class="action-card-title">AI Job Matching</div>
+            <div class="action-card-title">Live Job Matching</div>
             <div class="action-card-desc">Explore verified opportunities matched specifically to your target role and skills profile.</div>
           </a>
         </div>
@@ -385,13 +424,38 @@
         const token = localStorage.getItem('token');
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+        const loadSection = url => fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(12000)
+        }).catch(() => null);
+        const readinessRequest = loadSection('/api/career/readiness');
+        const codingRequest = loadSection('/api/coding/submissions');
+        const planRequest = loadSection('/api/career/daily-plan');
+        const applicationsRequest = loadSection('/api/career/applications');
+        const [readinessRes, codingRes, planRes, appRes] = await Promise.all([
+          readinessRequest,
+          codingRequest,
+          planRequest,
+          applicationsRequest
+        ]);
+
         // 1. Fetch Readiness Metrics
-        const readinessRes = await fetch('/api/career/readiness', { headers });
-        if (readinessRes.ok) {
+        if (readinessRes?.ok) {
           const r = await readinessRes.json();
+          const welcomeName = r.user?.name ? `${r.user.name}'s career workspace` : 'Your preparation at a glance';
+          document.getElementById('dashboardWelcome').textContent = welcomeName;
+          if (r.user?.targetRole) {
+            document.getElementById('dashboardWelcomeSubtitle').textContent =
+              `Your saved progress and next steps for ${r.user.targetRole}.`;
+          }
+          const nextAction = document.getElementById('dashboardNextAction');
+          nextAction.href = r.breakdown?.assessment?.completed ? '/roadmap' : '/assessment';
+          nextAction.textContent = r.breakdown?.assessment?.completed
+            ? 'Continue your roadmap'
+            : 'Start career assessment';
           document.getElementById('kpiReadiness').innerText = `${r.overallScore || 0}%`;
           document.getElementById('kpiReadinessMeta').innerHTML = `<span style="color:${r.statusColor || '#38bdf8'};font-weight:700;">● ${r.statusBadge || 'In Progress'}</span>`;
-          document.getElementById('kpiStreak').innerText = `${r.user?.streak || 1} Days`;
+          document.getElementById('kpiStreak').innerText = `${r.user?.streak ?? 0} Days`;
           document.getElementById('kpiStreakMeta').innerText = `Level ${r.user?.level || 1} • ${r.user?.xp || 0} XP`;
 
           // Multi-Factor Breakdown
@@ -427,23 +491,29 @@
               </div>
             `).join('');
           } else {
-            mList.innerHTML = `<div style="font-size:0.8rem;color:#34d399;">All core milestones completed! Maintain your practice streak.</div>`;
+            mList.innerHTML = `<div style="font-size:0.8rem;color:var(--text-muted);">No upcoming milestones are available right now.</div>`;
           }
+        } else {
+          document.getElementById('kpiReadiness').textContent = '—';
+          document.getElementById('kpiReadinessMeta').textContent = 'Readiness data unavailable';
+          document.getElementById('readinessBreakdownContainer').innerHTML =
+            '<p role="status" style="color:var(--text-muted);">Readiness data could not be loaded. Retry by refreshing the page.</p>';
         }
 
         // 2. Fetch Coding stats
-        const codingRes = await fetch('/api/coding/submissions', { headers });
-        if (codingRes.ok) {
+        if (codingRes?.ok) {
           const subs = await codingRes.json();
           const accepted = (subs || []).filter(s => s.status === 'accepted');
           const unique = new Set(accepted.map(s => s.problemId)).size;
           document.getElementById('kpiCoding').innerText = unique;
           document.getElementById('kpiCodingMeta').innerText = `${accepted.length} Accepted Submissions`;
+        } else {
+          document.getElementById('kpiCoding').textContent = '—';
+          document.getElementById('kpiCodingMeta').textContent = 'Coding data unavailable';
         }
 
         // 3. Fetch Daily Plan
-        const planRes = await fetch('/api/career/daily-plan', { headers });
-        if (planRes.ok) {
+        if (planRes?.ok) {
           const p = await planRes.json();
           document.getElementById('dailyPlanDate').innerText = p.date || 'Today';
           const tasks = p.plan?.tasks || [];
@@ -452,20 +522,30 @@
             tasksContainer.innerHTML = tasks.slice(0, 4).map(t => `
               <div style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;background:rgba(255,255,255,0.03);border:1px solid rgba(56,189,248,0.1);border-radius:10px;">
                 <div style="flex:1;padding-right:0.75rem;">
-                  <div style="font-size:0.85rem;font-weight:600;color:${t.completed ? '#94a3b8' : '#fff'};text-decoration:${t.completed ? 'line-through' : 'none'};">${t.title}</div>
-                  <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">+${t.xpReward} XP • ${t.category}</div>
+                  <div style="font-size:0.85rem;font-weight:600;color:${t.completed ? '#94a3b8' : '#fff'};text-decoration:${t.completed ? 'line-through' : 'none'};">${escapeHtml(t.title)}</div>
+                  <div style="font-size:0.72rem;color:var(--text-muted);margin-top:0.2rem;">+${Number(t.xpReward) || 0} XP • ${escapeHtml(t.category)}</div>
                 </div>
-                <a href="${t.actionUrl}" class="role-tag-pill" style="font-size:0.72rem;padding:0.3rem 0.65rem;text-decoration:none;background:${t.completed ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.1)'};color:${t.completed ? '#34d399' : '#00d2ff'};">
-                  ${t.completed ? 'Done ✓' : (t.actionText || 'Go')}
+                <a href="${safeInternalUrl(t.actionUrl)}" class="role-tag-pill" style="font-size:0.72rem;padding:0.3rem 0.65rem;text-decoration:none;background:${t.completed ? 'rgba(16,185,129,0.15)' : 'rgba(0,210,255,0.1)'};color:${t.completed ? '#34d399' : '#00d2ff'};">
+                  ${t.completed ? 'Done ✓' : escapeHtml(t.actionText || 'Go')}
                 </a>
               </div>
             `).join('');
+          } else {
+            tasksContainer.innerHTML = '<p role="status" style="padding:1rem;color:var(--text-muted);">No preparation tasks are scheduled today.</p>';
           }
+        } else {
+          const planError = await planRes?.json().catch(() => ({})) || {};
+          const message = planError.message ||
+            (planRes ? 'Today’s plan could not be loaded.' : 'Today’s plan request timed out or failed.');
+          const actionLink = planError.code === 'TARGET_ROLE_REQUIRED'
+            ? ` <a href="${safeInternalUrl(planError.actionUrl)}">Complete your profile</a> to generate a personalized plan.`
+            : '';
+          document.getElementById('dailyTasksList').innerHTML =
+            `<p role="status" style="padding:1rem;color:var(--text-muted);">${escapeHtml(message)}${actionLink}</p>`;
         }
 
         // 4. Fetch Applications
-        const appRes = await fetch('/api/career/applications', { headers });
-        if (appRes.ok) {
+        if (appRes?.ok) {
           const a = await appRes.json();
           const apps = a.applications || [];
           document.getElementById('kpiApplications').innerText = apps.length;
@@ -473,25 +553,58 @@
 
           const body = document.getElementById('recentApplicationsBody');
           if (apps.length === 0) {
-            body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No job applications tracked yet. Use <a href="/job-matching" style="color:#00d2ff;">AI Job Matching</a> to discover & apply!</td></tr>`;
+            body.innerHTML = `<tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:1.5rem;">No job applications tracked yet. Use <a href="/job-matching" style="color:#00d2ff;">Live Job Matching</a> to discover and track jobs.</td></tr>`;
           } else {
             body.innerHTML = apps.slice(0, 5).map(app => {
               const statusClass = `status-${(app.status || 'applied').toLowerCase()}`;
               return `
                 <tr>
-                  <td style="font-weight:600;color:#fff;">${app.company}</td>
-                  <td>${app.jobRole}</td>
-                  <td style="text-transform:capitalize;">${app.type || 'Job'}</td>
-                  <td><span class="status-badge ${statusClass}">${app.status || 'Applied'}</span></td>
-                  <td style="color:#00d2ff;font-weight:700;">${app.matchPercentage || 85}%</td>
+                  <td style="font-weight:600;color:#fff;">${escapeHtml(app.company)}</td>
+                  <td>${escapeHtml(app.jobRole)}</td>
+                  <td style="text-transform:capitalize;">${escapeHtml(app.type || 'Job')}</td>
+                  <td><span class="status-badge ${escapeHtml(statusClass)}">${escapeHtml(app.status || 'Applied')}</span></td>
+                  <td style="color:#00d2ff;font-weight:700;">${app.matchPercentage == null ? 'Not calculated' : `${app.matchPercentage}%`}</td>
                   <td>${app.interviewDate ? new Date(app.interviewDate).toLocaleDateString() : '—'}</td>
                 </tr>
               `;
             }).join('');
           }
+        } else {
+          document.getElementById('kpiApplications').textContent = '—';
+          document.getElementById('kpiApplicationsMeta').textContent = 'Application data unavailable';
+          document.getElementById('recentApplicationsBody').innerHTML =
+            '<tr><td colspan="6" role="status" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Applications could not be loaded. Refresh to retry.</td></tr>';
         }
       } catch (e) {
         console.error('Error loading cockpit data:', e);
+        document.getElementById('kpiReadiness').textContent = '—';
+        document.getElementById('kpiReadinessMeta').textContent = 'Readiness data unavailable';
+        document.getElementById('kpiCoding').textContent = '—';
+        document.getElementById('kpiCodingMeta').textContent = 'Coding data unavailable';
+        document.getElementById('kpiApplications').textContent = '—';
+        document.getElementById('kpiApplicationsMeta').textContent = 'Application data unavailable';
+        document.getElementById('dailyTasksList').innerHTML =
+          '<p role="status" style="padding:1rem;color:var(--text-muted);">Dashboard data could not be loaded. Refresh to retry.</p>';
+        document.getElementById('recentApplicationsBody').innerHTML =
+          '<tr><td colspan="6" role="status" style="text-align:center;color:var(--text-muted);padding:1.5rem;">Applications could not be loaded. Refresh to retry.</td></tr>';
+        window.showToast('Some dashboard data could not be loaded. Refresh to retry.', 'error');
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+    }
+
+    function safeInternalUrl(value) {
+      try {
+        const url = new URL(value, window.location.origin);
+        return url.origin === window.location.origin && String(value).startsWith('/')
+          ? `${url.pathname}${url.search}${url.hash}`
+          : '/dashboard';
+      } catch {
+        return '/dashboard';
       }
     }
 

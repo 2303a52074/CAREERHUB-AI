@@ -3,7 +3,14 @@ const { careerAssessments, wrapModel } = require('../utils/inMemoryDB');
 
 const CareerAssessmentSchema = new mongoose.Schema({
     userId: { type: String, required: true },
-    targetRole: { type: String, default: 'Full Stack Developer' },
+    sessionId: { type: String, default: null },
+    targetRole: { type: String, default: null },
+    assessmentCategory: { type: String, default: null, maxlength: 80 },
+    difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: null },
+    generationSource: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated'], default: null },
+    generationModel: { type: String, default: null, maxlength: 120 },
+    fallbackUsed: { type: Boolean, default: false },
+    categoryScores: { type: mongoose.Schema.Types.Mixed, default: null },
     scores: {
         aptitude: { type: Number, default: 0 },
         technical: { type: Number, default: 0 },
@@ -19,7 +26,9 @@ const CareerAssessmentSchema = new mongoose.Schema({
     suitableRoles: [String],
     detailedAnswers: [
         {
+            questionId: Number,
             category: String,
+            difficulty: String,
             question: String,
             userAnswer: String,
             correctAnswer: String,
@@ -27,6 +36,9 @@ const CareerAssessmentSchema = new mongoose.Schema({
             feedback: String
         }
     ],
+    aiInsights: { type: mongoose.Schema.Types.Mixed, default: null },
+    aiInsightsSource: { type: String, default: null },
+    aiInsightsModel: { type: String, default: null },
     date: { type: Date, default: Date.now }
 });
 

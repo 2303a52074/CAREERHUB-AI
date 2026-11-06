@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CareerHub AI — Student Profile</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    .profile-layout { max-width: 900px; margin: 0 auto; }
+    .section-card {
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 2rem;
+      margin-bottom: 1.5rem;
+    }
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .section-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .profile-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .profile-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    .form-group { display: flex; flex-direction: column; gap: 0.4rem; }
+    .form-group label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .form-group input, .form-group select, .form-group textarea {
+      padding: 0.75rem 1rem;
+      background: rgba(6, 11, 23, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: var(--border-glow);
+    }
+    .form-group textarea { resize: vertical; min-height: 80px; }
+    .tags-input-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0.6rem;
+      background: rgba(6, 11, 23, 0.8);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      min-height: 48px;
+      cursor: text;
+    }
+    .tags-input-container:focus-within { border-color: var(--border-glow); }
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      background: rgba(0, 210, 255, 0.12);
+      color: #00d2ff;
+      border: 1px solid rgba(0, 210, 255, 0.3);
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.78rem;
+      font-weight: 600;
+    }
+    .tag-remove {
+      cursor: pointer;
+      color: rgba(0, 210, 255, 0.6);
+      background: none;
+      border: none;
+      padding: 0;
+      font-size: 0.85rem;
+      line-height: 1;
+    }
+    .tag-remove:hover { color: #f87171; }
+    .tag-input {
+      flex: 1;
+      min-width: 120px;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-size: 0.85rem;
+      padding: 0.2rem 0.3rem;
+    }
+    .project-card, .exp-card {
+      background: rgba(0,0,0,0.2);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 0.85rem;
+      position: relative;
+    }
+    .remove-btn {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: rgba(248, 113, 113, 0.1);
+      color: #f87171;
+      border: 1px solid rgba(248,113,113,0.3);
+      border-radius: 6px;
+      padding: 0.25rem 0.6rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+    }
+    .add-item-btn {
+      width: 100%;
+      padding: 0.75rem;
+      background: rgba(0,210,255,0.06);
+      border: 1px dashed rgba(0,210,255,0.3);
+      border-radius: 8px;
+      color: #00d2ff;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .add-item-btn:hover { background: rgba(0,210,255,0.1); }
+    .completion-banner {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      background: var(--surface-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 1.5rem 2rem;
+      margin-bottom: 2rem;
+    }
+    .completion-circle {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: conic-gradient(#00d2ff var(--pct, 0%), rgba(255,255,255,0.08) 0%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: relative;
+    }
+    .completion-circle::before {
+      content: '';
+      position: absolute;
+      width: 54px;
+      height: 54px;
+      border-radius: 50%;
+      background: var(--surface-card);
+    }
+    .completion-pct {
+      position: relative;
+      z-index: 1;
+      font-size: 1rem;
+      font-weight: 800;
+      color: #00d2ff;
+    }
+    .completion-info { flex: 1; }
+    .completion-info h3 { font-size: 1rem; font-weight: 700; color: #fff; margin-bottom: 0.25rem; }
+    .completion-info p { font-size: 0.82rem; color: var(--text-muted); }
+    .save-sticky {
+      position: sticky;
+      bottom: 1.5rem;
+      z-index: 100;
+      display: flex;
+      justify-content: flex-end;
+      padding: 0 0.5rem;
+    }
+    .save-btn {
+      padding: 0.85rem 2.5rem;
+      background: linear-gradient(135deg, #00d2ff, #3a7bd5);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      box-shadow: 0 4px 20px rgba(0,210,255,0.3);
+      transition: all 0.2s;
+    }
+    .save-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 25px rgba(0,210,255,0.4); }
+    .save-btn:disabled { opacity: 0.6; transform: none; cursor: not-allowed; }
+    @media (max-width: 640px) {
+      .profile-grid-2 { grid-template-columns: 1fr; }
+      .profile-grid-3 { grid-template-columns: 1fr; }
+      .completion-banner { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body data-page-title="Student Profile" data-page-subtitle="Manage your career profile, skills, projects, and preferences">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container">
+        <div class="profile-layout">
+
+          <!-- Completion Banner -->
+          <div class="completion-banner">
+            <div class="completion-circle" id="completionCircle" style="--pct: 0%;">
+              <span class="completion-pct" id="completionPct">0%</span>
+            </div>
+            <div class="completion-info">
+              <h3>Profile Completeness</h3>
+              <p id="completionDesc">Fill in all sections to maximize your career readiness score and job match accuracy.</p>
+            </div>
+            <button class="save-btn" id="mainSaveBtn" onclick="saveProfile()">💾 Save Changes</button>
+          </div>
+
+          <!-- 1. Basic Information -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">👤 Basic Information</span>
+            </div>
+            <div class="profile-grid-2">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="fieldName" placeholder="Your full name">
+              </div>
+              <div class="form-group">
+                <label>Email Address</label>
+                <input type="email" id="fieldEmail" placeholder="your@email.com">
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Education -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">🎓 Education</span>
+            </div>
+            <div class="profile-grid-2">
+              <div class="form-group">
+                <label>Degree</label>
+                <select id="fieldDegree">
+                  <option value="B.Tech">B.Tech</option>
+                  <option value="B.E.">B.E.</option>
+                  <option value="B.Sc">B.Sc</option>
+                  <option value="BCA">BCA</option>
+                  <option value="MCA">MCA</option>
+                  <option value="M.Tech">M.Tech</option>
+                  <option value="MBA">MBA</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Branch / Specialization</label>
+                <input type="text" id="fieldBranch" placeholder="e.g. Computer Science & Engineering">
+              </div>
+              <div class="form-group">
+                <label>College / University</label>
+                <input type="text" id="fieldCollege" placeholder="e.g. SR University">
+              </div>
+              <div class="form-group">
+                <label>Graduation Year</label>
+                <select id="fieldGradYear">
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                  <option value="2024">2024 (Graduated)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>CGPA / Percentage</label>
+                <input type="text" id="fieldCgpa" placeholder="e.g. 8.5 or 85%">
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Technical Skills -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">💻 Technical Skills</span>
+            </div>
+            <div class="form-group">
+              <label>Technical Skills <span style="color:var(--text-muted);font-weight:400;text-transform:none;">(type a skill and press Enter or comma)</span></label>
+              <div class="tags-input-container" id="techSkillsContainer">
+                <input type="text" class="tag-input" id="techSkillInput" placeholder="Add a skill...">
+              </div>
+            </div>
+            <div style="margin-top:1.25rem;">
+              <div class="form-group">
+                <label>Soft Skills</label>
+                <div class="tags-input-container" id="softSkillsContainer">
+                  <input type="text" class="tag-input" id="softSkillInput" placeholder="Add a soft skill...">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Target Role & Career Goals -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">🎯 Career Preferences</span>
+            </div>
+            <div class="profile-grid-2" style="margin-bottom:1.25rem;">
+              <div class="form-group">
+                <label>Target Career Role</label>
+                <select id="fieldTargetRole">
+                  <option value="">Choose a target role</option>
+                  <option value="Full Stack Developer">Full Stack Developer</option>
+                  <option value="Frontend Developer">Frontend Developer</option>
+                  <option value="Backend Developer">Backend Developer</option>
+                  <option value="AI/ML Engineer">AI/ML Engineer</option>
+                  <option value="Data Scientist">Data Scientist</option>
+                  <option value="Data Analyst">Data Analyst</option>
+                  <option value="Cloud Engineer">Cloud Engineer</option>
+                  <option value="Software Developer">Software Developer</option>
+                  <option value="Cybersecurity Analyst">Cybersecurity Analyst</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Preferred Locations</label>
+                <div class="tags-input-container" id="locContainer">
+                  <input type="text" class="tag-input" id="locInput" placeholder="Add city...">
+                </div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Career Goals</label>
+              <textarea id="fieldCareerGoals" placeholder="Describe your 2-3 year career aspirations and what kind of impact you want to make..."></textarea>
+            </div>
+          </div>
+
+          <!-- 5. Certifications -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">🏅 Certifications</span>
+            </div>
+            <div class="form-group">
+              <label>Certifications <span style="color:var(--text-muted);font-weight:400;text-transform:none;">(press Enter to add)</span></label>
+              <div class="tags-input-container" id="certContainer">
+                <input type="text" class="tag-input" id="certInput" placeholder="e.g. AWS Cloud Practitioner - Amazon">
+              </div>
+            </div>
+          </div>
+
+          <!-- 6. Projects -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">🚀 Portfolio Projects</span>
+            </div>
+            <div id="projectsList"></div>
+            <button class="add-item-btn" onclick="addProject()">+ Add Project</button>
+          </div>
+
+          <!-- 7. Experience -->
+          <div class="section-card">
+            <div class="section-header">
+              <span class="section-title">💼 Work Experience & Internships</span>
+            </div>
+            <div id="experienceList"></div>
+            <button class="add-item-btn" onclick="addExperience()">+ Add Experience</button>
+          </div>
+
+          <!-- Sticky Save -->
+          <div class="save-sticky">
+            <button class="save-btn" onclick="saveProfile()" id="stickySaveBtn">💾 Save All Changes</button>
+          </div>
+
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="/assets/shared-nav.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    // Tags state
+    const tagData = {
+      techSkills: [],
+      softSkills: [],
+      certs: [],
+      locs: []
+    };
+    let projects = [];
+    let experiences = [];
+
+    // ---- Tags Input Setup ----
+    function setupTagInput(containerId, inputId, tagKey) {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          const val = input.value.trim().replace(/,+$/, '');
+          if (val && !tagData[tagKey].includes(val)) {
+            tagData[tagKey].push(val);
+            renderTags(containerId, inputId, tagKey);
+          }
+          input.value = '';
+        } else if (e.key === 'Backspace' && !input.value && tagData[tagKey].length > 0) {
+          tagData[tagKey].pop();
+          renderTags(containerId, inputId, tagKey);
+        }
+      });
+      container.addEventListener('click', () => input.focus());
+    }
+
+    function renderTags(containerId, inputId, tagKey) {
+      const container = document.getElementById(containerId);
+      const input = document.getElementById(inputId);
+      container.innerHTML = '';
+      tagData[tagKey].forEach((tag, i) => {
+        const chip = document.createElement('span');
+        chip.className = 'tag-chip';
+        chip.innerHTML = `${escapeHtml(tag)} <button class="tag-remove" onclick="removeTag('${tagKey}', ${i}, '${containerId}', '${inputId}')">×</button>`;
+        container.appendChild(chip);
+      });
+      container.appendChild(input);
+    }
+
+    window.removeTag = function(tagKey, index, containerId, inputId) {
+      tagData[tagKey].splice(index, 1);
+      renderTags(containerId, inputId, tagKey);
+    };
+
+    // ---- Projects ----
+    function renderProjects() {
+      const list = document.getElementById('projectsList');
+      list.innerHTML = projects.map((p, i) => `
+        <div class="project-card">
+          <button class="remove-btn" onclick="removeProject(${i})">Remove</button>
+          <div class="profile-grid-2" style="gap:0.75rem;">
+            <div class="form-group">
+              <label>Project Title</label>
+              <input type="text" value="${escapeHtml(p.title)}" onchange="projects[${i}].title=this.value" placeholder="e.g. AI Resume Analyzer">
+            </div>
+            <div class="form-group">
+              <label>Tech Stack</label>
+              <input type="text" value="${escapeHtml(p.techStack)}" onchange="projects[${i}].techStack=this.value" placeholder="e.g. React, Node.js, Python">
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:0.75rem;">
+            <label>Description</label>
+            <textarea onchange="projects[${i}].description=this.value" placeholder="Brief description of the project and its impact...">${escapeHtml(p.description)}</textarea>
+          </div>
+          <div class="form-group" style="margin-top:0.75rem;">
+            <label>GitHub / Live Link</label>
+            <input type="url" value="${escapeHtml(p.link)}" onchange="projects[${i}].link=this.value" placeholder="https://github.com/...">
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.addProject = function() {
+      projects.push({ title: '', techStack: '', description: '', link: '' });
+      renderProjects();
+    };
+
+    window.removeProject = function(i) {
+      projects.splice(i, 1);
+      renderProjects();
+    };
+
+    // ---- Experience ----
+    function renderExperience() {
+      const list = document.getElementById('experienceList');
+      list.innerHTML = experiences.map((e, i) => `
+        <div class="exp-card">
+          <button class="remove-btn" onclick="removeExperience(${i})">Remove</button>
+          <div class="profile-grid-2" style="gap:0.75rem;">
+            <div class="form-group">
+              <label>Company / Organization</label>
+              <input type="text" value="${escapeHtml(e.company)}" onchange="experiences[${i}].company=this.value" placeholder="e.g. Google">
+            </div>
+            <div class="form-group">
+              <label>Role / Designation</label>
+              <input type="text" value="${escapeHtml(e.role)}" onchange="experiences[${i}].role=this.value" placeholder="e.g. Software Engineer Intern">
+            </div>
+          </div>
+          <div class="form-group" style="margin-top:0.75rem;">
+            <label>Duration</label>
+            <input type="text" value="${escapeHtml(e.duration)}" onchange="experiences[${i}].duration=this.value" placeholder="e.g. Jun 2025 - Aug 2025 (3 months)">
+          </div>
+          <div class="form-group" style="margin-top:0.75rem;">
+            <label>Description / Key Achievements</label>
+            <textarea onchange="experiences[${i}].description=this.value" placeholder="What did you build, improve, or achieve?">${escapeHtml(e.description)}</textarea>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    window.addExperience = function() {
+      experiences.push({ company: '', role: '', duration: '', description: '' });
+      renderExperience();
+    };
+
+    window.removeExperience = function(i) {
+      experiences.splice(i, 1);
+      renderExperience();
+    };
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
+    }
+
+    // ---- Load Profile ----
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/career/profile', { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        const user = data.user || data;
+
+        // Basic
+        document.getElementById('fieldName').value = user.name || '';
+        document.getElementById('fieldEmail').value = user.email || '';
+
+        // Education
+        document.getElementById('fieldDegree').value = user.degree || '';
+        document.getElementById('fieldBranch').value = user.branch || '';
+        document.getElementById('fieldCollege').value = user.college || '';
+        document.getElementById('fieldGradYear').value = user.graduationYear || '';
+        document.getElementById('fieldCgpa').value = user.cgpa || '';
+
+        // Skills
+        tagData.techSkills = [...(user.technicalSkills || [])];
+        tagData.softSkills = [...(user.softSkills || [])];
+        tagData.certs = [...(user.certifications || [])];
+        tagData.locs = [...(user.preferredLocations || [])];
+        renderTags('techSkillsContainer', 'techSkillInput', 'techSkills');
+        renderTags('softSkillsContainer', 'softSkillInput', 'softSkills');
+        renderTags('certContainer', 'certInput', 'certs');
+        renderTags('locContainer', 'locInput', 'locs');
+
+        // Career preferences
+        document.getElementById('fieldTargetRole').value = user.targetRole || '';
+        document.getElementById('fieldCareerGoals').value = user.careerGoals || '';
+
+        // Projects & Experience
+        projects = (user.projects || []).map(p => ({ ...p }));
+        experiences = (user.experience || []).map(e => ({ ...e }));
+        renderProjects();
+        renderExperience();
+
+        // Completion
+        updateCompletion(user);
+      } catch (e) {
+        console.error('Error loading profile:', e);
+      }
+    }
+
+    function updateCompletion(user) {
+      const checks = [
+        !!(user.name),
+        !!(user.degree),
+        !!(user.branch),
+        !!(user.college),
+        !!(user.cgpa),
+        (user.technicalSkills || []).length >= 3,
+        (user.softSkills || []).length >= 1,
+        (user.certifications || []).length > 0,
+        (user.projects || []).length > 0,
+        (user.experience || []).length > 0,
+        !!(user.targetRole),
+        !!(user.careerGoals),
+      ];
+      const pct = Math.round((checks.filter(Boolean).length / checks.length) * 100);
+      const circle = document.getElementById('completionCircle');
+      const pctEl = document.getElementById('completionPct');
+      circle.style.setProperty('--pct', `${pct}%`);
+      pctEl.textContent = `${pct}%`;
+      const missing = checks.filter(c => !c).length;
+      document.getElementById('completionDesc').textContent = missing === 0
+        ? '✅ Profile is complete! You\'re ready to maximize job matches.'
+        : `${missing} section${missing > 1 ? 's' : ''} incomplete — fill them in to improve your career readiness score.`;
+    }
+
+    // ---- Save Profile ----
+    window.saveProfile = async function() {
+      const saveBtn = document.getElementById('mainSaveBtn');
+      const stickyBtn = document.getElementById('stickySaveBtn');
+      [saveBtn, stickyBtn].forEach(b => { b.disabled = true; b.textContent = '⏳ Saving...'; });
+
+      // Collect project data from DOM (ensure onChange captured)
+      const projectInputs = document.querySelectorAll('#projectsList .project-card');
+      projectInputs.forEach((card, i) => {
+        const inputs = card.querySelectorAll('input, textarea');
+        if (projects[i]) {
+          projects[i].title = inputs[0]?.value || '';
+          projects[i].techStack = inputs[1]?.value || '';
+          projects[i].description = inputs[2]?.value || '';
+          projects[i].link = inputs[3]?.value || '';
+        }
+      });
+
+      const expInputs = document.querySelectorAll('#experienceList .exp-card');
+      expInputs.forEach((card, i) => {
+        const inputs = card.querySelectorAll('input, textarea');
+        if (experiences[i]) {
+          experiences[i].company = inputs[0]?.value || '';
+          experiences[i].role = inputs[1]?.value || '';
+          experiences[i].duration = inputs[2]?.value || '';
+          experiences[i].description = inputs[3]?.value || '';
+        }
+      });
+
+      const payload = {
+        name: document.getElementById('fieldName').value.trim(),
+        email: document.getElementById('fieldEmail').value.trim(),
+        degree: document.getElementById('fieldDegree').value,
+        branch: document.getElementById('fieldBranch').value.trim(),
+        college: document.getElementById('fieldCollege').value.trim(),
+        graduationYear: document.getElementById('fieldGradYear').value,
+        cgpa: document.getElementById('fieldCgpa').value.trim(),
+        technicalSkills: tagData.techSkills,
+        softSkills: tagData.softSkills,
+        certifications: tagData.certs,
+        preferredLocations: tagData.locs,
+        targetRole: document.getElementById('fieldTargetRole').value,
+        careerGoals: document.getElementById('fieldCareerGoals').value.trim(),
+        projects: projects.filter(p => p.title),
+        experience: experiences.filter(e => e.company)
+      };
+
+      try {
+        const res = await fetch('/api/career/profile', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          window.showToast('Profile saved successfully! ✅', 'success');
+          if (data.user) updateCompletion(data.user);
+          // Update localStorage name
+          if (payload.name) localStorage.setItem('userName', payload.name);
+        } else {
+          const err = await res.json();
+          window.showToast(err.message || 'Failed to save profile.', 'error');
+        }
+      } catch (e) {
+        console.error(e);
+        window.showToast('Network error. Please check your connection.', 'error');
+      } finally {
+        [saveBtn, stickyBtn].forEach(b => { b.disabled = false; b.textContent = b === saveBtn ? '💾 Save Changes' : '💾 Save All Changes'; });
+      }
+    };
+
+    // Setup tag inputs
+    setupTagInput('techSkillsContainer', 'techSkillInput', 'techSkills');
+    setupTagInput('softSkillsContainer', 'softSkillInput', 'softSkills');
+    setupTagInput('certContainer', 'certInput', 'certs');
+    setupTagInput('locContainer', 'locInput', 'locs');
+
+    document.addEventListener('DOMContentLoaded', loadProfile);
+  </script>
+</body>
+</html>

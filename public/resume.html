@@ -91,9 +91,12 @@
         <div class="resume-split">
           <!-- Left: Upload or Paste -->
           <div class="upload-card">
-            <h2 style="font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:0.5rem;">Upload Resume PDF</h2>
+            <h2 style="font-size:1.25rem;font-weight:700;color:#fff;margin-bottom:0.5rem;">Upload Resume PDF or DOCX</h2>
             <p style="font-size:0.82rem;color:var(--text-muted);margin-bottom:1.5rem;">
-              Evaluate your resume with real PDF text extraction and placement ATS scoring.
+              Evaluate your resume with document text extraction and placement ATS scoring.
+            </p>
+            <p style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;margin-bottom:1rem;">
+              Resume text and any supplied job description are sent to the configured AI service for analysis. CareerHub does not save the raw text; the resulting analysis is saved to your account. Avoid including information you do not want processed.
             </p>
 
             <div style="margin-bottom:1.25rem;">
@@ -101,6 +104,7 @@
                 Target Role
               </label>
               <select id="resumeTargetRole" style="width:100%;padding:0.65rem 0.85rem;background:rgba(6,11,23,0.8);border:1px solid var(--border-subtle);border-radius:8px;color:#fff;font-size:0.85rem;outline:none;">
+                <option value="">Use saved profile target role</option>
                 <option value="Full Stack Developer">Full Stack Developer</option>
                 <option value="Frontend Engineer">Frontend Engineer</option>
                 <option value="Backend Engineer">Backend Engineer</option>
@@ -108,18 +112,23 @@
               </select>
             </div>
 
-            <!-- PDF Dropzone -->
+            <!-- Resume document dropzone -->
             <div class="drop-zone" id="dropZone">
-              <input type="file" id="resumeFileInput" accept=".pdf" style="display:none;">
+              <input type="file" id="resumeFileInput" accept=".pdf,.docx" style="display:none;">
               <div style="font-size:2.2rem;margin-bottom:0.5rem;">📄</div>
               <div style="font-weight:600;color:#fff;font-size:0.95rem;margin-bottom:0.25rem;" id="fileNameDisplay">
-                Drop your Resume PDF here or click to browse
+                Drop your Resume PDF or DOCX here or click to browse
               </div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">PDF up to 10MB supported</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);">PDF or DOCX up to 5MB supported</div>
             </div>
 
+            <section class="upload-card" style="margin-top:1.5rem;">
+              <h2 style="font-size:1.05rem;font-weight:700;color:#fff;margin-bottom:0.75rem;">Recent analyses</h2>
+              <div id="resumeHistory" style="color:var(--text-muted);font-size:0.85rem;">Loading analysis history...</div>
+            </section>
+
             <button id="btnUploadPdf" class="btn-action btn-next" style="width:100%;padding:0.75rem;font-size:0.9rem;margin-bottom:1.5rem;">
-              Analyze Uploaded PDF →
+              Analyze Uploaded Resume →
             </button>
 
             <!-- Text Paste Alternative -->
@@ -130,9 +139,14 @@
             </div>
 
             <textarea id="resumeTextarea" class="resume-textarea" placeholder="Paste your resume content or project bullet points here..."></textarea>
+            <label for="resumeJobDescription" style="display:block;font-size:0.8rem;font-weight:600;color:var(--text-muted);margin:1rem 0 0.4rem;text-transform:uppercase;">
+              Optional Job Description
+            </label>
+            <textarea id="resumeJobDescription" class="resume-textarea" placeholder="Paste a job description to compare its requirements with your resume (12,000 characters max)..."></textarea>
             <button id="btnAnalyzeText" class="btn-action btn-prev" style="width:100%;padding:0.75rem;font-size:0.85rem;">
               Analyze Pasted Text
             </button>
+            <p id="resumeAnalysisStatus" role="status" aria-live="polite" style="min-height:1.4rem;margin-top:.65rem;color:var(--text-muted);font-size:.8rem;"></p>
           </div>
 
           <!-- Right: ATS Evaluation Report -->
@@ -140,7 +154,7 @@
             <div style="display:flex;align-items:center;gap:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-subtle);margin-bottom:1.5rem;">
               <div class="ats-circle">
                 <span style="font-size:2.2rem;font-weight:800;color:#fff;line-height:1;" id="reportScore">--</span>
-                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">ATS SCORE</span>
+                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">AI SCORE ESTIMATE</span>
               </div>
               <div>
                 <h3 style="font-size:1.35rem;font-weight:700;color:#fff;margin-bottom:0.25rem;" id="reportVerdict">
@@ -167,13 +181,21 @@
               <div id="missingSkillsBox"></div>
             </div>
 
-            <!-- Actionable Recommendations -->
-            <div>
+            <div class="resume-analysis-section">
+              <h4>Projects</h4><ul id="projectsList"></ul>
+              <h4>Experience</h4><ul id="experienceList"></ul>
+              <h4>Education</h4><ul id="educationList"></ul>
+              <h4>ATS &amp; readability issues</h4><ul id="readabilityList"></ul>
+            </div>
+
+            <div class="resume-analysis-section">
               <h4 style="font-size:0.85rem;font-weight:700;color:var(--text-accent);margin-bottom:0.5rem;">
-                🚀 ATS Optimization Recommendations
+                Recommendations
               </h4>
               <ul id="recommendationsList" style="list-style:none;font-size:0.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:0.4rem;">
               </ul>
+              <h4 style="font-size:0.85rem;font-weight:700;color:var(--text-accent);margin:.9rem 0 .5rem;">Prioritized edits</h4>
+              <ol id="prioritizedEditsList" style="padding-left:1.2rem;font-size:.82rem;color:var(--text-secondary);display:flex;flex-direction:column;gap:.4rem;"></ol>
             </div>
           </div>
         </div>
@@ -185,12 +207,14 @@
   <script src="/assets/shared-nav.js"></script>
   <script>
     let selectedFile = null;
+    let analysisInProgress = false;
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
     const dropZone = document.getElementById('dropZone');
     const fileInput = document.getElementById('resumeFileInput');
+    let resumeHistory = [];
 
     dropZone.addEventListener('click', () => fileInput.click());
 
@@ -219,99 +243,255 @@
       }
     });
 
-    // Upload PDF
+    // Upload PDF or DOCX
     document.getElementById('btnUploadPdf').addEventListener('click', async () => {
+      const button = document.getElementById('btnUploadPdf');
+      if (analysisInProgress) return;
       if (!selectedFile) {
-        window.showToast('Please select a PDF resume file first.', 'error');
+        const message = 'Please select a PDF or DOCX resume file first.';
+        document.getElementById('resumeAnalysisStatus').textContent = message;
+        window.showToast(message, 'error');
+        return;
+      }
+      const extension = selectedFile.name.toLowerCase().split('.').pop();
+      const allowedTypes = extension === 'pdf'
+        ? ['application/pdf', 'application/octet-stream']
+        : extension === 'docx'
+          ? ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/octet-stream']
+          : [];
+      if (selectedFile.size > 5 * 1024 * 1024 ||
+          !allowedTypes.length ||
+          (selectedFile.type && !allowedTypes.includes(selectedFile.type))) {
+        const message = 'Choose a PDF or DOCX file no larger than 5MB.';
+        document.getElementById('resumeAnalysisStatus').textContent = message;
+        window.showToast(message, 'error');
         return;
       }
 
-      window.showToast('Uploading and parsing PDF with ATS engine...', 'info');
+      analysisInProgress = true;
+      setAnalysisButtonsDisabled(true);
+      document.getElementById('resumeAnalysisStatus').textContent = 'Extracting resume text and requesting an AI analysis…';
+      button.disabled = true;
+      button.textContent = 'Analyzing resume...';
       const formData = new FormData();
       formData.append('resume', selectedFile);
       formData.append('targetRole', document.getElementById('resumeTargetRole').value);
+      formData.append('jobDescription', document.getElementById('resumeJobDescription').value.trim());
 
       try {
         const res = await fetch('/api/resume/upload', {
           method: 'POST',
           headers: { ...headers },
-          body: formData
+          body: formData,
+          signal: AbortSignal.timeout(35000)
         });
 
         if (res.ok) {
           const data = await res.json();
-          window.showToast('Resume parsed successfully!', 'success');
+          document.getElementById('resumeAnalysisStatus').textContent = 'Resume text was extracted and the analysis was saved to your account.';
+          window.showToast('Resume analyzed successfully.', 'success');
           renderReport(data);
+          await loadResumeHistory();
         } else {
-          window.showToast('Failed to analyze PDF file.', 'error');
+          const error = await res.json().catch(() => ({}));
+          const message = error.message || 'Resume analysis failed. No new result was saved.';
+          document.getElementById('resumeAnalysisStatus').textContent = message;
+          window.showToast(message, 'error');
         }
       } catch (err) {
         console.error(err);
-        window.showToast('Network error uploading resume.', 'error');
+        const message = err.name === 'TimeoutError'
+          ? 'Resume analysis timed out. Please retry.'
+          : 'Network error uploading resume. Please retry.';
+        document.getElementById('resumeAnalysisStatus').textContent = message;
+        window.showToast(message, 'error');
+      } finally {
+        analysisInProgress = false;
+        setAnalysisButtonsDisabled(false);
+        button.disabled = false;
+        button.textContent = 'Analyze Uploaded Resume →';
       }
     });
 
     // Analyze Text
     document.getElementById('btnAnalyzeText').addEventListener('click', async () => {
+      const button = document.getElementById('btnAnalyzeText');
+      if (analysisInProgress) return;
       const text = document.getElementById('resumeTextarea').value.trim();
       if (!text) {
-        window.showToast('Please paste resume text before analyzing.', 'error');
+        const message = 'Please paste resume text before analyzing.';
+        document.getElementById('resumeAnalysisStatus').textContent = message;
+        window.showToast(message, 'error');
         return;
       }
 
-      window.showToast('Analyzing resume text with ATS engine...', 'info');
+      analysisInProgress = true;
+      setAnalysisButtonsDisabled(true);
+      document.getElementById('resumeAnalysisStatus').textContent = 'Sending pasted resume text for analysis…';
+      button.disabled = true;
+      button.textContent = 'Analyzing text...';
       try {
         const res = await fetch('/api/resume/analyze-text', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...headers },
           body: JSON.stringify({
             resumeText: text,
-            targetRole: document.getElementById('resumeTargetRole').value
-          })
+            targetRole: document.getElementById('resumeTargetRole').value,
+            jobDescription: document.getElementById('resumeJobDescription').value.trim()
+          }),
+          signal: AbortSignal.timeout(35000)
         });
 
         if (res.ok) {
           const data = await res.json();
-          window.showToast('Resume text analyzed successfully!', 'success');
+          document.getElementById('resumeAnalysisStatus').textContent = 'Analysis complete and saved to your account.';
+          window.showToast('Resume analyzed successfully.', 'success');
           renderReport(data);
+          await loadResumeHistory();
         } else {
-          window.showToast('Failed to analyze resume text.', 'error');
+          const error = await res.json().catch(() => ({}));
+          const message = error.message || 'Resume analysis failed. No new result was saved.';
+          document.getElementById('resumeAnalysisStatus').textContent = message;
+          window.showToast(message, 'error');
         }
       } catch (err) {
         console.error(err);
-        window.showToast('Network error analyzing resume.', 'error');
+        const message = err.name === 'TimeoutError'
+          ? 'Resume analysis timed out. Please retry.'
+          : 'Network error analyzing resume. Please retry.';
+        document.getElementById('resumeAnalysisStatus').textContent = message;
+        window.showToast(message, 'error');
+      } finally {
+        analysisInProgress = false;
+        setAnalysisButtonsDisabled(false);
+        button.disabled = false;
+        button.textContent = 'Analyze Pasted Text';
       }
     });
 
     function renderReport(data) {
       document.getElementById('reportCard').style.display = 'block';
-      const score = data.score || 85;
-      document.getElementById('reportScore').innerText = score;
-      document.getElementById('reportVerdict').innerText = score >= 80 ? 'Strong ATS Compatibility' : 'ATS Optimizations Required';
-      document.getElementById('reportSummary').innerText = data.summary || 'Resume analyzed against target role hiring parameters.';
+      const score = Number.isFinite(data.score) ? data.score : null;
+      document.getElementById('reportScore').innerText = score === null ? '—' : score;
+      document.getElementById('reportVerdict').innerText = score === null
+        ? 'More resume text required'
+        : score >= 80 ? 'Strong text match' : 'Improve role alignment';
+      const analysisSource = data.analysisMethod === 'openrouter'
+        ? 'AI-generated analysis'
+        : data.analysisMethod === 'rule-based' ? 'Rule-based text analysis' : null;
+      const summary = data.summary || 'Resume analysis complete.';
+      const compatibility = Number.isFinite(data.atsCompatibility)
+        ? ` ATS/readability compatibility estimate: ${data.atsCompatibility}/100.`
+        : '';
+      document.getElementById('reportSummary').innerText = analysisSource
+        ? `${summary} Score is an AI estimate, not an ATS vendor score.${compatibility} Analysis method: ${analysisSource}. ${data.comparedWithJobDescription ? 'Compared with the supplied job description.' : 'No job description was supplied; this is a target-role analysis.'}`
+        : summary;
 
       // Detected
       const det = data.matchedSkills || data.detectedSkills || [];
       document.getElementById('detectedSkillsBox').innerHTML = det.map(s => `
-        <span class="pill-tag pill-match">${s}</span>
+        <span class="pill-tag pill-match">${escapeHtml(s)}</span>
       `).join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">None detected</span>';
 
       // Missing
       const mis = data.missingSkills || [];
       document.getElementById('missingSkillsBox').innerHTML = mis.map(s => `
-        <span class="pill-tag pill-miss">${s}</span>
-      `).join('') || '<span style="color:#34d399;font-size:0.8rem;">No critical missing skills!</span>';
+        <span class="pill-tag pill-miss">${escapeHtml(s)}</span>
+      `).join('') || '<span style="color:var(--text-muted);font-size:0.8rem;">No missing skills were evaluated.</span>';
 
       // Recommendations
-      const recs = data.recommendations || [
-        'Quantify achievements with metrics (e.g. "reduced latency by 35%")',
-        'Highlight core tech stack in each project header',
-        'Add target role keywords to resume professional summary'
-      ];
+      const recs = data.recommendations || [];
       document.getElementById('recommendationsList').innerHTML = recs.map(r => `
-        <li>● ${r}</li>
-      `).join('');
+        <li>● ${escapeHtml(r)}</li>
+      `).join('') || '<li>Complete the resume text extraction before reviewing recommendations.</li>';
+      renderAnalysisList('projectsList', data.projects, 'No project evidence was identified.');
+      renderAnalysisList('experienceList', data.experience, 'No experience evidence was identified.');
+      renderAnalysisList('educationList', data.education, 'No education evidence was identified.');
+      renderAnalysisList('readabilityList', data.atsReadabilityIssues, 'No text-based readability issues were identified.');
+      renderAnalysisList('prioritizedEditsList', data.prioritizedEdits, 'No prioritized edits were returned.', 'li');
     }
+
+    function renderAnalysisList(elementId, values, emptyMessage, itemTag = 'li') {
+      const list = document.getElementById(elementId);
+      const items = Array.isArray(values) ? values : [];
+      list.innerHTML = items.length
+        ? items.map(value => `<${itemTag}>${escapeHtml(value)}</${itemTag}>`).join('')
+        : `<li>${escapeHtml(emptyMessage)}</li>`;
+    }
+
+    function setAnalysisButtonsDisabled(disabled) {
+      document.getElementById('btnUploadPdf').disabled = disabled;
+      document.getElementById('btnAnalyzeText').disabled = disabled;
+    }
+
+    async function loadResumeHistory() {
+      const container = document.getElementById('resumeHistory');
+      try {
+        const response = await fetch('/api/resume/history', { headers });
+        if (!response.ok) {
+          const result = await response.json().catch(() => ({}));
+          container.textContent = result.message || 'Sign in to view your saved resume analyses.';
+          return;
+        }
+        const result = await response.json();
+        resumeHistory = result.analyses || [];
+        if (resumeHistory.length === 0) {
+          container.textContent = 'No analyses saved yet. Your results will appear here.';
+          return;
+        }
+        container.innerHTML = resumeHistory.map((analysis, index) => `
+          <button type="button" data-resume-analysis="${index}" style="display:flex;width:100%;justify-content:space-between;gap:1rem;text-align:left;margin:0.45rem 0;padding:0.75rem;border:1px solid var(--border-subtle);border-radius:8px;background:rgba(6,11,23,0.5);color:#fff;cursor:pointer;">
+            <span>${escapeHtml(analysis.targetRole)} · ${escapeHtml(analysis.analysisMethod || 'not_run')}</span>
+            <span>${Number.isFinite(analysis.score) ? `${analysis.score}/100` : 'No score'} · ${escapeHtml(new Date(analysis.createdAt).toLocaleDateString())}</span>
+          </button>
+        `).join('');
+        container.querySelectorAll('[data-resume-analysis]').forEach(button => {
+          button.addEventListener('click', () => {
+            const analysis = resumeHistory[Number(button.dataset.resumeAnalysis)];
+            if (analysis) renderReport(analysis);
+          });
+        });
+      } catch (error) {
+        console.error('Resume history load failed:', error);
+        container.textContent = 'Unable to load saved analyses. Please retry.';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[character]);
+    }
+
+    async function loadProfileTargetRole() {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const response = await fetch('/api/career/profile', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const targetRole = data.user?.targetRole?.trim();
+        if (!targetRole) return;
+        const select = document.getElementById('resumeTargetRole');
+        if (!Array.from(select.options).some(option => option.value === targetRole)) {
+          select.add(new Option(targetRole, targetRole));
+        }
+        select.value = targetRole;
+      } catch (error) {
+        console.error('Profile target-role load failed:', error);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadResumeHistory();
+      loadProfileTargetRole();
+    });
   </script>
 </body>
 </html>

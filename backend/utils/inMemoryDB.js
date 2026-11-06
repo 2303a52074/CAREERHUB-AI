@@ -1,5 +1,3 @@
-const bcrypt = require('bcryptjs');
-
 // In-Memory Data Stores
 const users = [];
 const interviews = [];
@@ -9,410 +7,18 @@ const challenges = [];
 const jobOpportunities = [];
 const jobApplications = [];
 const careerAssessments = [];
+const careerAssessmentSessions = [];
 const careerRoadmaps = [];
 const dailyPlans = [];
+const dailyPlanGenerationLocks = [];
+const careerConversations = [];
+const resumeAnalyses = [];
+const skillGapAnalyses = [];
+const examSessions = [];
+const additionalCodingProblems = require('./additionalCodingProblems');
 
-// Initialize seed data
-(async () => {
+const seedPromise = (async () => {
     try {
-        const hashedPassword = await bcrypt.hash('password123', 10);
-        users.push({
-            _id: 'user-demo-1',
-            id: 'user-demo-1',
-            name: 'Demo Candidate',
-            email: 'demo@example.com',
-            password: hashedPassword,
-            role: 'admin',
-            xp: 380,
-            level: 3,
-            streak: 5,
-            publicProfile: true,
-            theme: 'dark',
-            degree: 'B.Tech',
-            branch: 'Computer Science & Engineering',
-            college: 'SR University',
-            graduationYear: '2026',
-            cgpa: '8.8',
-            technicalSkills: ['JavaScript', 'React', 'Node.js', 'Express', 'Python', 'HTML/CSS', 'SQL', 'Git'],
-            softSkills: ['Problem Solving', 'Team Collaboration', 'Communication', 'Adaptability'],
-            certifications: ['Full Stack Web Development - Meta', 'AWS Cloud Practitioner', 'Algorithms Specialization'],
-            projects: [
-                {
-                    title: 'CareerHub AI - Placement Portal',
-                    techStack: 'React, Node.js, Express, Gemini AI',
-                    description: 'Full stack AI-powered career assistant with automated mock interviews, resume scoring, and career roadmaps.',
-                    link: 'https://github.com/demo/careerhub'
-                },
-                {
-                    title: 'Distributed Task Queue System',
-                    techStack: 'Node.js, Redis, Docker, Jest',
-                    description: 'Asynchronous task processing engine with exponential backoff and worker pools.',
-                    link: 'https://github.com/demo/task-queue'
-                }
-            ],
-            experience: [
-                {
-                    company: 'InnovateX Labs',
-                    role: 'Software Engineer Intern',
-                    duration: 'May 2025 - Aug 2025 (4 mos)',
-                    description: 'Built high-throughput REST endpoints and automated CI/CD pipelines.'
-                }
-            ],
-            careerInterests: ['Full Stack Development', 'Distributed Systems', 'Cloud Architecture'],
-            preferredRoles: ['Full Stack Developer', 'Software Development Engineer', 'Frontend Engineer'],
-            preferredLocations: ['Bengaluru', 'Hyderabad', 'Remote'],
-            careerGoals: 'To join an innovative technology team as a Software Engineer, contributing to high-scale cloud platforms while mastering modern distributed systems.',
-            careerReadinessScore: 82,
-            resumeScore: 86,
-            targetRole: 'Full Stack Developer'
-        });
-
-        // Seed default job opportunities
-        jobOpportunities.push(
-            {
-                _id: 'opp-1',
-                id: '1',
-                type: 'job',
-                title: 'Associate Software Engineer',
-                organization: 'Google',
-                location: 'Bengaluru / Hybrid',
-                salaryOrStipend: '₹22 - ₹32 LPA',
-                requiredSkills: ['JavaScript', 'React', 'Data Structures', 'Algorithms', 'System Design'],
-                eligibility: 'B.Tech / M.Tech in CS/IT, Min CGPA: 8.0, 2025-2026 batch',
-                deadline: '2026-10-15',
-                openings: 15,
-                description: 'Build large-scale applications and cloud solutions that impact billions of users globally.',
-                applicationLink: 'https://careers.google.com'
-            },
-            {
-                _id: 'opp-2',
-                id: '2',
-                type: 'job',
-                title: 'Software Engineer 1 (Full Stack)',
-                organization: 'Microsoft',
-                location: 'Hyderabad / Bengaluru',
-                salaryOrStipend: '₹20 - ₹28 LPA',
-                requiredSkills: ['TypeScript', 'React', 'Node.js', 'Azure', 'C# / Java'],
-                eligibility: 'B.Tech / M.Tech / MCA, Min CGPA: 7.5',
-                deadline: '2026-10-30',
-                openings: 25,
-                description: 'Develop features for cloud collaboration suites and enterprise developer tools.',
-                applicationLink: 'https://careers.microsoft.com'
-            },
-            {
-                _id: 'opp-3',
-                id: '3',
-                type: 'job',
-                title: 'Full Stack Developer',
-                organization: 'Razorpay',
-                location: 'Bengaluru / Remote',
-                salaryOrStipend: '₹18 - ₹25 LPA',
-                requiredSkills: ['React', 'Node.js', 'SQL', 'Docker', 'REST APIs'],
-                eligibility: 'B.Tech / B.E / MCA, Min CGPA: 7.0',
-                deadline: '2026-10-20',
-                openings: 8,
-                description: 'Shape the next generation of financial infrastructure and payment gateway tech for millions of merchants.',
-                applicationLink: 'https://razorpay.com/jobs'
-            },
-            {
-                _id: 'opp-4',
-                id: '4',
-                type: 'internship',
-                title: 'Software Development Engineering Intern',
-                organization: 'Amazon',
-                location: 'Bengaluru / Hyderabad',
-                salaryOrStipend: '₹80,000 / month',
-                requiredSkills: ['Python', 'Java', 'Data Structures', 'AWS', 'Problem Solving'],
-                eligibility: 'Pre-final & final year students (2026/2027 batch), CGPA >= 7.5',
-                deadline: '2026-11-05',
-                openings: 40,
-                description: '6-month summer internship with high pre-placement offer (PPO) conversion rates.',
-                applicationLink: 'https://amazon.jobs'
-            },
-            {
-                _id: 'opp-5',
-                id: '5',
-                type: 'internship',
-                title: 'Frontend Engineering Intern',
-                organization: 'Swiggy',
-                location: 'Remote',
-                salaryOrStipend: '₹50,000 / month',
-                requiredSkills: ['JavaScript', 'React', 'HTML/CSS', 'Redux / Zustand', 'Web Performance'],
-                eligibility: 'Students graduating in 2026/2027',
-                deadline: '2026-10-25',
-                openings: 10,
-                description: 'Work on ultra-fast consumer storefront interfaces powering millions of food orders daily.',
-                applicationLink: 'https://swiggy.com/careers'
-            },
-            {
-                _id: 'opp-meta',
-                id: 'meta-1',
-                type: 'job',
-                title: 'Software Engineer - Front End & Full Stack',
-                organization: 'Meta',
-                location: 'Remote / Menlo Park / London',
-                salaryOrStipend: '$145,000 - $190,000 / yr',
-                requiredSkills: ['React', 'JavaScript', 'GraphQL', 'System Design', 'TypeScript'],
-                eligibility: 'BS/MS in Computer Science or related STEM degree',
-                deadline: '2026-11-30',
-                openings: 35,
-                description: 'Build user-facing experiences for billions of people across Instagram, WhatsApp, and Meta Reality Labs.',
-                applicationLink: 'https://www.metacareers.com/jobs'
-            },
-            {
-                _id: 'opp-apple',
-                id: 'apple-1',
-                type: 'job',
-                title: 'Software Development Engineer - Cloud & Web Services',
-                organization: 'Apple',
-                location: 'Cupertino, CA / Austin / Bengaluru',
-                salaryOrStipend: '$150,000 - $210,000 / yr',
-                requiredSkills: ['Python', 'Go', 'Swift', 'Distributed Systems', 'Kubernetes'],
-                eligibility: 'B.Tech / M.Tech / MS in CS, 0-2 years experience',
-                deadline: '2026-12-15',
-                openings: 20,
-                description: 'Craft high-performance distributed backend architectures powering iCloud and Apple Services ecosystem.',
-                applicationLink: 'https://jobs.apple.com/en-us/search?search=Software%20Engineer'
-            },
-            {
-                _id: 'opp-cred',
-                id: 'cred-1',
-                type: 'job',
-                title: 'Backend Software Engineer - Fintech Platform',
-                organization: 'CRED',
-                location: 'Bengaluru / Hybrid',
-                salaryOrStipend: '₹24 - ₹34 LPA',
-                requiredSkills: ['Java', 'Golang', 'Kafka', 'Redis', 'High Scale Microservices'],
-                eligibility: 'B.Tech / B.E, strong DSA and low-latency system design fundamentals',
-                deadline: '2026-11-20',
-                openings: 12,
-                description: 'Scale financial transactions and rewards infrastructure with zero-downtime microservices.',
-                applicationLink: 'https://cred.club/careers'
-            },
-            {
-                _id: 'opp-flipkart',
-                id: 'flipkart-1',
-                type: 'job',
-                title: 'Software Development Engineer 1 (SDE-1)',
-                organization: 'Flipkart',
-                location: 'Bengaluru, India',
-                salaryOrStipend: '₹18 - ₹26 LPA',
-                requiredSkills: ['Data Structures', 'Java', 'Spring Boot', 'MySQL', 'System Design'],
-                eligibility: '2025 / 2026 Graduating Batches, CGPA >= 7.0',
-                deadline: '2026-11-10',
-                openings: 45,
-                description: 'Build ultra-scalable e-commerce checkout and supply-chain logistics engines for India’s top commerce platform.',
-                applicationLink: 'https://www.flipkartcareers.com/'
-            },
-            {
-                _id: 'opp-6',
-                id: '6',
-                type: 'hackathon',
-                title: 'Smart India Hackathon 2026',
-                organization: 'Ministry of Education & AICTE',
-                location: 'National / Hybrid',
-                salaryOrStipend: '₹1,00,000 Prize per Problem Statement',
-                requiredSkills: ['Full Stack', 'AI/ML', 'IoT', 'Cloud', 'Rapid Prototyping'],
-                eligibility: 'Open to all engineering college students in teams of 6',
-                deadline: '2026-10-18',
-                openings: 500,
-                description: 'World’s biggest open innovation hackathon solving real-world government and industry challenges.',
-                applicationLink: 'https://sih.gov.in'
-            },
-            {
-                _id: 'opp-7',
-                id: '7',
-                type: 'hackathon',
-                title: 'Google Solution Challenge 2026',
-                organization: 'Google Developer Student Clubs',
-                location: 'Global Online',
-                salaryOrStipend: '$12,000 Total Prizes & Mentorship',
-                requiredSkills: ['Flutter', 'Firebase', 'Gemini AI', 'Google Cloud'],
-                eligibility: 'University students globally',
-                deadline: '2026-11-15',
-                openings: 200,
-                description: 'Solve for one or more of the United Nations 17 Sustainable Development Goals using Google tech.',
-                applicationLink: 'https://developers.google.com/community/gdsc-solution-challenge'
-            },
-            {
-                _id: 'opp-8',
-                id: '8',
-                type: 'course',
-                title: 'Meta Full-Stack Developer Professional Certificate',
-                organization: 'Meta & Coursera',
-                location: 'Self-Paced Online',
-                salaryOrStipend: 'Industry Recognized Credential',
-                requiredSkills: ['HTML', 'CSS', 'JavaScript', 'React', 'Django / Python', 'Database Design'],
-                eligibility: 'Beginner to Intermediate learners',
-                deadline: 'Rolling Admission',
-                openings: 1000,
-                description: 'Comprehensive program preparing graduates for entry-level full-stack engineering roles.',
-                applicationLink: 'https://coursera.org/meta-full-stack'
-            },
-            {
-                _id: 'opp-9',
-                id: '9',
-                type: 'course',
-                title: 'AWS Certified Solutions Architect - Associate',
-                organization: 'Amazon Web Services',
-                location: 'Online Examination',
-                salaryOrStipend: 'Global Cloud Certification',
-                requiredSkills: ['Cloud Architecture', 'AWS S3', 'EC2', 'IAM', 'VPC', 'Serverless Lambda'],
-                eligibility: 'Engineers with foundational cloud knowledge',
-                deadline: 'Flexible Exam Scheduling',
-                openings: 1000,
-                description: 'Validation of expertise in designing secure, resilient, and cost-effective cloud systems.',
-                applicationLink: 'https://aws.amazon.com/certification'
-            }
-        );
-
-        // Seed default job applications for user-demo-1
-        jobApplications.push(
-            {
-                _id: 'app-1',
-                userId: 'user-demo-1',
-                company: 'Google',
-                jobRole: 'Associate Software Engineer',
-                type: 'job',
-                location: 'Bengaluru / Hybrid',
-                salaryOrStipend: '₹28 LPA',
-                appliedDate: '2026-09-08',
-                status: 'Interview',
-                interviewDate: '2026-09-22T14:00:00Z',
-                matchPercentage: 92,
-                notes: 'Passed initial coding screen. Technical Round 1 on System Design and Trees/Graphs scheduled.',
-                contactPerson: 'Campus Talent Acquisition'
-            },
-            {
-                _id: 'app-2',
-                userId: 'user-demo-1',
-                company: 'Microsoft',
-                jobRole: 'Software Engineer 1',
-                type: 'job',
-                location: 'Hyderabad',
-                salaryOrStipend: '₹24 LPA',
-                appliedDate: '2026-09-05',
-                status: 'Assessment',
-                interviewDate: '',
-                matchPercentage: 88,
-                notes: 'Codility online assessment completed with 100% test cases passing. Awaiting interview schedule.',
-                contactPerson: 'University Recruiting'
-            },
-            {
-                _id: 'app-3',
-                userId: 'user-demo-1',
-                company: 'Razorpay',
-                jobRole: 'Full Stack Developer',
-                type: 'job',
-                location: 'Bengaluru',
-                salaryOrStipend: '₹20 LPA',
-                appliedDate: '2026-09-02',
-                status: 'Shortlisted',
-                interviewDate: '',
-                matchPercentage: 94,
-                notes: 'Profile and GitHub repository reviewed by hiring manager. Shortlisted for round 1.',
-                contactPerson: 'Engineering Lead'
-            },
-            {
-                _id: 'app-4',
-                userId: 'user-demo-1',
-                company: 'Swiggy',
-                jobRole: 'Engineering Intern',
-                type: 'internship',
-                location: 'Remote',
-                salaryOrStipend: '₹50,000 / mo',
-                appliedDate: '2026-09-11',
-                status: 'Applied',
-                interviewDate: '',
-                matchPercentage: 90,
-                notes: 'Application submitted via CareerHub portal with customized resume.',
-                contactPerson: 'HR Team'
-            },
-            {
-                _id: 'app-5',
-                userId: 'user-demo-1',
-                company: 'Amazon',
-                jobRole: 'SDE Intern',
-                type: 'internship',
-                location: 'Hyderabad',
-                salaryOrStipend: '₹80,000 / mo',
-                appliedDate: '2026-08-20',
-                status: 'Selected',
-                interviewDate: '2026-09-01T10:00:00Z',
-                matchPercentage: 95,
-                notes: 'Offer letter received! Offer accepted for Spring 2027 internship.',
-                contactPerson: 'Recruiter Ananya'
-            }
-        );
-
-        // Seed default career roadmap for user-demo-1
-        careerRoadmaps.push({
-            _id: 'roadmap-1',
-            userId: 'user-demo-1',
-            targetRole: 'Full Stack Developer',
-            generatedDate: new Date(),
-            progressPercentage: 55,
-            phases: [
-                {
-                    phaseNumber: 1,
-                    title: 'Phase 1 — Fundamentals & Core Architecture',
-                    description: 'Deepen core software engineering fundamentals, data structures, and foundational web protocols.',
-                    status: 'completed',
-                    milestones: [
-                        { id: 'm1-1', title: 'Master Advanced JavaScript (Closures, Event Loop, Promises, Prototypes)', completed: true },
-                        { id: 'm1-2', title: 'Solidify React 19 component lifecycle, custom hooks, and state paradigms', completed: true },
-                        { id: 'm1-3', title: 'Design clean RESTful and GraphQL API contracts with Express & TypeScript', completed: true },
-                        { id: 'm1-4', title: 'Solve 25+ LeetCode problems across Arrays, Two Pointers, and Strings', completed: true }
-                    ]
-                },
-                {
-                    phaseNumber: 2,
-                    title: 'Phase 2 — Full-Stack Projects & Production Craft',
-                    description: 'Build real-world multi-tier applications with authentication, databases, and automated testing.',
-                    status: 'in-progress',
-                    milestones: [
-                        { id: 'm2-1', title: 'Build and deploy an end-to-end full stack application with relational SQL/PostgreSQL', completed: true },
-                        { id: 'm2-2', title: 'Implement secure JWT authentication with refresh rotation and RBAC roles', completed: true },
-                        { id: 'm2-3', title: 'Containerize application microservices with Docker and Docker Compose', completed: false },
-                        { id: 'm2-4', title: 'Add unit and integration tests with Jest/Supertest achieving >80% code coverage', completed: false }
-                    ]
-                },
-                {
-                    phaseNumber: 3,
-                    title: 'Phase 3 — Resume Optimization & ATS Tuning',
-                    description: 'Transform project bullet points using Google XYZ formula and pass modern ATS screening.',
-                    status: 'in-progress',
-                    milestones: [
-                        { id: 'm3-1', title: 'Run resume through CareerHub AI Resume Analyzer and achieve >= 85 Score', completed: true },
-                        { id: 'm3-2', title: 'Quantify metrics across internship and projects (e.g. "reduced latency by 35%")', completed: true },
-                        { id: 'm3-3', title: 'Ensure GitHub repositories have clean READMEs, architecture diagrams, and live demos', completed: false }
-                    ]
-                },
-                {
-                    phaseNumber: 4,
-                    title: 'Phase 4 — Targeted Interview Preparation',
-                    description: 'Simulate high-pressure technical, system design, and behavioral interviews.',
-                    status: 'pending',
-                    milestones: [
-                        { id: 'm4-1', title: 'Complete 5 AI Technical Mock Interviews with score >= 80%', completed: true },
-                        { id: 'm4-2', title: 'Practice 3 HR Behavioral interviews using the STAR framework', completed: false },
-                        { id: 'm4-3', title: 'Study High-Level System Design (Caching, Load Balancing, DB Sharding)', completed: false }
-                    ]
-                },
-                {
-                    phaseNumber: 5,
-                    title: 'Phase 5 — Strategic Applications & Placement',
-                    description: 'Track applications, leverage alumni referrals, and conquer final round interviews.',
-                    status: 'pending',
-                    milestones: [
-                        { id: 'm4-1', title: 'Track at least 10 targeted job applications in CareerHub Application Tracker', completed: false },
-                        { id: 'm5-2', title: 'Reach out to 5 alumni on LinkedIn for warm referrals and informational chats', completed: false },
-                        { id: 'm5-3', title: 'Prepare counter-offers and evaluate total compensation packages', completed: false }
-                    ]
-                }
-            ]
-        });
-
         // Seed default coding problems
         codingProblems.push(
             {
@@ -517,21 +123,12 @@ const dailyPlans = [];
                 constraints: "1 <= nums.length <= 10^5"
             }
         );
+        codingProblems.push(...additionalCodingProblems.map(problem => ({
+            ...problem,
+            _id: `problem-${problem.id}`,
+            companies: []
+        })));
 
-        // Seed initial interview
-        interviews.push({
-            _id: 'interview-1',
-            userId: 'user-demo-1',
-            role: 'Frontend Developer',
-            difficulty: 'medium',
-            totalScore: 85,
-            xpEarned: 85,
-            answers: [
-                { question: "Explain the virtual DOM in React.", answer: "The virtual DOM is an in-memory representation of real DOM elements.", score: 9, skill: "frontend" },
-                { question: "What is closure in JavaScript?", answer: "A closure is a function with access to its outer function's scope.", score: 8, skill: "javascript" }
-            ],
-            date: new Date()
-        });
     } catch (e) {
         console.warn("Seed init error:", e.message);
     }
@@ -564,6 +161,14 @@ class QueryBuilder {
     limit(n) {
         this.dataPromise = this.dataPromise.then(items => {
             if (Array.isArray(items)) return items.slice(0, n);
+            return items;
+        });
+        return this;
+    }
+
+    skip(n) {
+        this.dataPromise = this.dataPromise.then(items => {
+            if (Array.isArray(items)) return items.slice(n);
             return items;
         });
         return this;
@@ -636,12 +241,29 @@ class QueryBuilder {
     }
 }
 
+function sameMongoIdentifier(left, right) {
+    if (left === right) return true;
+    const leftIsObjectId = left?._bsontype === 'ObjectId';
+    const rightIsObjectId = right?._bsontype === 'ObjectId';
+    return left != null && right != null &&
+        (leftIsObjectId || rightIsObjectId) &&
+        String(left) === String(right);
+}
+
 function matchFilter(item, filter) {
     if (!filter || Object.keys(filter).length === 0) return true;
     for (const [key, val] of Object.entries(filter)) {
         if (key === '_id' || key === 'id') {
             if (String(item._id) !== String(val) && String(item.id) !== String(val)) return false;
-        } else if (item[key] !== val) {
+        } else if (val && typeof val === 'object' && !Array.isArray(val) && '$ne' in val) {
+            const current = item[key];
+            const containsValue = Array.isArray(current)
+                ? current.some(value => sameMongoIdentifier(value, val.$ne))
+                : sameMongoIdentifier(current, val.$ne);
+            if (containsValue) return false;
+        } else if (val === null && item[key] == null) {
+            continue;
+        } else if (!sameMongoIdentifier(item[key], val)) {
             return false;
         }
     }
@@ -672,6 +294,38 @@ function wrapModel(collection, modelName, originalMongooseModel, mongoose) {
         };
         return doc;
     }
+
+    ModelConstructor.init = function() {
+        if (mongoose.connection.readyState === 1 && originalMongooseModel) {
+            return originalMongooseModel.init();
+        }
+        return Promise.resolve(ModelConstructor);
+    };
+
+    ModelConstructor.updateOne = function(filter, update, options) {
+        if (mongoose.connection.readyState === 1 && originalMongooseModel) {
+            return originalMongooseModel.updateOne(filter, update, options);
+        }
+        const item = collection.find(entry => matchFilter(entry, filter));
+        if (!item) {
+            return Promise.resolve({ acknowledged: true, matchedCount: 0, modifiedCount: 0, upsertedCount: 0 });
+        }
+        Object.entries(update.$set || {}).forEach(([key, value]) => {
+            item[key] = value;
+        });
+        Object.entries(update.$inc || {}).forEach(([key, value]) => {
+            item[key] = (Number(item[key]) || 0) + Number(value);
+        });
+        Object.entries(update.$addToSet || {}).forEach(([key, value]) => {
+            const values = item[key] || [];
+            if (!values.some(current => String(current) === String(value))) values.push(value);
+            item[key] = values;
+        });
+        Object.entries(update).forEach(([key, value]) => {
+            if (!key.startsWith('$')) item[key] = value;
+        });
+        return Promise.resolve({ acknowledged: true, matchedCount: 1, modifiedCount: 1, upsertedCount: 0 });
+    };
 
     ModelConstructor.findOne = function(filter) {
         if (mongoose.connection.readyState === 1 && originalMongooseModel) {
@@ -705,7 +359,20 @@ function wrapModel(collection, modelName, originalMongooseModel, mongoose) {
         }
         const idx = collection.findIndex(i => String(i._id) === String(id) || String(i.id) === String(id));
         if (idx >= 0) {
-            collection[idx] = { ...collection[idx], ...updates };
+            const updated = { ...collection[idx] };
+            Object.entries(updates.$set || {}).forEach(([key, value]) => {
+                updated[key] = value;
+            });
+            Object.entries(updates.$push || {}).forEach(([key, value]) => {
+                updated[key] = [...(updated[key] || []), value];
+            });
+            Object.entries(updates.$inc || {}).forEach(([key, value]) => {
+                updated[key] = (Number(updated[key]) || 0) + Number(value);
+            });
+            Object.entries(updates).forEach(([key, value]) => {
+                if (!key.startsWith('$')) updated[key] = value;
+            });
+            collection[idx] = updated;
             return new QueryBuilder({ ...collection[idx] });
         }
         return new QueryBuilder(null);
@@ -729,6 +396,13 @@ function wrapModel(collection, modelName, originalMongooseModel, mongoose) {
         }
         const items = collection.filter(i => matchFilter(i, filter)).map(i => ({ ...i }));
         return new QueryBuilder(items);
+    };
+
+    ModelConstructor.countDocuments = function(filter = {}) {
+        if (mongoose.connection.readyState === 1 && originalMongooseModel) {
+            return originalMongooseModel.countDocuments(filter);
+        }
+        return Promise.resolve(collection.filter(item => matchFilter(item, filter)).length);
     };
 
     ModelConstructor.deleteMany = function(filter = {}) {
@@ -765,7 +439,14 @@ module.exports = {
     jobOpportunities,
     jobApplications,
     careerAssessments,
+    careerAssessmentSessions,
     careerRoadmaps,
     dailyPlans,
-    wrapModel
+    dailyPlanGenerationLocks,
+    careerConversations,
+    resumeAnalyses,
+    skillGapAnalyses,
+    examSessions,
+    wrapModel,
+    seedPromise
 };

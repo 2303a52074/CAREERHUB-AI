@@ -138,7 +138,7 @@
             </a>
 
             <div style="display: flex; gap: 12px;">
-                <button class="btn btn-outline" onclick="location.href='dashboard.html'">
+                <button class="btn btn-outline" onclick="location.href='/dashboard'">
                     <i class="fas fa-columns"></i> Placement Cockpit
                 </button>
                 <button class="btn btn-outline" onclick="logout()">
@@ -167,18 +167,7 @@
     <script>
         const token = localStorage.getItem("token");
         if (!token) {
-            // acquire demo credentials if needed
-            fetch('/api/auth/demo', { method: 'POST' })
-                .then(r => r.json())
-                .then(d => {
-                    if (d.token) {
-                        localStorage.setItem("token", d.token);
-                        loadUsers();
-                    } else {
-                        window.location.href = "login.html";
-                    }
-                })
-                .catch(() => { window.location.href = "login.html"; });
+            window.location.href = "/login?next=/admin";
         } else {
             loadUsers();
         }
@@ -281,7 +270,7 @@
 
         function logout() {
             localStorage.removeItem("token");
-            window.location.href = "login.html";
+            window.location.href = "/login";
         }
     </script>
 </body>

@@ -7,6 +7,7 @@
   <link rel="icon" type="image/png" href="/assets/logo.png">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/assets/shared-nav.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     .analytics-kpi-grid {
@@ -26,6 +27,13 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       padding: 1.75rem;
+      position: relative;
+    }
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 280px;
+      margin-top: 1rem;
     }
     .stat-row {
       display: flex;
@@ -37,7 +45,7 @@
       background: rgba(255, 255, 255, 0.02);
       border: 1px solid rgba(255, 255, 255, 0.04);
     }
-    @media (max-width: 900px) {
+    @media (max-width: 950px) {
       .analytics-kpi-grid { grid-template-columns: repeat(2, 1fr); }
       .analytics-split { grid-template-columns: 1fr; }
     }
@@ -52,6 +60,7 @@
     <div class="main-wrapper">
       <div id="header-container"></div>
       <main class="page-container">
+        <div id="analyticsStatus" role="status" aria-live="polite" style="margin-bottom:1rem;color:var(--text-secondary);font-size:0.85rem;"></div>
         
         <!-- 4 Top KPIs -->
         <div class="analytics-kpi-grid">
@@ -80,61 +89,80 @@
           </div>
         </div>
 
-        <!-- Split 1: Readiness Breakdown & Coding Accuracy -->
+        <!-- Split 1: Readiness Radar & Coding Accuracy Donut -->
         <div class="analytics-split">
-          <!-- Readiness Factors -->
+          <!-- Readiness Radar Chart -->
           <div class="chart-panel">
-            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
-              Readiness Component Breakdown
-            </h3>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
-              Multi-factor weighted evaluation across 6 critical placement dimensions
-            </p>
-            <div id="readinessComponentsList">
-              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading readiness metrics...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="font-size:1.1rem;font-weight:700;color:#fff;">Placement Readiness Radar</h3>
+                <p style="font-size:0.8rem;color:var(--text-muted);">Evaluation across all 6 core placement pillars</p>
+              </div>
+              <span class="role-tag-pill" style="font-size:0.75rem;">Dynamic Weighting</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="readinessRadarChart"></canvas>
             </div>
           </div>
 
-          <!-- Coding Submissions Stats -->
+          <!-- Coding Submissions Breakdown -->
           <div class="chart-panel">
-            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
-              Algorithmic Problem Velocity
-            </h3>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
-              Sandbox code execution accuracy and acceptance rate
-            </p>
-            <div id="codingStatsContainer">
-              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading submission records...</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="font-size:1.1rem;font-weight:700;color:#fff;">Coding Submissions & Accuracy</h3>
+                <p style="font-size:0.8rem;color:var(--text-muted);">Accepted vs failed isolated test executions</p>
+              </div>
+              <span class="role-tag-pill" style="font-size:0.75rem;" id="accuracyPill">--% Accuracy</span>
+            </div>
+            <div class="chart-container">
+              <canvas id="codingDoughnutChart"></canvas>
+            </div>
+            <p id="codingEmptyState" style="display:none;color:var(--text-muted);font-size:0.8rem;text-align:center;">No coding submissions recorded yet.</p>
+          </div>
+        </div>
+
+        <!-- Split 2: Interview Trajectory & Applications Pipeline Funnel -->
+        <div class="analytics-split">
+          <!-- Interview Trajectory Line Chart -->
+          <div class="chart-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="font-size:1.1rem;font-weight:700;color:#fff;">Mock Interview Performance Trend</h3>
+                <p style="font-size:0.8rem;color:var(--text-muted);">Scores progression over technical and behavioral rounds</p>
+              </div>
+              <a href="/interviews" class="role-tag-pill" style="font-size:0.72rem;text-decoration:none;">New Session →</a>
+            </div>
+            <div class="chart-container">
+              <canvas id="interviewTrendChart"></canvas>
+            </div>
+            <p id="interviewEmptyState" style="display:none;color:var(--text-muted);font-size:0.8rem;text-align:center;">No interview sessions recorded yet.</p>
+          </div>
+
+          <!-- Applications Conversion Bar Chart -->
+          <div class="chart-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <h3 style="font-size:1.1rem;font-weight:700;color:#fff;">Recruitment Pipeline Stages</h3>
+                <p style="font-size:0.8rem;color:var(--text-muted);">Distribution of tracked opportunities across stages</p>
+              </div>
+              <a href="/applications" class="role-tag-pill" style="font-size:0.72rem;text-decoration:none;">View Pipeline →</a>
+            </div>
+            <div class="chart-container">
+              <canvas id="applicationsBarChart"></canvas>
             </div>
           </div>
         </div>
 
-        <!-- Split 2: Interview Trajectory & Applications Conversion -->
-        <div class="analytics-split">
-          <!-- Interview Trajectory -->
-          <div class="chart-panel">
-            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
-              Mock Interview Score Trajectory
-            </h3>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
-              Recent technical and behavioral session performance
-            </p>
-            <div id="interviewTrajectoryList">
-              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading interview history...</div>
-            </div>
-          </div>
-
-          <!-- Applications Conversion Funnel -->
-          <div class="chart-panel">
-            <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
-              Recruitment Conversion Funnel
-            </h3>
-            <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
-              Progress of tracked opportunities through recruitment stages
-            </p>
-            <div id="appFunnelContainer">
-              <div style="padding:2rem;text-align:center;color:var(--text-muted);">Loading applications funnel...</div>
-            </div>
+        <!-- Technical Competency Proficiency Matrix -->
+        <div class="chart-panel" style="margin-bottom:2rem;">
+          <h3 style="font-size:1.1rem;font-weight:700;color:#fff;margin-bottom:0.25rem;">
+            Profile Skills
+          </h3>
+          <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:1.5rem;">
+            Self-reported skills and measured proficiency when available
+          </p>
+          <div id="competenciesContainer" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));gap:1rem;">
+            <div style="padding:1rem;color:var(--text-muted);">Loading verified competencies...</div>
           </div>
         </div>
 
@@ -147,6 +175,11 @@
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+    let radarChart = null;
+    let codingChart = null;
+    let interviewChart = null;
+    let appChart = null;
+
     async function loadAnalytics() {
       try {
         const [readinessRes, historyRes] = await Promise.all([
@@ -154,17 +187,24 @@
           fetch('/api/career/analytics/history', { headers })
         ]);
 
-        if (readinessRes.ok && historyRes.ok) {
-          const r = await readinessRes.json();
-          const h = await historyRes.json();
-          renderAnalytics(r, h);
+        if (!readinessRes.ok || !historyRes.ok) {
+          document.getElementById('analyticsStatus').textContent =
+            readinessRes.status === 401 || historyRes.status === 401
+              ? 'Sign in to view your personal analytics.'
+              : 'Analytics could not be loaded. Please retry.';
+          return;
         }
+        const r = await readinessRes.json();
+        const h = await historyRes.json();
+        document.getElementById('analyticsStatus').textContent = 'Analytics use your saved profile and activity data.';
+        renderAnalyticsData(r, h);
       } catch (err) {
         console.error('Analytics load error:', err);
+        document.getElementById('analyticsStatus').textContent = 'Network error loading analytics. Please retry.';
       }
     }
 
-    function renderAnalytics(r, h) {
+    function renderAnalyticsData(r, h) {
       // 1. KPIs
       document.getElementById('kpiReadiness').innerText = `${r.overallScore || 0}%`;
       document.getElementById('kpiReadinessStatus').innerText = r.statusBadge || 'Placement Ready';
@@ -173,82 +213,212 @@
       document.getElementById('kpiInterviewAvg').innerText = `${h.interviews?.averageScore || 0}%`;
       document.getElementById('kpiInterviewCount').innerText = `${h.interviews?.totalSessions || 0} Sessions Evaluated`;
       document.getElementById('kpiRoadmapProg').innerText = `${h.roadmapProgress || 0}%`;
+      document.getElementById('accuracyPill').innerText = `${h.coding?.accuracyRate || 0}% Accuracy`;
 
-      // 2. Readiness components
+      // 2. Chart 1: Readiness Radar
       const b = r.breakdown || {};
-      const components = [
-        { label: 'Coding Mastery', score: b.coding?.score || 0, weight: '25%' },
-        { label: 'Career Assessment', score: b.assessment?.score || 0, weight: '20%' },
-        { label: 'Mock Interviews', score: b.interview?.score || 0, weight: '20%' },
-        { label: 'Resume ATS Score', score: b.resume?.score || 0, weight: '15%' },
-        { label: 'Roadmap Milestones', score: b.roadmap?.score || 0, weight: '10%' },
-        { label: 'Profile Depth', score: b.profile?.score || 0, weight: '10%' }
+      const radarLabels = ['Coding', 'Assessment', 'Interviews', 'Resume ATS', 'Roadmap', 'Profile Depth'];
+      const radarData = [
+        b.coding?.score || 0,
+        b.assessment?.score || 0,
+        b.interview?.score || 0,
+        b.resume?.score || 0,
+        b.roadmap?.score || 0,
+        b.profile?.score || 0
       ];
 
-      document.getElementById('readinessComponentsList').innerHTML = components.map(c => `
-        <div style="margin-bottom:0.9rem;">
-          <div style="display:flex;justify-content:space-between;font-size:0.85rem;margin-bottom:0.35rem;">
-            <span style="color:#fff;font-weight:600;">${c.label} <span style="font-size:0.72rem;color:var(--text-muted);">(${c.weight})</span></span>
-            <span style="color:#00d2ff;font-weight:700;">${c.score}%</span>
-          </div>
-          <div style="height:8px;background:rgba(255,255,255,0.06);border-radius:4px;overflow:hidden;">
-            <div style="width:${c.score}%;height:100%;background:var(--gradient-primary);border-radius:4px;"></div>
-          </div>
-        </div>
-      `).join('');
+      const ctxRadar = document.getElementById('readinessRadarChart').getContext('2d');
+      if (radarChart) radarChart.destroy();
+      radarChart = new Chart(ctxRadar, {
+        type: 'radar',
+        data: {
+          labels: radarLabels,
+          datasets: [{
+            label: 'Candidate Readiness (%)',
+            data: radarData,
+            backgroundColor: 'rgba(0, 210, 255, 0.2)',
+            borderColor: '#00d2ff',
+            borderWidth: 2,
+            pointBackgroundColor: '#38bdf8',
+            pointBorderColor: '#fff',
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            r: {
+              angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
+              grid: { color: 'rgba(255, 255, 255, 0.08)' },
+              pointLabels: { color: '#cbd5e1', font: { size: 11, weight: '600' } },
+              suggestedMin: 0,
+              suggestedMax: 100,
+              ticks: { display: false, stepSize: 20 }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
 
-      // 3. Coding Stats
-      document.getElementById('codingStatsContainer').innerHTML = `
-        <div class="stat-row">
-          <span style="color:#fff;font-weight:600;">Total Code Submissions</span>
-          <span style="color:#38bdf8;font-weight:700;">${h.coding?.totalSubmissions || 0}</span>
-        </div>
-        <div class="stat-row">
-          <span style="color:#fff;font-weight:600;">Accepted (Passed Test Cases)</span>
-          <span style="color:#34d399;font-weight:700;">${h.coding?.acceptedCount || 0}</span>
-        </div>
-        <div class="stat-row">
-          <span style="color:#fff;font-weight:600;">Wrong Answers / Runtime Errors</span>
-          <span style="color:#f87171;font-weight:700;">${h.coding?.failedCount || 0}</span>
-        </div>
-        <div class="stat-row">
-          <span style="color:#fff;font-weight:600;">Candidate Accuracy Rate</span>
-          <span style="color:#fbbf24;font-weight:700;">${h.coding?.accuracyRate || 0}%</span>
-        </div>
-      `;
+      // 3. Chart 2: Coding Doughnut
+      const accepted = h.coding?.acceptedCount || 0;
+      const failed = h.coding?.failedCount || 0;
+      const totalSubs = accepted + failed;
 
-      // 4. Interview Trajectory
+      const ctxDoughnut = document.getElementById('codingDoughnutChart').getContext('2d');
+      if (codingChart) codingChart.destroy();
+      codingChart = new Chart(ctxDoughnut, {
+        type: 'doughnut',
+        data: {
+          labels: ['Accepted', 'Wrong / Error'],
+          datasets: [{
+            data: [accepted, failed],
+            backgroundColor: totalSubs > 0 ? ['#10b981', '#ef4444'] : ['rgba(56, 189, 248, 0.2)', 'transparent'],
+            borderWidth: 0,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#cbd5e1', font: { size: 12 } }
+            }
+          },
+          cutout: '70%'
+        }
+      });
+      document.getElementById('codingEmptyState').style.display = totalSubs > 0 ? 'none' : 'block';
+
+      // 4. Chart 3: Interview Trajectory
       const trend = h.interviews?.trend || [];
-      document.getElementById('interviewTrajectoryList').innerHTML = trend.length > 0
-        ? trend.map(t => `
-          <div class="stat-row">
-            <div>
-              <div style="font-weight:600;color:#fff;">${t.session} • ${t.role}</div>
-              <div style="font-size:0.75rem;color:var(--text-muted);">${t.date}</div>
-            </div>
-            <span style="font-weight:700;color:${t.score >= 80 ? '#34d399' : '#38bdf8'};font-size:1rem;">
-              ${t.score}%
-            </span>
-          </div>
-        `).join('')
-        : '<div style="padding:2rem;text-align:center;color:var(--text-muted);">No mock interviews completed yet. Complete your first session to see score trajectory!</div>';
+      const sessionLabels = trend.map(t => t.session);
+      const sessionScores = trend.map(t => t.score);
 
-      // 5. Applications Funnel
+      const ctxLine = document.getElementById('interviewTrendChart').getContext('2d');
+      if (interviewChart) interviewChart.destroy();
+      interviewChart = new Chart(ctxLine, {
+        type: 'line',
+        data: {
+          labels: sessionLabels,
+          datasets: [{
+            label: 'Interview Score (%)',
+            data: sessionScores,
+            borderColor: '#a5b4fc',
+            backgroundColor: 'rgba(99, 102, 241, 0.15)',
+            borderWidth: 2.5,
+            fill: true,
+            tension: 0.35,
+            pointBackgroundColor: '#818cf8',
+            pointRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8' }
+            },
+            y: {
+              min: 40,
+              max: 100,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#94a3b8' }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+      document.getElementById('interviewEmptyState').style.display = trend.length > 0 ? 'none' : 'block';
+
+      // 5. Chart 4: Applications Bar Chart
       const apps = h.applications || {};
-      const funnel = [
-        { stage: 'Total Applied', count: apps.total || 0, color: '#38bdf8' },
-        { stage: 'Screening / Assessment', count: apps.screening || 0, color: '#818cf8' },
-        { stage: 'Interviews Active', count: apps.interview || 0, color: '#fbbf24' },
-        { stage: 'Offers & Selected', count: apps.offer || 0, color: '#34d399' },
-        { stage: 'Archived / Rejected', count: apps.rejected || 0, color: '#f87171' }
+      const appLabels = ['Applied', 'Screening', 'Interview', 'Selected / Offer', 'Rejected'];
+      const appCounts = [
+        apps.applied || 0,
+        apps.screening || 0,
+        apps.interview || 0,
+        apps.offer || 0,
+        apps.rejected || 0
       ];
 
-      document.getElementById('appFunnelContainer').innerHTML = funnel.map(f => `
-        <div class="stat-row">
-          <span style="color:#fff;font-weight:600;">${f.stage}</span>
-          <span style="font-weight:700;color:${f.color};font-size:1rem;">${f.count}</span>
-        </div>
-      `).join('');
+      const ctxBar = document.getElementById('applicationsBarChart').getContext('2d');
+      if (appChart) appChart.destroy();
+      appChart = new Chart(ctxBar, {
+        type: 'bar',
+        data: {
+          labels: appLabels,
+          datasets: [{
+            label: 'Applications',
+            data: appCounts,
+            backgroundColor: [
+              'rgba(56, 189, 248, 0.65)',
+              'rgba(129, 140, 248, 0.65)',
+              'rgba(251, 191, 36, 0.65)',
+              'rgba(52, 211, 153, 0.65)',
+              'rgba(248, 113, 113, 0.65)'
+            ],
+            borderRadius: 6,
+            borderWidth: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8', font: { size: 11 } }
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { stepSize: 1, color: '#94a3b8' }
+            }
+          },
+          plugins: {
+            legend: { display: false }
+          }
+        }
+      });
+
+      // 6. Competencies Matrix
+      const comps = h.competencies || [];
+      const compContainer = document.getElementById('competenciesContainer');
+      if (comps.length > 0) {
+        compContainer.innerHTML = comps.map(c => `
+          <div style="background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);padding:1rem;border-radius:10px;">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem;">
+              <span style="font-weight:600;color:#fff;font-size:0.88rem;">${escapeHtml(c.skill)}</span>
+              <span style="color:#00d2ff;font-weight:700;font-size:0.85rem;">${c.proficiency == null ? 'Not assessed' : `${c.proficiency}%`}</span>
+            </div>
+            <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:0.5rem;">
+              ${c.proficiency == null ? '' : `<div style="width:${c.proficiency}%;height:100%;background:var(--gradient-primary);border-radius:3px;"></div>`}
+            </div>
+            <div style="font-size:0.72rem;color:var(--text-muted);display:flex;justify-content:space-between;">
+              <span>Status: <strong style="color:#38bdf8;">Self-reported</strong></span>
+              <span>${c.proficiency == null ? 'No benchmark available' : 'Profile estimate'}</span>
+            </div>
+          </div>
+        `).join('');
+      } else {
+        compContainer.innerHTML = '<div style="color:var(--text-muted);padding:1rem;">Add technical skills to your profile to view competency matrix.</div>';
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, character => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      })[character]);
     }
 
     document.addEventListener('DOMContentLoaded', loadAnalytics);

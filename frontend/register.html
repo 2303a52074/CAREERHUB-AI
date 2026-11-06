@@ -8,6 +8,7 @@
     <meta name="description" content="Join CareerHub AI: Your AI-Powered Career & Placement Assistant">
     <link rel="icon" type="image/png" href="assets/logo.png">
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -197,15 +198,6 @@
         
         <div id="message" style="display: none;"></div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px;">
-            <button type="button" class="btn-register" style="background: linear-gradient(135deg, #ffa116, #ea580c); margin: 0; padding: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 15px rgba(254, 161, 22, 0.3);" onclick="leetCodeLogin()">
-                <i class="fas fa-code"></i> Connect LeetCode
-            </button>
-            <button type="button" class="btn-register" style="background: linear-gradient(135deg, #10b981, #059669); margin: 0; padding: 12px; font-size: 13px; font-weight: 700; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);" onclick="quickDemoLogin()">
-                <i class="fas fa-bolt"></i> Instant Demo
-            </button>
-        </div>
-
         <div style="display: flex; align-items: center; margin: 15px 0; color: rgba(255,255,255,0.4); font-size: 12px;">
             <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.15);"></div>
             <span style="padding: 0 10px;">or register manually</span>
@@ -225,7 +217,7 @@
             
             <div class="input-group">
                 <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" id="password" placeholder="Create a password (min 6 characters)" required>
+                <input type="password" id="password" placeholder="Create a password (8-72 bytes)" minlength="8" required autocomplete="new-password">
             </div>
             
             <button type="submit" class="btn-register" id="registerBtn">
@@ -234,61 +226,13 @@
         </form>
         
         <div class="login-link">
-            Already have an account? <a href="login.html">Sign In</a>
+            Already have an account? <a href="/login">Sign In</a>
         </div>
     </div>
     
     <script>
         const BASE_URL = window.location.origin;
 
-        async function leetCodeLogin() {
-            const username = prompt("Enter your official LeetCode handle (e.g. neal_wu or your username):");
-            if (!username || !username.trim()) return;
-
-            const cleanUser = username.trim();
-            try {
-                const lcRes = await fetch(`${BASE_URL}/api/user/leetcode/${encodeURIComponent(cleanUser)}`);
-                const lcData = await lcRes.json();
-
-                const authRes = await fetch(`${BASE_URL}/api/auth/demo`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const authData = await authRes.json();
-
-                if (authData.token) {
-                    localStorage.setItem('token', authData.token);
-                    localStorage.setItem('userName', cleanUser);
-                    localStorage.setItem('leetcodeUsername', cleanUser);
-                    if (lcData.success) {
-                        localStorage.setItem('leetcodeStats', JSON.stringify(lcData));
-                    }
-                    window.location.href = 'dashboard.html?section=coding&synced=true';
-                }
-            } catch (e) {
-                quickDemoLogin();
-            }
-        }
-
-        async function quickDemoLogin() {
-            try {
-                const response = await fetch(`${BASE_URL}/api/auth/demo`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                const data = await response.json();
-                if (data.token) {
-                    localStorage.setItem('token', data.token);
-                    if (data.user) {
-                        localStorage.setItem('userName', data.user.name);
-                    }
-                    window.location.href = 'dashboard.html';
-                }
-            } catch (e) {
-                window.location.href = 'login.html';
-            }
-        }
-        
         async function register() {
             const name = document.getElementById('name').value;
             const email = document.getElementById('email').value;
@@ -301,8 +245,8 @@
                 return;
             }
             
-            if (password.length < 6) {
-                showMessage('Password must be at least 6 characters', 'error');
+            if (password.length < 8 || new TextEncoder().encode(password).length > 72) {
+                showMessage('Password must be between 8 and 72 bytes long', 'error');
                 return;
             }
             
@@ -323,7 +267,7 @@
                 if (response.ok) {
                     showMessage('Account created successfully! Redirecting to login...', 'success');
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = '/login';
                     }, 2000);
                 } else {
                     showMessage(data.message || 'Registration failed. Please try again.', 'error');
@@ -351,7 +295,7 @@
         
         // Check if already logged in
         if (localStorage.getItem('token')) {
-            window.location.href = 'dashboard.html';
+            window.location.href = '/dashboard';
         }
     </script>
 </body>

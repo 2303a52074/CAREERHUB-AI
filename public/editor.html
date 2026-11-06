@@ -59,19 +59,26 @@
         <div class="toolbar">
             <div style="display: flex; align-items: center; gap: 12px;">
                 <select style="background: #14223d; color: white; border: 1px solid rgba(56, 189, 248, 0.25); padding: 7px 16px; border-radius: 8px; outline: none;">
-                    <option>JavaScript (Node.js)</option>
-                    <option>Python 3</option>
+                    <option>Checking isolated runner…</option>
                 </select>
-                <a href="dashboard.html" style="color: #8da4c4; text-decoration: none; font-size: 13px; font-weight: 600; margin-left: 8px;">
+                <a href="/dashboard" style="color: #8da4c4; text-decoration: none; font-size: 13px; font-weight: 600; margin-left: 8px;">
                     <i class="fas fa-arrow-left"></i> Cockpit
                 </a>
             </div>
             <div>
                 <button class="btn-ai" onclick="getAIHint()"><i class="fas fa-brain"></i> AI Hint</button>
-                <button class="btn-run" onclick="submitCode()">Run Code <i class="fas fa-play"></i></button>
+                <button class="btn-run" id="runCodeButton" onclick="submitCode()" disabled>Run Code <i class="fas fa-play"></i></button>
             </div>
         </div>
-        
+        <div style="display:flex;gap:12px;padding:8px 18px;background:#080f20;align-items:center;">
+            <label for="executionMode" style="font-size:12px;color:#8da4c4;">Mode</label>
+            <select id="executionMode" style="background:#14223d;color:white;border:1px solid rgba(56,189,248,.25);padding:6px 10px;border-radius:7px;">
+                <option value="problem">Problem function</option>
+                <option value="program">Program with stdin</option>
+            </select>
+            <label for="standardInput" style="font-size:12px;color:#8da4c4;">Input</label>
+            <textarea id="standardInput" rows="2" maxlength="5000" style="flex:1;resize:vertical;min-height:36px;background:#040812;color:#cbd5e1;border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:7px;font:12px monospace;">[2,7,11,15], 9</textarea>
+        </div>
         <div id="monaco-editor"></div>
 
         <div class="console" id="console-output">
@@ -84,35 +91,115 @@
 <script>
     require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs' }});
     let editor;
+    let languages = [];
+    let runnerReady = false;
+    const savedCode = new Map();
+    const languageSelect = document.querySelector('.toolbar select');
+    const runMode = document.getElementById('executionMode');
+    const runButton = document.getElementById('runCodeButton');
+    const authToken = localStorage.getItem('token');
+    const authHeaders = authToken ? { Authorization: `Bearer ${authToken}` } : {};
 
     require(['vs/editor/editor.main'], function() {
+        const selected = languages.find(language => language.value === languageSelect.value);
         editor = monaco.editor.create(document.getElementById('monaco-editor'), {
-            value: "function twoSum(nums, target) {\n    // Type your solution here\n    \n}",
-            language: 'javascript',
+            value: selected?.starterCode || "function twoSum(nums, target) {\n    // Type your solution here\n    \n}",
+            language: selected?.editorLanguage || 'javascript',
             theme: 'vs-dark',
             automaticLayout: true,
             fontSize: 16
         });
     });
 
-    async function submitCode() {
-        const code = editor.getValue();
-        const outputDiv = document.getElementById('console-output');
-        outputDiv.innerHTML += `<div class="output-line">> Running test cases...</div>`;
-
-        const response = await fetch('/api/coding/run', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, language: 'javascript' })
-        });
-        const result = await response.json();
-        
-        if(result.success) {
-            outputDiv.innerHTML += `<div class="output-success">✓ Test Cases Passed! Output: ${result.output}</div>`;
-        } else {
-            outputDiv.innerHTML += `<div class="output-error">✗ Error: ${result.error}</div>`;
+    async function loadLanguages() {
+        try {
+            const response = await fetch('/api/coding/languages', { headers: authHeaders });
+            const data = await response.json();
+            if (response.status === 401) {
+                throw new Error('Sign in again to use the coding runner; your session may have expired.');
+            }
+            if (!response.ok || !Array.isArray(data.languages) || !data.languages.length) {
+                throw new Error(data.message || 'No supported languages are available.');
+            }
+            languages = data.languages;
+            languageSelect.innerHTML = languages.map(language =>
+                `<option value="${language.value}">${language.label}</option>`
+            ).join('');
+            languageSelect.value = languages.some(language => language.value === 'javascript')
+                ? 'javascript'
+                : languages[0].value;
+            languageSelect.disabled = false;
+            runnerReady = true;
+            runButton.disabled = false;
+            if (editor) {
+                const selected = languages.find(language => language.value === languageSelect.value);
+                monaco.editor.setModelLanguage(editor.getModel(), selected.editorLanguage);
+                editor.setValue(selected.starterCode);
+                runMode.value = selected.value === 'javascript' ? 'problem' : 'program';
+                languageSelect.dataset.previous = selected.value;
+            }
+        } catch (error) {
+            languageSelect.innerHTML = '<option value="">Runner unavailable</option>';
+            languageSelect.disabled = true;
+            runButton.disabled = true;
+            const signInRequired = error.message.includes('Sign in again');
+            document.getElementById('console-output').textContent =
+                signInRequired
+                    ? error.message
+                    : `${error.message} Configure the backend runner and reload.`;
         }
     }
+
+    languageSelect.addEventListener('change', () => {
+        if (!editor) return;
+        savedCode.set(languageSelect.dataset.previous || 'javascript', editor.getValue());
+        const selected = languages.find(language => language.value === languageSelect.value);
+        if (!selected) return;
+        monaco.editor.setModelLanguage(editor.getModel(), selected.editorLanguage);
+        editor.setValue(savedCode.get(selected.value) || selected.starterCode);
+        runMode.value = selected.value === 'javascript' ? 'problem' : 'program';
+        languageSelect.dataset.previous = selected.value;
+    });
+
+    async function submitCode() {
+        if (!runnerReady || !editor) return;
+        const activeLanguage = languageSelect.value;
+        const button = runButton;
+        button.disabled = true;
+        const code = editor.getValue();
+        const outputDiv = document.getElementById('console-output');
+        outputDiv.textContent = 'Submitting to the isolated code execution service…';
+        try {
+            const response = await fetch('/api/coding/run', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
+                body: JSON.stringify({
+                    code,
+                    language: activeLanguage,
+                    mode: runMode.value,
+                    testInput: runMode.value === 'problem'
+                        ? document.getElementById('standardInput').value
+                        : '',
+                    stdin: runMode.value === 'program'
+                        ? document.getElementById('standardInput').value
+                        : ''
+                })
+            });
+            const result = await response.json();
+            outputDiv.textContent = response.ok
+                ? `${result.status}: ${result.stdout || result.error || 'No output'}\nRuntime: ${result.executionTime || 'n/a'}s · Memory: ${result.memoryUsed ?? 'n/a'} KB`
+                : `${result.code || response.status}: ${result.error || result.message || 'Code execution failed.'}`;
+            outputDiv.className = `console ${result.success ? 'output-success' : 'output-error'}`;
+        } catch (error) {
+            outputDiv.textContent = `Could not reach the coding backend: ${error.message}`;
+            outputDiv.className = 'console output-error';
+        } finally {
+            button.disabled = !runnerReady;
+        }
+    }
+
+    languageSelect.disabled = true;
+    loadLanguages();
 </script>
 </body>
 </html>
