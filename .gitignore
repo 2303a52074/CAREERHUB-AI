@@ -5,8 +5,8 @@ node_modules/
 # Environment variables and secrets
 .env
 .env.*
-!.env.example
-!.env.template
+.env.example
+.env.template
 
 # User uploads and generated files
 uploads/*
