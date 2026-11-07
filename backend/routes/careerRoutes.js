@@ -16,6 +16,7 @@ const CodingProblem = require('../models/CodingProblem');
 const CareerConversation = require('../models/CareerConversation');
 const SkillGapAnalysis = require('../models/SkillGapAnalysis');
 const ResumeAnalysis = require('../models/ResumeAnalysis');
+const JobDescriptionAnalysis = require('../models/JobDescriptionAnalysis');
 const {
     fetchLiveJobs,
     calculateJobMatch,
@@ -34,9 +35,8 @@ const {
     generateAssessmentInsights,
     generateMcqQuestions,
     generateSkillGapAdvice,
-    generatePersonalizedRoadmap,
-    generateDailyPreparationTasks,
     generateJobDescriptionAdvice,
+    getApprovedDataProcessingStatus,
     generateCareerRecommendationAdvice,
     recommendLearningResources,
     explainJobFit
@@ -45,6 +45,11 @@ const { validateProfileUpdate } = require('../utils/profileValidation');
 const { resolveTargetRole, targetRoleRequiredResponse } = require('../utils/roleResolution');
 const { providerErrorMessage } = require('../utils/providerErrors');
 const { getOrGenerateDailyPlan } = require('../utils/dailyPlanGeneration');
+const {
+    analyzeJobDescriptionLocally,
+    buildDailyPreparationTasks,
+    buildCareerRoadmapLocally
+} = require('../utils/localCareerAnalysis');
 
 const APPLICATION_STATUSES = [
     'Saved', 'Application Started', 'Applied', 'Shortlisted',
@@ -71,6 +76,45 @@ async function runDeduplicated(inFlight, key, operation) {
     }
 }
 
+function getAssessmentProviderStatus() {
+    const feature = 'assessment_question_generation';
+    const configuredProvider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openrouter';
+    if (configuredProvider === 'gemini') {
+        const configuration = getGeminiConfiguration(feature);
+        return {
+            provider: 'Gemini',
+            model: configuration.model,
+            configured: configuration.primaryConfigured,
+            reason: configuration.configurationIssue,
+            requiredConfiguration: configuration.requiredConfiguration
+        };
+    }
+
+    const groq = getGroqConfiguration(feature);
+    if (groq.primaryEnabled) {
+        return {
+            provider: 'Groq',
+            model: groq.model,
+            configured: groq.primaryConfigured,
+            reason: !groq.apiKeyConfigured || !groq.model
+                ? 'provider_configuration_missing'
+                : null,
+            requiredConfiguration: ['GROQ_API_KEY', 'GROQ_MODEL', 'GROQ_PRIMARY_FEATURES']
+        };
+    }
+
+    const openRouter = getOpenRouterConfiguration(feature);
+    return {
+        provider: openRouter.providerSupported ? 'OpenRouter' : null,
+        model: openRouter.model,
+        configured: openRouter.providerSupported && openRouter.apiKeyConfigured,
+        reason: !openRouter.providerSupported || !openRouter.apiKeyConfigured
+            ? 'provider_configuration_missing'
+            : null,
+        requiredConfiguration: openRouter.requiredConfiguration
+    };
+}
+
 function normalizeMilestoneTitle(value) {
     return String(value || '').trim().toLocaleLowerCase().replace(/\s+/g, ' ');
 }
@@ -81,11 +125,11 @@ async function generateAndSaveRoadmap({ user, userId, targetRole, previousRoadma
 
     const generation = (async () => {
         const [latestAssessment, latestSkillGap] = await Promise.all([
-            CareerAssessment.findOne({ userId: key }).sort({ date: -1 }).select('scores'),
-            SkillGapAnalysis.findOne({ userId: key }).sort({ generatedAt: -1 }).select('missingSkills')
+            CareerAssessment.findOne({ userId: String(userId) }).sort({ date: -1 }).select('scores'),
+            SkillGapAnalysis.findOne({ userId: String(userId) }).sort({ generatedAt: -1 }).select('missingSkills')
         ]);
-        const generated = await generatePersonalizedRoadmap({
-            ...(user?.toObject?.() || user || {}),
+        const generated = buildCareerRoadmapLocally({
+            profile: user?.toObject?.() || user || {},
             targetRole,
             assessmentScores: latestAssessment?.scores || null,
             missingSkills: (latestSkillGap?.missingSkills || []).map(item =>
@@ -105,10 +149,11 @@ async function generateAndSaveRoadmap({ user, userId, targetRole, previousRoadma
 
         const phases = generated.phases.map((phase, phaseIndex) => ({
             ...phase,
+            phaseNumber: phaseIndex + 1,
             status: 'pending',
             milestones: phase.milestones.map((milestone, milestoneIndex) => ({
                 ...milestone,
-                id: `ai-p${phaseIndex + 1}-m${milestoneIndex + 1}`,
+                id: `local-p${phaseIndex + 1}-m${milestoneIndex + 1}`,
                 completed: completedByTitle.has(normalizeMilestoneTitle(milestone.title))
             }))
         }));
@@ -144,7 +189,7 @@ async function generateAndSaveRoadmap({ user, userId, targetRole, previousRoadma
             generationSource: generated.source,
             generationModel: generated.model,
             fallbackUsed: Boolean(generated.fallbackUsed),
-            aiGenerationStatus: 'generated',
+            aiGenerationStatus: 'not_applicable',
             phases
         });
         await roadmap.save();
@@ -472,10 +517,14 @@ router.get('/assistant/status', optionalAuth, (req, res) => {
         retryAfter: status.retryAfter || null,
         provider: status.provider,
         model: status.model,
+        dataProcessingApproval: status.dataProcessingApproval,
+        assistantMode: status.assistantMode,
         geminiPrimaryEnabled: status.geminiPrimaryEnabled,
         geminiPrimaryConfigured: status.geminiPrimaryConfigured,
         geminiPrimaryQuotaBlocked: status.geminiPrimaryQuotaBlocked,
         geminiPrimaryModel: status.geminiPrimaryModel,
+        geminiConfigurationIssue: status.geminiConfigurationIssue,
+        geminiEnabledFeatures: status.geminiEnabledFeatures,
         groqPrimaryEnabled: status.groqPrimaryEnabled,
         groqPrimaryConfigured: status.groqPrimaryConfigured,
         groqPrimaryQuotaBlocked: status.groqPrimaryQuotaBlocked,
@@ -637,7 +686,14 @@ router.put('/profile', optionalAuth, async (req, res) => {
 
 router.get('/assessment/options', optionalAuth, (req, res) => {
     const { categories, difficulties, lengths } = getCuratedAssessmentOptions();
-    res.json({ categories, difficulties, lengths, source: 'openrouter' });
+    const providerStatus = getAssessmentProviderStatus();
+    res.json({
+        categories,
+        difficulties,
+        lengths,
+        source: providerStatus.provider?.toLowerCase() || null,
+        providerStatus
+    });
 });
 
 router.post('/assessment/start', optionalAuth, async (req, res) => {
@@ -657,18 +713,22 @@ router.post('/assessment/start', optionalAuth, async (req, res) => {
         const resolvedRole = resolveTargetRole(undefined, req.user).role;
         if (!resolvedRole) return targetRoleRequiredResponse(res);
 
-        const assessmentGroq = getGroqConfiguration('assessment_question_generation');
-        const assessmentGemini = getGeminiConfiguration('assessment_question_generation');
-        const assessmentOpenRouter = getOpenRouterConfiguration('assessment_question_generation');
-        const assessmentConfigured = assessmentGemini.primaryEnabled
-            ? assessmentGemini.primaryConfigured
-            : assessmentGroq.primaryEnabled
-                ? assessmentGroq.primaryConfigured
-                : assessmentOpenRouter.providerSupported && assessmentOpenRouter.apiKeyConfigured;
-        if (!assessmentConfigured) {
+        const assessmentProviderStatus = getAssessmentProviderStatus();
+        if (!assessmentProviderStatus.configured) {
+            const providerError = {
+                provider: assessmentProviderStatus.provider,
+                providerDiagnostics: {
+                    configurationIssue: assessmentProviderStatus.reason
+                }
+            };
             return res.status(503).json({
                 code: 'AI_PROVIDER_NOT_CONFIGURED',
-                message: providerErrorMessage('AI_PROVIDER_NOT_CONFIGURED', 'Assessment question generation')
+                message: providerErrorMessage(
+                    'AI_PROVIDER_NOT_CONFIGURED',
+                    'Assessment question generation',
+                    providerError
+                ),
+                providerStatus: assessmentProviderStatus
             });
         }
         const requestKey = JSON.stringify([
@@ -718,6 +778,7 @@ router.post('/assessment/start', optionalAuth, async (req, res) => {
                     questions,
                     source: generated.source,
                     model: generated.model || null,
+                    contextMode: generated.contextMode || 'personalized',
                     fallbackUsed: Boolean(generated.fallbackUsed),
                     status: 'active'
                 });
@@ -742,6 +803,10 @@ router.post('/assessment/start', optionalAuth, async (req, res) => {
             difficulty,
             source: session.source,
             model: session.model,
+            contextMode: session.contextMode,
+            ...(session.contextMode === 'generic_privacy_safe'
+                ? { privacyNotice: 'Gemini receives only the selected topic, difficulty, and question count—not your role or profile. Questions are general practice.' }
+                : {}),
             fallbackUsed: Boolean(session.fallbackUsed),
             questions: questions.map(({ questionId, category: questionCategory, question, options, difficulty: questionDifficulty }) => ({
                 id: questionId,
@@ -760,7 +825,7 @@ router.post('/assessment/start', optionalAuth, async (req, res) => {
 router.get('/assessment/questions', authMiddleware, (req, res) => {
     res.status(410).json({
         code: 'ASSESSMENT_SESSION_REQUIRED',
-        message: 'Assessment questions are generated by OpenRouter for each session. Start a new assessment session.'
+        message: 'Assessment questions are generated for each session. Start a new assessment session.'
     });
 });
 
@@ -772,7 +837,7 @@ router.post('/assessment/submit', optionalAuth, async (req, res) => {
         if (typeof sessionId !== 'string' || !sessionId.trim() || sessionId.length > 100) {
             return res.status(400).json({
                 code: 'ASSESSMENT_SESSION_REQUIRED',
-                message: 'Submit answers with the session ID returned by the OpenRouter assessment start endpoint.'
+                message: 'Submit answers with the session ID returned by the assessment start endpoint.'
             });
         }
         if (mongoose.connection.readyState === 1 && !mongoose.Types.ObjectId.isValid(sessionId)) {
@@ -842,20 +907,22 @@ router.post('/assessment/submit', optionalAuth, async (req, res) => {
             answer.answer ?? answer.selectedOption ?? answer.value));
         const resultSessionId = String(activeSession._id);
         let aiInsights = null;
-        let aiInsightsStatus = { status: 'not_configured' };
-        if (getCareerAssistantStatus().configured) {
-            try {
-                aiInsights = await generateAssessmentInsights({
-                    evaluation: activeSession && evaluation.categoryScores
-                        ? { ...evaluation, scores: evaluation.categoryScores }
-                        : evaluation,
-                    targetRole: resolvedRole,
-                    profile: req.user
-                });
-                aiInsightsStatus = { status: 'generated', source: aiInsights.source, model: aiInsights.model };
-            } catch (error) {
-                aiInsightsStatus = { status: 'unavailable', code: error.code || 'AI_PROVIDER_UNAVAILABLE' };
-            }
+        let aiInsightsStatus = { status: 'unavailable', code: 'AI_PROVIDER_NOT_CONFIGURED' };
+        try {
+            aiInsights = await generateAssessmentInsights({
+                evaluation: activeSession && evaluation.categoryScores
+                    ? { ...evaluation, scores: evaluation.categoryScores }
+                    : evaluation,
+                targetRole: resolvedRole,
+                profile: req.user
+            });
+            aiInsightsStatus = { status: 'generated', source: aiInsights.source, model: aiInsights.model };
+        } catch (error) {
+            aiInsightsStatus = {
+                status: 'unavailable',
+                code: error.code || 'AI_PROVIDER_UNAVAILABLE',
+                message: providerErrorMessage(error.code || 'AI_PROVIDER_UNAVAILABLE', 'Assessment insights', error)
+            };
         }
 
         // Save assessment record
@@ -866,6 +933,7 @@ router.post('/assessment/submit', optionalAuth, async (req, res) => {
             difficulty: activeSession?.difficulty || null,
             generationSource: activeSession?.source || null,
             generationModel: activeSession?.model || null,
+            contextMode: activeSession?.contextMode || 'personalized',
             fallbackUsed: Boolean(activeSession?.fallbackUsed),
             categoryScores: evaluation.categoryScores || null,
             targetRole: resolvedRole,
@@ -939,6 +1007,25 @@ router.get('/assessment/latest', optionalAuth, async (req, res) => {
         });
     } catch (err) {
         res.status(500).json({ message: "Failed to fetch assessment." });
+    }
+});
+
+router.get('/assessment/history/:assessmentId', optionalAuth, async (req, res) => {
+    try {
+        const { assessmentId } = req.params;
+        if (mongoose.connection.readyState === 1 && !mongoose.Types.ObjectId.isValid(assessmentId)) {
+            return res.status(400).json({ message: 'Assessment ID is invalid.' });
+        }
+        const userId = String(req.user._id || req.user.id);
+        const assessment = await CareerAssessment.findOne({
+            _id: assessmentId,
+            userId
+        }).select('-userId');
+        if (!assessment) return res.status(404).json({ message: 'Saved assessment not found.' });
+        return res.json({ assessment });
+    } catch (error) {
+        console.error('Saved assessment retrieval failed:', error.message);
+        return res.status(500).json({ message: 'Could not retrieve the saved assessment.' });
     }
 });
 
@@ -1367,12 +1454,6 @@ router.get('/roadmap', optionalAuth, async (req, res) => {
 
         res.json(roadmap);
     } catch (err) {
-        if (err.code?.startsWith('AI_')) {
-            return res.status(err.status || 502).json({
-                code: err.code,
-                message: providerErrorMessage(err.code, 'Career roadmap', err)
-            });
-        }
         console.error('Roadmap error:', err);
         res.status(500).json({ message: "Failed to fetch roadmap." });
     }
@@ -1394,12 +1475,6 @@ router.post('/roadmap/regenerate', optionalAuth, async (req, res) => {
         });
         return res.json({ message: 'Career roadmap regenerated.', roadmap });
     } catch (err) {
-        if (err.code?.startsWith('AI_')) {
-            return res.status(err.status || 502).json({
-                code: err.code,
-                message: providerErrorMessage(err.code, 'Career roadmap', err)
-            });
-        }
         console.error('Roadmap regeneration error:', err);
         return res.status(500).json({ message: 'Failed to regenerate your roadmap.' });
     }
@@ -1734,11 +1809,19 @@ router.get('/daily-plan', optionalAuth, async (req, res) => {
                                 }
                             }
                         }
-                        const codingProblem = await CodingProblem.findOne({}).select('title');
-                        const generated = await generateDailyPreparationTasks({
+                        const [codingProblem, codingAttempts] = await Promise.all([
+                            CodingProblem.findOne({
+                                catalogVersion: 'careerhub-dsa-100-v1',
+                                isActive: true,
+                                _id: { $nin: user.completedCodingProblems || [] }
+                            }).select('_id title'),
+                            CodeSubmission.countDocuments({ userId })
+                        ]);
+                        const generated = buildDailyPreparationTasks({
                             profile: user,
                             pendingMilestone: pendingRoadmapMilestone,
-                            codingProblem
+                            codingProblem,
+                            codingAttempts
                         });
                         const generatedPlan = new DailyPlan({
                             userId,
@@ -1857,7 +1940,19 @@ router.put('/daily-plan/task/:taskId', optionalAuth, async (req, res) => {
 // ----------------------------------------------------
 // 9. JOB DESCRIPTION ANALYZER
 // ----------------------------------------------------
-router.post('/job-analyzer', optionalAuth, async (req, res) => {
+router.get('/job-analyzer/history', authMiddleware, async (req, res) => {
+    try {
+        const analyses = await JobDescriptionAnalysis.find({
+            userId: String(req.user._id || req.user.id)
+        }).sort({ createdAt: -1 }).limit(20);
+        return res.json({ analyses });
+    } catch (error) {
+        console.error('Job description analysis history failed:', error.message);
+        return res.status(500).json({ message: 'Could not load saved job-description analyses.' });
+    }
+});
+
+router.post('/job-analyzer', authMiddleware, async (req, res) => {
     try {
         const { jobDescription, jobTitle, company } = req.body;
         if (typeof jobDescription !== 'string' || !jobDescription.trim()) {
@@ -1875,103 +1970,69 @@ router.post('/job-analyzer', optionalAuth, async (req, res) => {
             return res.status(400).json({ message: 'Company must be text with at most 120 characters.' });
         }
 
-        const userId = req.user._id || req.user.id;
-        const user = await User.findById(userId) || req.user;
-
-        const text = jobDescription.toLowerCase();
-
-        const techSkillsCatalog = [
-            'javascript', 'typescript', 'react', 'next.js', 'vue', 'angular', 'node.js', 'express',
-            'python', 'django', 'fastapi', 'flask', 'java', 'spring boot', 'c++', 'c#', '.net',
-            'golang', 'rust', 'ruby', 'php', 'sql', 'mysql', 'postgresql', 'mongodb', 'redis',
-            'graphql', 'rest api', 'docker', 'kubernetes', 'aws', 'azure', 'gcp', 'ci/cd',
-            'git', 'system design', 'microservices', 'kafka', 'tailwind', 'html', 'css',
-            'unit testing', 'jest', 'agile', 'scrum', 'data structures', 'algorithms'
-        ];
-
-        const softSkillsCatalog = [
-            'communication', 'teamwork', 'leadership', 'problem solving', 'critical thinking',
-            'adaptability', 'time management', 'collaboration', 'ownership', 'mentorship'
-        ];
-
-        const detectedReqTech = techSkillsCatalog.filter(skill => text.includes(skill));
-        const detectedReqSoft = softSkillsCatalog.filter(skill => text.includes(skill));
-
-        const normalizeSkill = value => String(value).toLowerCase()
-            .replace(/[^a-z0-9+#.]+/g, ' ').trim();
-        const userSkills = (Array.isArray(user.technicalSkills) ? user.technicalSkills : [])
-            .filter(skill => typeof skill === 'string' && skill.trim())
-            .map(normalizeSkill);
-        const userSoft = (Array.isArray(user.softSkills) ? user.softSkills : [])
-            .filter(skill => typeof skill === 'string' && skill.trim())
-            .map(normalizeSkill);
-        const skillIsListed = (profileSkills, requirement) => {
-            const normalizedRequirement = normalizeSkill(requirement);
-            const requirementWords = normalizedRequirement.split(' ');
-            return profileSkills.some(profileSkill =>
-                profileSkill === normalizedRequirement ||
-                profileSkill.split(' ').some(word => requirementWords.includes(word))
-            );
-        };
-
-        const matchedTech = detectedReqTech.filter(reqSkill => skillIsListed(userSkills, reqSkill));
-        const missingTech = detectedReqTech.filter(reqSkill =>
-            !skillIsListed(userSkills, reqSkill)
-        );
-
-        const matchedSoft = detectedReqSoft.filter(reqSkill => skillIsListed(userSoft, reqSkill));
-
-        const overallMatch = detectedReqTech.length
-            ? Math.round((matchedTech.length / detectedReqTech.length) * 100)
-            : null;
-
-        const cap = s => s.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-        const aiAdvice = await generateJobDescriptionAdvice({
-            jobDescription,
+        const userId = String(req.user._id || req.user.id);
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: 'Account not found.' });
+        const analysis = analyzeJobDescriptionLocally({
+            jobDescription: jobDescription.trim(),
             jobTitle,
             company,
-            profile: user,
-            extractedRequirements: [...detectedReqTech, ...detectedReqSoft],
-            missingSkills: missingTech
+            profile: user
         });
 
-        res.json({
-            jobTitle: jobTitle?.trim() || null,
-            company: company?.trim() || null,
-            overallMatch,
-            extractedRequirements: detectedReqTech.map(cap),
-            matchedSkills: matchedTech.map(cap),
-            missingSkills: missingTech.map(cap),
-            matchedSoftSkills: matchedSoft.map(cap),
-            recommendations: aiAdvice.preparationSteps,
-            interviewQuestions: aiAdvice.interviewQuestions,
-            aiSummary: aiAdvice.summary,
-            aiAdviceStatus: {
-                status: 'generated',
-                source: aiAdvice.source,
-                model: aiAdvice.model,
-                fallbackUsed: Boolean(aiAdvice.fallbackUsed)
-            },
-            recommendationMethod: aiAdvice.source,
-            methodology: 'Technical match is the proportion of detected catalog requirements also listed in the profile. No technical score is returned when no supported requirements are found; listed skills are not proficiency-verified.',
-            readinessVerdict: overallMatch === null
-                ? 'A match score is unavailable because no supported technical requirements were detected.'
-                : overallMatch >= 80
-                ? 'Strong listed-skill overlap with the detected requirements. This is not an interview outcome prediction.'
-                : overallMatch >= 60
-                ? 'Partial listed-skill overlap. Review missing requirements before applying.'
-                : 'Limited listed-skill overlap. Consider prioritizing the missing technologies.'
-        });
-    } catch (err) {
-        if (err.code?.startsWith('AI_')) {
-            return res.status(err.status || 502).json({
-                code: err.code,
-                message: providerErrorMessage(err.code, 'Job description analysis', err)
-            });
+        const approval = getApprovedDataProcessingStatus('job_analyzer');
+        if (approval.approved) {
+            try {
+                const aiAdvice = await generateJobDescriptionAdvice({
+                    jobDescription: jobDescription.trim(),
+                    jobTitle,
+                    company,
+                    profile: {
+                        targetRole: user.targetRole,
+                        technicalSkills: user.technicalSkills,
+                        softSkills: user.softSkills
+                    },
+                    extractedRequirements: [
+                        ...analysis.extractedRequirements,
+                        ...analysis.matchedSoftSkills
+                    ],
+                    missingSkills: analysis.missingSkills
+                });
+                analysis.recommendations = aiAdvice.preparationSteps;
+                analysis.interviewQuestions = aiAdvice.interviewQuestions;
+                analysis.aiSummary = aiAdvice.summary;
+                analysis.aiAdviceStatus = {
+                    status: 'generated',
+                    source: aiAdvice.source,
+                    model: aiAdvice.model,
+                    fallbackUsed: Boolean(aiAdvice.fallbackUsed)
+                };
+                analysis.analysisMethod = aiAdvice.source;
+                analysis.recommendationMethod = aiAdvice.source;
+            } catch (error) {
+                if (!error.code?.startsWith('AI_')) throw error;
+                console.warn('Approved job-description AI analysis unavailable:', error.code);
+                analysis.aiAdviceStatus = {
+                    status: 'unavailable',
+                    reason: 'Advanced analysis failed; local requirement analysis is available.'
+                };
+            }
+        } else {
+            analysis.aiAdviceStatus.reason = approval.reason;
         }
-        console.error('Job analyzer error:', err);
-        res.status(500).json({ message: 'Failed to analyze job description.' });
+
+        const saved = await new JobDescriptionAnalysis({
+            userId,
+            ...analysis
+        }).save();
+        return res.status(201).json({
+            ...analysis,
+            analysisId: saved._id,
+            analyzedAt: saved.createdAt
+        });
+    } catch (error) {
+        console.error('Job analyzer failed:', error.message);
+        return res.status(500).json({ message: 'Failed to analyze the job description.' });
     }
 });
 

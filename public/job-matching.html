@@ -51,6 +51,26 @@
       gap: 1.5rem;
       min-width: 0;
     }
+    .jobs-pagination {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-top: 1.25rem;
+      padding-right: 13rem;
+      scroll-margin-bottom: 6rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+    }
+    .jobs-pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .jobs-pagination button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
     .opp-card {
       min-width: 0;
       background: var(--surface-card);
@@ -151,12 +171,15 @@
       .opp-card .source-label { overflow-wrap: anywhere; }
       .opp-card > div:last-child { flex-direction: column; }
       .opp-card > div:last-child > * { width: 100%; }
+      .jobs-pagination { padding-right: 13rem; }
     }
     @media (max-width: 420px) {
       .job-filter-controls { grid-template-columns: 1fr; }
       .job-filter-controls input { grid-column: auto; }
       .opp-header { flex-direction: column; }
       .match-method { text-align: left; }
+      .jobs-pagination { align-items: flex-start; flex-direction: column; padding-right: 0; }
+      .jobs-pagination-controls { align-items: flex-start; flex-direction: column; }
     }
   </style>
 </head>
@@ -200,6 +223,7 @@
             Loading personalized job matches...
           </div>
         </div>
+        <nav class="jobs-pagination" id="jobsPagination" aria-label="Job listing pages"></nav>
 
       </main>
     </div>
@@ -210,6 +234,8 @@
     let allOpportunities = [];
     let trackedJobIds = new Set();
     let currentFilter = 'all';
+    let currentPage = 1;
+    const JOBS_PAGE_SIZE = 12;
 
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
@@ -217,6 +243,7 @@
     async function loadOpportunities() {
       const grid = document.getElementById('oppGrid');
       const status = document.getElementById('jobsStatus');
+      document.getElementById('jobsPagination').innerHTML = '';
       if (!token) {
         grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">Sign in to view profile-matched jobs and save listings.</div>';
         status.innerHTML = 'Authentication is required. <a href="/login?next=%2Fjob-matching">Sign in</a>';
@@ -261,6 +288,34 @@
       }
     }
 
+    function renderPagination(totalItems) {
+      const pagination = document.getElementById('jobsPagination');
+      const pageCount = Math.ceil(totalItems / JOBS_PAGE_SIZE);
+      if (pageCount <= 1) {
+        pagination.innerHTML = '';
+        return;
+      }
+
+      const firstItem = (currentPage - 1) * JOBS_PAGE_SIZE + 1;
+      const lastItem = Math.min(currentPage * JOBS_PAGE_SIZE, totalItems);
+      pagination.innerHTML = `
+        <span aria-live="polite">Showing ${firstItem}–${lastItem} of ${totalItems} listings</span>
+        <div class="jobs-pagination-controls">
+          <button type="button" class="btn-action btn-prev" data-page-direction="-1"
+            aria-label="Previous job listings page" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+          <span aria-current="page">Page ${currentPage} of ${pageCount}</span>
+          <button type="button" class="btn-action btn-next" data-page-direction="1"
+            aria-label="Next job listings page" ${currentPage === pageCount ? 'disabled' : ''}>Next</button>
+        </div>`;
+      pagination.querySelectorAll('[data-page-direction]').forEach(button => {
+        button.addEventListener('click', () => {
+          currentPage += Number(button.dataset.pageDirection);
+          renderGrid();
+          pagination.scrollIntoView({ block: 'nearest' });
+        });
+      });
+    }
+
     function renderGrid() {
       const q = document.getElementById('oppSearch').value.toLowerCase().trim();
       const category = document.getElementById('categoryFilter').value;
@@ -281,10 +336,15 @@
       const grid = document.getElementById('oppGrid');
       if (list.length === 0) {
         grid.innerHTML = '<div style="grid-column:1/-1;padding:3rem;text-align:center;color:var(--text-muted);">No listings match the selected filters.</div>';
+        renderPagination(0);
         return;
       }
 
-      grid.innerHTML = list.map((opp, index) => {
+      const pageCount = Math.ceil(list.length / JOBS_PAGE_SIZE);
+      currentPage = Math.min(Math.max(currentPage, 1), pageCount);
+      const pageStart = (currentPage - 1) * JOBS_PAGE_SIZE;
+      const pageItems = list.slice(pageStart, pageStart + JOBS_PAGE_SIZE);
+      grid.innerHTML = pageItems.map((opp, index) => {
         const applicationLink = safeJobUrl(opp.applicationLink);
         const tracked = trackedJobIds.has(opp.id);
         return `
@@ -297,9 +357,11 @@
               </div>
               <div>
                 <div class="opp-match-pill">
-                <span>🎯</span> <span>${opp.overallMatch == null ? 'Match unavailable' : `${opp.overallMatch}% profile match`}</span>
+                <span>🎯</span> <span>${opp.overallMatch == null ? 'Add profile details' : `${opp.overallMatch}% profile match`}</span>
                 </div>
-                <div class="match-method">${opp.overallMatch == null ? 'Match score unavailable' : 'Calculated from your profile attributes'}</div>
+                <div class="match-method">${opp.overallMatch == null
+                  ? `<a href="/profile">Add skills, a target role, or preferred location</a> to calculate a match.`
+                  : `Calculated from your ${escapeHtml((opp.matchBasis || []).join(', ') || 'profile attributes')}.`}</div>
               </div>
             </div>
 
@@ -332,12 +394,13 @@
           </div>
         </article>`;
       }).join('');
+      renderPagination(list.length);
 
       grid.querySelectorAll('[data-job-index]').forEach(button => {
-        button.addEventListener('click', () => trackJob(list[Number(button.dataset.jobIndex)], button));
+        button.addEventListener('click', () => trackJob(pageItems[Number(button.dataset.jobIndex)], button));
       });
       grid.querySelectorAll('[data-explain-index]').forEach(button => {
-        button.addEventListener('click', () => explainJobFit(list[Number(button.dataset.explainIndex)], button));
+        button.addEventListener('click', () => explainJobFit(pageItems[Number(button.dataset.explainIndex)], button));
       });
     }
 
@@ -449,12 +512,16 @@
         document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
         tab.classList.add('active');
         currentFilter = tab.dataset.type;
+        currentPage = 1;
         renderGrid();
       });
     });
 
     ['oppSearch', 'categoryFilter', 'locationFilter', 'sortFilter'].forEach(id => {
-      document.getElementById(id).addEventListener(id === 'oppSearch' ? 'input' : 'change', renderGrid);
+      document.getElementById(id).addEventListener(id === 'oppSearch' ? 'input' : 'change', () => {
+        currentPage = 1;
+        renderGrid();
+      });
     });
     document.addEventListener('DOMContentLoaded', loadOpportunities);
   </script>

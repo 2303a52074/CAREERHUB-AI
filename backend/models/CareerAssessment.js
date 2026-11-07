@@ -9,6 +9,7 @@ const CareerAssessmentSchema = new mongoose.Schema({
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: null },
     generationSource: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated'], default: null },
     generationModel: { type: String, default: null, maxlength: 120 },
+    contextMode: { type: String, enum: ['generic_privacy_safe', 'personalized'], default: 'personalized' },
     fallbackUsed: { type: Boolean, default: false },
     categoryScores: { type: mongoose.Schema.Types.Mixed, default: null },
     scores: {

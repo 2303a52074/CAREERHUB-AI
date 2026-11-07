@@ -168,7 +168,7 @@ const CareerHub = {
 
         } catch (e) {
             typingDiv.remove();
-            showToast('Career assistant request failed.', 'error');
+            showToast(e.message || 'Career assistant request failed.', 'error');
         }
     },
 

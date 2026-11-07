@@ -125,6 +125,7 @@
               Today's Preparation Goals
             </h2>
             <p style="font-size:0.85rem;color:var(--text-muted);" id="dailyDateDisplay">Loading schedule...</p>
+            <p id="dailyPlanSource" role="status" style="font-size:.76rem;color:var(--text-muted);">Daily plans are generated locally from saved goals, skills, and practice progress.</p>
           </div>
 
           <div style="min-width:240px;">
@@ -198,6 +199,10 @@
       const tasks = plan.tasks || [];
       const streak = data.userStreak || plan.streak || 1;
       const percent = plan.completionPercentage || 0;
+      document.getElementById('dailyPlanSource').textContent =
+        data.generationSource === 'local'
+          ? 'Generated locally from your saved goals, skills, and coding progress. No AI provider is required.'
+          : `Plan source: ${data.generationSource || 'saved'}.`;
 
       document.getElementById('dailyStreakBadge').innerText = `🔥 ${streak} Day Streak`;
       document.getElementById('dailyDateDisplay').innerText = data.date ? `Target Date: ${data.date}` : new Date().toDateString();

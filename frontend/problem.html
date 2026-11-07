@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#07111f">
+  <title>Problem Workspace — CareerHub AI</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/assets/shared-nav.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+  <style>
+    .workspace-page { max-width:1500px; margin:0 auto; display:grid; gap:1rem; }
+    .workspace-header,.workspace-card { background:var(--surface-card); border:1px solid var(--border-subtle); border-radius:14px; padding:1rem 1.2rem; }
+    .workspace-header { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; }
+    .workspace-header h1 { margin:0; color:#f5f8ff; font-size:1.25rem; }
+    .workspace-header p,.muted { color:var(--text-muted); line-height:1.55; }
+    .workspace-grid { display:grid; grid-template-columns:minmax(300px,.85fr) minmax(420px,1.15fr); gap:1rem; align-items:start; }
+    .problem-content { color:#d5e0ef; white-space:pre-wrap; line-height:1.65; }
+    .problem-content h2,.problem-content h3 { color:#f5f8ff; }
+    .problem-content pre,.example pre { overflow:auto; padding:.75rem; border-radius:8px; background:#07111d; border:1px solid var(--border-subtle); color:#d6e8fa; white-space:pre-wrap; }
+    .tag-row,.editor-toolbar,.actions,.nav-problems { display:flex; flex-wrap:wrap; align-items:center; gap:.6rem; }
+    .pill { border:1px solid var(--border-subtle); border-radius:999px; padding:.25rem .6rem; color:#cbd8e8; font-size:.75rem; }
+    .editor-toolbar { justify-content:space-between; margin-bottom:.65rem; }
+    .editor-toolbar select,.custom-input,.editor-fallback { background:#081523; border:1px solid var(--border-subtle); border-radius:8px; color:#e6edf7; padding:.65rem; }
+    .editor-toolbar select { min-width:155px; }
+    #editor { height:470px; border:1px solid var(--border-subtle); border-radius:9px; overflow:hidden; }
+    .editor-fallback { width:100%; min-height:470px; resize:vertical; font:13px/1.5 Consolas,monospace; }
+    .custom-input { width:100%; min-height:95px; resize:vertical; font:13px/1.5 Consolas,monospace; }
+    .action { border:1px solid #287b9b; border-radius:8px; padding:.6rem .9rem; background:#0b4560; color:#eefaff; cursor:pointer; font:600 .85rem Inter,sans-serif; }
+    .action.secondary { background:#101a2b; border-color:var(--border-subtle); }
+    .action:disabled { opacity:.55; cursor:wait; }
+    .output-panel { min-height:3rem; padding:.8rem; border:1px solid var(--border-subtle); border-radius:9px; background:#07111d; color:#d5e0ef; white-space:pre-wrap; overflow-wrap:anywhere; }
+    .output-panel[data-kind="success"] { border-color:#10b981; }
+    .output-panel[data-kind="error"] { border-color:#ef4444; color:#fecaca; }
+    .case-list,.history-list { display:grid; gap:.55rem; }
+    .example,.history-item { padding:.7rem; border:1px solid var(--border-subtle); border-radius:8px; }
+    .example strong,.history-item strong { color:#f5f8ff; }
+    .status-line { min-height:1.3rem; color:var(--text-secondary); font-size:.85rem; }
+    .nav-problems { justify-content:space-between; }
+    details summary { cursor:pointer; color:#80d9f3; font-weight:600; }
+    .hidden { display:none !important; }
+    @media(max-width:950px) { .workspace-grid { grid-template-columns:1fr; } #editor,.editor-fallback { height:380px; min-height:380px; } }
+  </style>
+</head>
+<body data-page-title="Coding Workspace" data-page-subtitle="Write, run public samples, and submit to hidden tests">
+  <div class="app-layout">
+    <div id="sidebar-container"></div>
+    <div class="main-wrapper">
+      <div id="header-container"></div>
+      <main class="page-container workspace-page">
+        <header class="workspace-header">
+          <div>
+            <h1 id="problemTitle">Loading problem…</h1>
+            <p id="problemMeta" class="muted"></p>
+            <div class="tag-row" id="problemTags"></div>
+          </div>
+          <nav class="nav-problems">
+            <a class="action secondary" href="/problems">All problems</a>
+            <button type="button" class="action secondary" id="previousProblem">Previous</button>
+            <button type="button" class="action secondary" id="nextProblem">Next</button>
+          </nav>
+        </header>
+        <section class="workspace-grid">
+          <article class="workspace-card">
+            <div id="problemDescription" class="problem-content">Loading problem statement…</div>
+            <div id="examples" class="case-list"></div>
+            <details class="workspace-card" style="padding:.8rem;margin-top:1rem">
+              <summary>Hints</summary><ol id="hints" class="problem-content"></ol>
+            </details>
+            <details class="workspace-card" style="padding:.8rem;margin-top:.7rem">
+              <summary>Editorial and optimal approach</summary>
+              <p id="editorial" class="problem-content"></p>
+              <p id="complexity" class="muted"></p>
+            </details>
+          </article>
+          <section class="workspace-card" aria-label="Code editor and test results">
+            <div class="editor-toolbar">
+              <label for="languageSelect">Language
+                <select id="languageSelect" aria-label="Programming language">
+                  <option value="python">Python 3</option><option value="java">Java 17</option>
+                  <option value="cpp">C++17</option><option value="javascript">JavaScript</option>
+                </select>
+              </label>
+              <div class="actions">
+                <button class="action secondary" id="resetCode" type="button">Reset code</button>
+                <button class="action secondary" id="runSamples" type="button">Run samples</button>
+                <button class="action" id="submitCode" type="button">Submit solution</button>
+              </div>
+            </div>
+            <p id="editorStatus" class="status-line" role="status">Loading editor…</p>
+            <div id="editor" aria-label="Code editor"></div>
+            <textarea id="editorFallback" class="editor-fallback hidden" aria-label="Code editor fallback" spellcheck="false"></textarea>
+            <label for="customInput" class="muted" style="display:block;margin:.9rem 0 .4rem">Custom input for Run</label>
+            <textarea id="customInput" class="custom-input" placeholder="Optional stdin. Leave blank to run the problem's public samples."></textarea>
+            <p id="executionStatus" class="status-line" role="status" aria-live="polite"></p>
+            <div id="executionOutput" class="output-panel" role="status">No execution yet.</div>
+            <h3 style="color:#f5f8ff;margin:1.1rem 0 .6rem">Submission history</h3>
+            <div id="submissionHistory" class="history-list"><p class="muted">Loading your history…</p></div>
+          </section>
+        </section>
+      </main>
+    </div>
+  </div>
+  <script src="/assets/shared-nav.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const token = localStorage.getItem('token');
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      let problem = null;
+      let editor = null;
+      let starterCode = {};
+      let busy = false;
+      const fallback = $('editorFallback');
+
+      function escapeHtml(value) {
+        return String(value ?? '').replace(/[&<>"']/g, character => ({
+          '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        })[character]);
+      }
+
+      function getCode() { return editor ? editor.getValue() : fallback.value; }
+      function setCode(code) {
+        if (editor) editor.setValue(code || '');
+        fallback.value = code || '';
+      }
+      function setOutput(message, kind = '') {
+        $('executionOutput').textContent = message;
+        $('executionOutput').dataset.kind = kind;
+      }
+      async function api(url, options = {}) {
+        const response = await fetch(url, {
+          ...options,
+          headers: { ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(options.headers || {}) }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.message || data.error || `Request failed (${response.status}).`);
+        return data;
+      }
+
+      function initMonaco() {
+        if (!window.require || !window.require.config) {
+          fallback.classList.remove('hidden');
+          $('editor').classList.add('hidden');
+          $('editorStatus').textContent = 'Monaco is unavailable; using the built-in text editor.';
+          return;
+        }
+        window.require.config({
+          paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs' }
+        });
+        const monacoFallbackTimer = setTimeout(() => {
+          if (editor) return;
+          fallback.classList.remove('hidden');
+          $('editor').classList.add('hidden');
+          $('editorStatus').textContent = 'Monaco did not load in time; using the built-in text editor.';
+        }, 8000);
+        window.require(['vs/editor/editor.main'], () => {
+          clearTimeout(monacoFallbackTimer);
+          editor = monaco.editor.create($('editor'), {
+            value: starterCode[$('languageSelect').value] || '',
+            language: $('languageSelect').value,
+            theme: 'vs-dark',
+            automaticLayout: true,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            fontSize: 13,
+            tabSize: 4
+          });
+          fallback.classList.add('hidden');
+          $('editor').classList.remove('hidden');
+          $('editorStatus').textContent = 'Monaco Editor ready. Code runs only in the local Docker sandbox.';
+        }, () => {
+          clearTimeout(monacoFallbackTimer);
+          fallback.classList.remove('hidden');
+          $('editor').classList.add('hidden');
+          $('editorStatus').textContent = 'Monaco could not load; using the built-in text editor.';
+        });
+      }
+
+      function renderProblem(data) {
+        problem = data;
+        starterCode = data.starterCode || {};
+        $('problemTitle').textContent = data.title;
+        $('problemMeta').textContent = `${data.problemId || ''} · ${data.difficulty} · ${data.category}` +
+          (data.solved ? ' · Solved' : data.attempted ? ' · Attempted' : '');
+        $('problemTags').replaceChildren(...(data.tags || data.topics || []).map(text => {
+          const item = document.createElement('span');
+          item.className = 'pill';
+          item.textContent = text;
+          return item;
+        }));
+        $('problemDescription').textContent = [
+          data.description,
+          `Input: ${data.inputFormat || 'See examples.'}`,
+          `Output: ${data.outputFormat || 'See examples.'}`,
+          `Constraints: ${data.constraints || 'See problem statement.'}`
+        ].join('\n\n');
+        $('examples').replaceChildren(...(data.examples || []).map((example, index) => {
+          const card = document.createElement('section');
+          card.className = 'example';
+          const heading = document.createElement('strong');
+          heading.textContent = `Example ${index + 1}`;
+          const input = document.createElement('pre');
+          input.textContent = `Input\n${example.input}`;
+          const output = document.createElement('pre');
+          output.textContent = `Output\n${example.output}`;
+          card.append(heading, input, output);
+          if (example.explanation) {
+            const explanation = document.createElement('p');
+            explanation.className = 'muted';
+            explanation.textContent = example.explanation;
+            card.append(explanation);
+          }
+          return card;
+        }));
+        $('hints').replaceChildren(...(data.hints || []).map(hint => {
+          const item = document.createElement('li');
+          item.textContent = hint;
+          return item;
+        }));
+        $('editorial').textContent = data.editorial || 'Editorial unavailable.';
+        $('complexity').textContent =
+          `Time: ${data.timeComplexity || '—'} · Space: ${data.spaceComplexity || '—'}`;
+        setCode(starterCode[$('languageSelect').value] || data.solutionTemplate || '');
+        initMonaco();
+      }
+
+      async function loadHistory() {
+        try {
+          const rows = await api(`/api/coding/problems/${encodeURIComponent(id)}/submissions`);
+          if (!rows.length) {
+            $('submissionHistory').textContent = 'No attempts saved for this problem yet.';
+            return;
+          }
+          $('submissionHistory').replaceChildren(...rows.map(row => {
+            const entry = document.createElement('article');
+            entry.className = 'history-item';
+            const title = document.createElement('strong');
+            title.textContent = `${String(row.status || 'unknown').replace(/_/g, ' ')} · ${row.language}`;
+            const details = document.createElement('p');
+            details.className = 'muted';
+            details.textContent = `${new Date(row.submittedAt).toLocaleString()} · ${row.executionTime ?? '—'} ms · ${row.testResults?.filter(test => test.passed).length || 0}/${row.testResults?.length || 0} tests passed`;
+            entry.append(title, details);
+            const restore = document.createElement('button');
+            restore.type = 'button';
+            restore.className = 'action secondary';
+            restore.textContent = 'Load this source';
+            restore.addEventListener('click', () => {
+              $('languageSelect').value = row.language;
+              if (editor) monaco.editor.setModelLanguage(editor.getModel(), row.language);
+              setCode(row.code || '');
+            });
+            entry.append(restore);
+            return entry;
+          }));
+        } catch (error) {
+          $('submissionHistory').textContent = error.message;
+        }
+      }
+
+      async function loadNeighbors() {
+        const match = /^ch-(\d+)$/.exec(problem.problemId || '');
+        if (!match) {
+          $('previousProblem').disabled = true;
+          $('nextProblem').disabled = true;
+          return;
+        }
+        const current = Number(match[1]);
+        for (const [buttonId, next] of [['previousProblem', current - 1], ['nextProblem', current + 1]]) {
+          const button = $(buttonId);
+          const nextId = `ch-${String(next).padStart(3, '0')}`;
+          if (next < 1 || next > 100) {
+            button.disabled = true;
+            continue;
+          }
+          try {
+            const list = await api(`/api/coding/problems?search=${encodeURIComponent(nextId)}&page=1&limit=5`);
+            const neighbor = list.problems?.find(item => item.problemId === nextId);
+            button.disabled = !neighbor;
+            if (neighbor) button.addEventListener('click', () => {
+              location.href = `/problem?id=${encodeURIComponent(neighbor._id)}`;
+            }, { once: true });
+          } catch {
+            button.disabled = true;
+          }
+        }
+      }
+
+      function setBusy(value) {
+        busy = value;
+        ['languageSelect', 'resetCode', 'runSamples', 'submitCode'].forEach(idName => {
+          $(idName).disabled = value;
+        });
+      }
+
+      async function runSamples() {
+        if (busy) return;
+        setBusy(true);
+        setOutput('Running public sample tests in the isolated local runner…');
+        $('executionStatus').textContent = '';
+        try {
+          const input = $('customInput').value;
+          if (input.trim()) {
+            const result = await api(`/api/coding/problems/${encodeURIComponent(id)}/run`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: getCode(), language: $('languageSelect').value, stdin: input })
+            });
+            $('executionStatus').textContent = `${result.statusDescription || result.status} · ${result.executionTime ?? '—'} ms`;
+            setOutput(result.success ? result.stdout || '(No output)' : result.error || result.compileOutput || result.stderr || result.status, result.success ? 'success' : 'error');
+          } else {
+            const result = await api(`/api/coding/problems/${encodeURIComponent(id)}/run`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: getCode(), language: $('languageSelect').value })
+            });
+            $('executionStatus').textContent = `${result.status} · ${result.passed}/${result.total} public tests · ${result.executionTime} ms`;
+            setOutput(result.results.map((test, index) =>
+              `Sample ${index + 1}: ${test.status}${test.passed ? ' ✓' : `\nExpected: ${test.expectedOutput || '—'}\nActual: ${test.actualOutput || test.error || '—'}`}`
+            ).join('\n\n'), result.status === 'accepted' ? 'success' : 'error');
+          }
+          await loadHistory();
+        } catch (error) {
+          $('executionStatus').textContent = 'Run failed';
+          setOutput(error.message, 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function submitSolution() {
+        if (busy) return;
+        setBusy(true);
+        setOutput('Submitting to hidden tests in the isolated local runner…');
+        try {
+          const result = await api(`/api/coding/submit/${encodeURIComponent(id)}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: getCode(), language: $('languageSelect').value })
+          });
+          $('executionStatus').textContent = `${result.status} · score ${result.score} · +${result.xpEarned} XP`;
+          setOutput(`${result.message}\n${result.results.filter(item => !item.passed).length} test(s) did not pass. Hidden inputs and outputs are not returned.`, result.status === 'accepted' ? 'success' : 'error');
+          await Promise.all([loadHistory(), loadProblemStatus()]);
+        } catch (error) {
+          $('executionStatus').textContent = 'Submission failed';
+          setOutput(error.message, 'error');
+        } finally {
+          setBusy(false);
+        }
+      }
+
+      async function loadProblemStatus() {
+        const refreshed = await api(`/api/coding/problems/${encodeURIComponent(id)}`);
+        $('problemMeta').textContent = `${refreshed.problemId || ''} · ${refreshed.difficulty} · ${refreshed.category}` +
+          (refreshed.solved ? ' · Solved' : refreshed.attempted ? ' · Attempted' : '');
+      }
+
+      $('languageSelect').addEventListener('change', () => {
+        if (editor) monaco.editor.setModelLanguage(editor.getModel(), $('languageSelect').value);
+        setCode(starterCode[$('languageSelect').value] || '');
+      });
+      $('resetCode').addEventListener('click', () => setCode(starterCode[$('languageSelect').value] || ''));
+      $('runSamples').addEventListener('click', runSamples);
+      $('submitCode').addEventListener('click', submitSolution);
+
+      (async () => {
+        if (!token) {
+          $('problemDescription').textContent = 'Sign in to open a problem and save your submissions.';
+          $('editorStatus').textContent = 'Authentication required.';
+          ['runSamples', 'submitCode', 'resetCode', 'languageSelect'].forEach(idName => { $(idName).disabled = true; });
+          return;
+        }
+        if (!id) {
+          $('problemDescription').textContent = 'No problem was selected. Return to the problem catalog.';
+          ['runSamples', 'submitCode', 'resetCode', 'languageSelect'].forEach(idName => {
+            $(idName).disabled = true;
+          });
+          return;
+        }
+        try {
+          const [data, languages] = await Promise.all([
+            api(`/api/coding/problems/${encodeURIComponent(id)}`),
+            api('/api/coding/languages')
+          ]);
+          if (languages.status !== 'ready') {
+            $('editorStatus').textContent = `${languages.engine?.message || 'Local Docker execution is unavailable.'} Code remains editable; Run and Submit will report the runner state.`;
+          }
+          renderProblem(data);
+          await Promise.all([loadHistory(), loadNeighbors()]);
+        } catch (error) {
+          $('problemTitle').textContent = 'Problem unavailable';
+          $('problemDescription').textContent = error.message;
+          $('editorStatus').textContent = error.message;
+          ['runSamples', 'submitCode'].forEach(idName => { $(idName).disabled = true; });
+        }
+      })();
+    })();
+  </script>
+</body>
+</html>

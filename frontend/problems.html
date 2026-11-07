@@ -9,10 +9,10 @@
   <link rel="stylesheet" href="/assets/shared-nav.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    .problems-page { max-width: 1100px; margin: 0 auto; }
+    .problems-page { max-width: 1180px; margin: 0 auto; }
     .problems-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .filter-row { display: flex; gap: 0.65rem; flex-wrap: wrap; align-items: center; }
-    .filter-select, .search-input { padding: 0.6rem 0.9rem; background: rgba(14,25,48,0.9); border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none; }
+    .filter-select, .search-input { min-height:40px; padding: 0.6rem 0.9rem; background: rgba(14,25,48,0.9); border: 1px solid var(--border-subtle); border-radius: 8px; color: #fff; font-size: 0.85rem; outline: none; }
     .search-input { min-width: 220px; }
     .search-input:focus, .filter-select:focus { border-color: var(--text-accent); }
     .problem-list { display: flex; flex-direction: column; gap: 0.75rem; }
@@ -21,15 +21,13 @@
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
       padding: 1.1rem 1.35rem;
-      display: flex;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
       align-items: center;
-      justify-content: space-between;
       gap: 1rem;
-      cursor: pointer;
       transition: var(--transition-smooth);
-      text-decoration: none;
     }
-    .problem-card:hover { border-color: var(--border-hover); background: rgba(18,33,64,0.85); transform: translateX(4px); }
+    .problem-card:hover { border-color: var(--border-hover); background: rgba(18,33,64,0.85); }
     .problem-info { display: flex; align-items: center; gap: 1rem; min-width: 0; }
     .problem-icon { width: 40px; height: 40px; border-radius: 10px; background: rgba(0,210,255,0.08); border: 1px solid rgba(56,189,248,0.2); display: flex; align-items: center; justify-content: center; color: #00d2ff; flex-shrink: 0; font-size: 1.1rem; }
     .problem-meta { min-width: 0; }
@@ -40,14 +38,28 @@
     .difficulty-badge.easy { background: rgba(16,185,129,0.12); color: #34d399; border: 1px solid rgba(16,185,129,0.3); }
     .difficulty-badge.medium { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
     .difficulty-badge.hard { background: rgba(239,68,68,0.12); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+    .problem-actions { display:flex; align-items:center; justify-content:flex-end; gap:.55rem; flex-wrap:wrap; }
+    .problem-action { min-height:36px; border:1px solid var(--border-subtle); border-radius:7px; padding:.45rem .7rem; background:rgba(7,17,31,.7); color:#dcecff; font:600 .76rem Inter,sans-serif; text-decoration:none; cursor:pointer; }
+    .problem-action:hover:not(:disabled) { border-color:var(--border-hover); }
+    .problem-action:disabled { opacity:.6; cursor:wait; }
+    .hint-result { grid-column:1/-1; margin:0; color:var(--text-secondary); font-size:.84rem; line-height:1.55; white-space:pre-wrap; }
+    .catalog-notice { margin:.6rem 0 1rem; color:var(--text-muted); font-size:.84rem; line-height:1.5; }
     .kpi-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
     .kpi-pill { background: var(--surface-card); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 0.65rem 1rem; font-size: 0.82rem; color: var(--text-secondary); }
     .kpi-pill strong { color: #fff; font-size: 1.1rem; display: block; }
+    .catalog-progress { margin:0 0 1rem; display:flex; flex-wrap:wrap; gap:.7rem; }
+    .catalog-progress span { border:1px solid var(--border-subtle); background:var(--surface-card); border-radius:9px; padding:.55rem .75rem; color:var(--text-secondary); font-size:.8rem; }
+    .catalog-progress strong { color:#fff; }
+    .pagination { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:1rem; color:var(--text-secondary); font-size:.82rem; }
     #statusMsg { color: var(--text-muted); font-size: 0.88rem; padding: 2rem; text-align: center; }
-    @media (max-width: 700px) { .problems-header { flex-direction: column; align-items: flex-start; } }
+    @media (max-width: 700px) {
+      .problems-header { flex-direction: column; align-items: flex-start; }
+      .problem-card { grid-template-columns: minmax(0, 1fr); }
+      .problem-actions { justify-content: flex-start; }
+    }
   </style>
 </head>
-<body data-page-title="Coding Problems" data-page-subtitle="Curated placement preparation problems from the live problem catalog">
+<body data-page-title="Coding Problems" data-page-subtitle="Curated problems with official practice links and privacy-safe AI hints">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
@@ -57,8 +69,8 @@
 
           <div class="problems-header">
             <div>
-              <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0;">Coding Problem Catalog</h2>
-              <p style="color:var(--text-muted);font-size:0.83rem;margin:0.3rem 0 0;">Click any problem to open it in the interactive coding IDE.</p>
+              <h2 style="font-size:1.35rem;font-weight:800;color:#fff;margin:0;">CareerHub DSA Practice</h2>
+              <p style="color:var(--text-muted);font-size:0.83rem;margin:0.3rem 0 0;">Original problems, local Docker-isolated execution, and private saved progress.</p>
             </div>
             <div class="filter-row">
               <input type="text" id="searchInput" class="search-input" placeholder="Search problems…" autocomplete="off">
@@ -70,21 +82,44 @@
               </select>
               <select id="topicFilter" class="filter-select">
                 <option value="">All topics</option>
+                <option value="arrays">Arrays</option><option value="strings">Strings</option>
+                <option value="hashing">Hashing</option><option value="two-pointers">Two Pointers</option>
+                <option value="sliding-window">Sliding Window</option><option value="binary-search">Binary Search</option>
+                <option value="linked-lists">Linked Lists</option><option value="stacks-queues">Stacks and Queues</option>
+                <option value="trees-bst">Trees and BST</option><option value="graphs">Graphs</option>
+                <option value="dynamic-programming">Dynamic Programming</option><option value="sorting-recursion">Sorting and Recursion</option>
               </select>
-              <a href="/coding" class="btn btn-primary" style="font-size:0.82rem;padding:0.6rem 1rem;border-radius:8px;text-decoration:none;white-space:nowrap;">Open IDE</a>
+              <select id="statusFilter" class="filter-select" aria-label="Filter by completion status">
+                <option value="">All status</option><option value="todo">Unsolved</option>
+                <option value="attempted">Attempted</option><option value="solved">Solved</option><option value="saved">Saved</option>
+              </select>
+              <select id="sortFilter" class="filter-select" aria-label="Sort problems">
+                <option value="problemId">Problem ID</option><option value="title">Title</option>
+                <option value="difficulty">Difficulty</option><option value="createdAt">Newest</option>
+              </select>
+              <a href="/coding" class="btn btn-primary" style="font-size:0.82rem;padding:0.6rem 1rem;border-radius:8px;text-decoration:none;white-space:nowrap;">Progress dashboard</a>
             </div>
           </div>
 
-          <div class="kpi-row" id="kpiRow">
-            <div class="kpi-pill"><strong id="kpiTotal">--</strong>Total Problems</div>
-            <div class="kpi-pill"><strong id="kpiEasy" style="color:#34d399;">--</strong>Easy</div>
-            <div class="kpi-pill"><strong id="kpiMedium" style="color:#fbbf24;">--</strong>Medium</div>
-            <div class="kpi-pill"><strong id="kpiHard" style="color:#f87171;">--</strong>Hard</div>
+          <div class="catalog-progress" id="catalogProgress" aria-live="polite">
+            <span>Engine: <strong id="engineState">Checking…</strong></span>
+            <span>Solved: <strong id="solvedCount">—</strong></span>
+            <span>Attempted: <strong id="attemptedCount">—</strong></span>
+            <span>Success rate: <strong id="successRate">—</strong></span>
           </div>
 
+          <p class="catalog-notice" id="catalogNotice" role="status">Loading local execution and your saved progress…</p>
           <div class="problem-list" id="problemList">
             <div id="statusMsg">Loading problems…</div>
           </div>
+          <nav class="pagination" aria-label="Coding problem pagination">
+            <span id="pageSummary" aria-live="polite"></span>
+            <div class="problem-actions">
+              <button type="button" class="problem-action" id="previousPage" disabled>Previous</button>
+              <span id="pageNumber"></span>
+              <button type="button" class="problem-action" id="nextPage" disabled>Next</button>
+            </div>
+          </nav>
 
         </div>
       </main>
@@ -96,50 +131,82 @@
     const token = localStorage.getItem('token');
     const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
 
-    const escapeHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-
-    const ICONS = {
-      Easy: '⚡', Medium: '🧩', Hard: '🔥', default: '💻'
+    const tokenHeaders = () => {
+      const currentToken = localStorage.getItem('token');
+      return currentToken ? { Authorization: `Bearer ${currentToken}` } : {};
     };
 
-    let allProblems = [];
+    const ICONS = { Easy: '⚡', Medium: '🧩', Hard: '🔥', default: '💻' };
+    const PAGE_SIZE = 20;
+    let currentPage = 1;
+    let pageCount = 1;
+    let searchTimer = null;
 
     async function loadProblems() {
       const list = document.getElementById('problemList');
       const msg = document.getElementById('statusMsg');
+      list.replaceChildren(msg);
+      msg.style.display = '';
+      msg.textContent = 'Loading problems…';
+      if (!localStorage.getItem('token')) {
+        msg.textContent = 'Sign in to browse the coding library and save private progress.';
+        return;
+      }
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(PAGE_SIZE),
+        search: document.getElementById('searchInput').value.trim(),
+        difficulty: document.getElementById('difficultyFilter').value,
+        topic: document.getElementById('topicFilter').value,
+        status: document.getElementById('statusFilter').value,
+        sort: document.getElementById('sortFilter').value
+      });
       try {
-        const res = await fetch('/api/coding/problems', { headers });
-        if (!res.ok) {
-          msg.textContent = res.status === 401
+        const [response, statsResponse, languageResponse] = await Promise.all([
+          fetch(`/api/coding/problems?${params}`, { headers: tokenHeaders() }),
+          fetch('/api/coding/stats', { headers: tokenHeaders() }),
+          fetch('/api/coding/languages', { headers: tokenHeaders() })
+        ]);
+        if (!response.ok) {
+          msg.textContent = response.status === 401
             ? 'Sign in to view the problem catalog.'
             : 'Could not load problems. Please retry.';
           return;
         }
-        allProblems = await res.json();
-        if (!Array.isArray(allProblems) || allProblems.length === 0) {
-          msg.textContent = 'No coding problems are available yet. Check back soon.';
+        const data = await response.json();
+        const problems = Array.isArray(data.problems) ? data.problems : [];
+        pageCount = Math.max(1, data.pages || 1);
+        currentPage = data.page || currentPage;
+        const stats = statsResponse.ok ? await statsResponse.json() : null;
+        if (stats) {
+          document.getElementById('solvedCount').textContent = stats.totalSolved;
+          document.getElementById('attemptedCount').textContent = stats.totalAttempted;
+          document.getElementById('successRate').textContent = `${stats.successRate}%`;
+        }
+        if (languageResponse.ok) {
+          const engine = await languageResponse.json();
+          document.getElementById('engineState').textContent =
+            engine.status === 'ready' ? 'Ready (local Docker)' : 'Unavailable';
+          document.getElementById('catalogNotice').textContent = engine.status === 'ready'
+            ? 'Run executes public samples; Submit evaluates hidden tests in the isolated local runner. No remote execution API is used.'
+            : `${engine.engine?.message || engine.message || 'Docker is unavailable.'} Build the local image with the instructions in README.md.`;
+        } else {
+          document.getElementById('engineState').textContent = 'Unavailable';
+          document.getElementById('catalogNotice').textContent =
+            'Could not verify the local Docker runner. Code execution remains disabled until its health check succeeds.';
+        }
+        if (!problems.length) {
+          msg.textContent = stats?.totalProblems === 0
+            ? 'The coding catalog is not available yet. Its problem content must pass validation before it can be seeded.'
+            : 'No problems match these filters.';
+          updatePagination(data.total || 0, 0);
           return;
         }
         msg.style.display = 'none';
-
-        // Populate topic filter
-        const topics = [...new Set(allProblems.flatMap(p => p.topics || []))].sort();
-        const topicSel = document.getElementById('topicFilter');
-        topics.forEach(t => {
-          const opt = document.createElement('option');
-          opt.value = t; opt.textContent = t;
-          topicSel.appendChild(opt);
-        });
-
-        // Update KPIs
-        document.getElementById('kpiTotal').textContent = allProblems.length;
-        document.getElementById('kpiEasy').textContent = allProblems.filter(p => p.difficulty === 'Easy').length;
-        document.getElementById('kpiMedium').textContent = allProblems.filter(p => p.difficulty === 'Medium').length;
-        document.getElementById('kpiHard').textContent = allProblems.filter(p => p.difficulty === 'Hard').length;
-
-        renderList(allProblems);
-      } catch (err) {
-        console.error(err);
+        renderList(problems);
+        updatePagination(data.total, problems.length);
+      } catch (error) {
+        console.error(error);
         msg.textContent = 'Network error loading problems. Please retry.';
       }
     }
@@ -147,46 +214,154 @@
     function renderList(problems) {
       const list = document.getElementById('problemList');
       if (!problems.length) {
-        list.innerHTML = '<div style="color:var(--text-muted);padding:2rem;text-align:center;">No problems match your filters.</div>';
+        const empty = document.createElement('div');
+        empty.style.cssText = 'color:var(--text-muted);padding:2rem;text-align:center;';
+        empty.textContent = 'No problems match your filters.';
+        list.replaceChildren(empty);
         return;
       }
-      list.innerHTML = problems.map(p => {
+      list.replaceChildren(...problems.map(p => {
         const id = p._id || p.id;
-        const diff = (p.difficulty || 'Easy');
-        const diffClass = diff.toLowerCase();
-        const icon = ICONS[diff] || ICONS.default;
-        const tags = (p.topics || []).map(t => `<span class="tag-pill">${escapeHtml(t)}</span>`).join('');
-        return `
-          <a class="problem-card" href="/coding?problemId=${encodeURIComponent(id)}" title="Open ${escapeHtml(p.title)} in IDE">
-            <div class="problem-info">
-              <div class="problem-icon">${icon}</div>
-              <div class="problem-meta">
-                <div class="problem-title">${escapeHtml(p.title)}</div>
-                <div class="problem-tags">${tags}</div>
-              </div>
-            </div>
-            <span class="difficulty-badge ${diffClass}">${escapeHtml(diff)}</span>
-          </a>
-        `;
-      }).join('');
+        const diff = (p.difficulty || 'easy').toLowerCase();
+        const displayDifficulty = diff[0].toUpperCase() + diff.slice(1);
+        const diffClass = diff;
+        const icon = ICONS[displayDifficulty] || ICONS.default;
+        const card = document.createElement('article');
+        card.className = 'problem-card';
+        const info = document.createElement('div');
+        info.className = 'problem-info';
+        const problemIcon = document.createElement('div');
+        problemIcon.className = 'problem-icon';
+        problemIcon.textContent = icon;
+        const meta = document.createElement('div');
+        meta.className = 'problem-meta';
+        const title = document.createElement('div');
+        title.className = 'problem-title';
+        title.textContent = p.title;
+        const tags = document.createElement('div');
+        tags.className = 'problem-tags';
+        (p.topics || []).forEach(topic => {
+          const tag = document.createElement('span');
+          tag.className = 'tag-pill';
+          tag.textContent = topic;
+          tags.appendChild(tag);
+        });
+        if (p.solved || p.attempted || p.saved) {
+          const progress = document.createElement('span');
+          progress.className = 'tag-pill';
+          progress.textContent = p.solved ? 'Solved' : p.attempted ? 'Attempted' : 'Saved';
+          tags.appendChild(progress);
+        }
+        meta.append(title, tags);
+        info.append(problemIcon, meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'problem-actions';
+        const difficulty = document.createElement('span');
+        difficulty.className = `difficulty-badge ${diffClass}`;
+        difficulty.textContent = displayDifficulty;
+        actions.appendChild(difficulty);
+        const workspaceLink = document.createElement('a');
+        workspaceLink.className = 'problem-action';
+        workspaceLink.href = `/problem?id=${encodeURIComponent(id)}`;
+        workspaceLink.textContent = 'Open workspace';
+        actions.appendChild(workspaceLink);
+        const saveButton = document.createElement('button');
+        saveButton.type = 'button';
+        saveButton.className = 'problem-action';
+        saveButton.textContent = p.saved ? 'Remove saved' : 'Save problem';
+        saveButton.addEventListener('click', () => toggleSaved(id, !p.saved, saveButton));
+        actions.appendChild(saveButton);
+        const hintButton = document.createElement('button');
+        hintButton.type = 'button';
+        hintButton.className = 'problem-action';
+        hintButton.textContent = 'Get AI hint';
+        const hintResult = document.createElement('p');
+        hintResult.className = 'hint-result';
+        hintResult.setAttribute('role', 'status');
+        hintButton.addEventListener('click', () => requestProblemHint(id, hintButton, hintResult));
+        actions.appendChild(hintButton);
+        card.append(info, actions);
+        card.appendChild(hintResult);
+        return card;
+      }));
     }
 
-    function applyFilters() {
-      const search = document.getElementById('searchInput').value.trim().toLowerCase();
-      const diff = document.getElementById('difficultyFilter').value;
-      const topic = document.getElementById('topicFilter').value;
-      const filtered = allProblems.filter(p => {
-        if (diff && p.difficulty !== diff) return false;
-        if (topic && !(p.topics || []).includes(topic)) return false;
-        if (!search) return true;
-        return [p.title, ...(p.topics || [])].some(v => String(v).toLowerCase().includes(search));
-      });
-      renderList(filtered);
+    async function requestProblemHint(problemId, button, output) {
+      if (button.disabled) return;
+      button.disabled = true;
+      button.textContent = 'Generating hint…';
+      output.textContent = 'Requesting a hint from the configured AI provider…';
+      try {
+        const response = await fetch('/api/coding/hint', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...tokenHeaders() },
+          body: JSON.stringify({ problemId })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          output.textContent = result.message || 'The hint could not be generated. Please retry.';
+          return;
+        }
+        const concepts = Array.isArray(result.concepts) ? result.concepts.join(', ') : '';
+        const provenance = [result.source, result.model].filter(Boolean).join(' · ');
+        output.textContent = [
+          result.hint,
+          concepts ? `Concepts: ${concepts}` : '',
+          result.complexityConsiderations ? `Complexity: ${result.complexityConsiderations}` : '',
+          result.privacyNotice || '',
+          provenance ? `Generated by ${provenance}.` : ''
+        ].filter(Boolean).join('\n');
+      } catch (error) {
+        console.error('Coding hint request failed:', error);
+        output.textContent = 'Network error requesting a coding hint. Please retry.';
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Get AI hint';
+      }
     }
 
-    document.getElementById('searchInput').addEventListener('input', applyFilters);
-    document.getElementById('difficultyFilter').addEventListener('change', applyFilters);
-    document.getElementById('topicFilter').addEventListener('change', applyFilters);
+    function updatePagination(total, currentSize) {
+      const first = total ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+      document.getElementById('pageSummary').textContent =
+        `${first}–${first + currentSize - 1} of ${total} problems`;
+      document.getElementById('pageNumber').textContent = `Page ${currentPage} of ${pageCount}`;
+      document.getElementById('previousPage').disabled = currentPage <= 1;
+      document.getElementById('nextPage').disabled = currentPage >= pageCount;
+    }
+
+    async function toggleSaved(problemId, shouldSave, button) {
+      button.disabled = true;
+      try {
+        const response = await fetch(`/api/coding/saved/${encodeURIComponent(problemId)}`, {
+          method: shouldSave ? 'PUT' : 'DELETE',
+          headers: tokenHeaders()
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'Could not update saved problems.');
+        await loadProblems();
+      } catch (error) {
+        window.showToast?.(error.message, 'error');
+        button.disabled = false;
+      }
+    }
+
+    function applyFilters(debounce = false) {
+      currentPage = 1;
+      clearTimeout(searchTimer);
+      if (debounce) searchTimer = setTimeout(loadProblems, 250);
+      else loadProblems();
+    }
+
+    document.getElementById('searchInput').addEventListener('input', () => applyFilters(true));
+    ['difficultyFilter', 'topicFilter', 'statusFilter', 'sortFilter'].forEach(id =>
+      document.getElementById(id).addEventListener('change', () => applyFilters()));
+    document.getElementById('previousPage').addEventListener('click', () => {
+      if (currentPage > 1) { currentPage--; loadProblems(); }
+    });
+    document.getElementById('nextPage').addEventListener('click', () => {
+      if (currentPage < pageCount) { currentPage++; loadProblems(); }
+    });
 
     document.addEventListener('DOMContentLoaded', loadProblems);
   </script>

@@ -12,6 +12,24 @@ assert.match(providerErrorMessage('AI_PROVIDER_INVALID_OUTPUT', 'Resume analysis
 assert.match(providerErrorMessage('AI_PROVIDER_REQUEST_REJECTED', 'Career Assistant'), /rejected this request configuration/i);
 assert.equal(providerErrorMessage('AI_ANSWER_REQUIRED', 'Interview'), 'Provide an answer before requesting an AI evaluation.');
 assert.match(providerErrorMessage('AI_PROVIDER_NOT_CONFIGURED'), /configured AI provider is not ready/i);
+assert.match(providerErrorMessage('AI_PROVIDER_NOT_CONFIGURED', 'Assessment question generation', {
+    provider: 'Gemini',
+    providerDiagnostics: { configurationIssue: 'feature_not_enabled' }
+}), /not listed in GEMINI_PRIMARY_FEATURES/i);
+assert.match(providerErrorMessage('AI_PROVIDER_NOT_CONFIGURED', 'Career Assistant', {
+    provider: 'Gemini',
+    providerDiagnostics: { configurationIssue: 'privacy_restricted' }
+}), /request was not sent.*unpaid-tier privacy/i);
+assert.match(providerErrorMessage('AI_MODEL_INVALID', 'Career Assistant', {
+    provider: 'Gemini',
+    providerDiagnostics: {
+        httpStatus: 404,
+        googleCode: 404,
+        googleStatus: 'NOT_FOUND',
+        googleMessage: 'This model is no longer available.',
+        googleReasons: []
+    }
+}), /Gemini returned HTTP 404 \(NOT_FOUND\).*no longer available/i);
 assert.doesNotMatch(providerErrorMessage('AI_PROVIDER_QUOTA_EXCEEDED'), /API key value/i);
 assert.match(providerErrorMessage('AI_PROVIDER_UNAVAILABLE', 'Career Assistant', {
     fallbackAttempted: true

@@ -52,7 +52,30 @@ async function run() {
     }, normalized);
     assert.equal(match.overallMatch, 70);
     assert.deepEqual(match.matchedSkills, ['python']);
-    assert.equal(calculateJobMatch({}, normalized).overallMatch, null);
+    assert.deepEqual(match.matchedProfileSkills, ['python']);
+    assert.deepEqual(match.matchBasis, ['listed skills', 'target role', 'preferred location']);
+
+    const descriptionOnlyMatch = calculateJobMatch({
+        technicalSkills: ['Python', 'C++']
+    }, {
+        title: 'Backend Engineer',
+        description: 'Build backend services with Python and C++.',
+        tags: [],
+        sourceJobTypes: ['Full-time']
+    });
+    assert.equal(descriptionOnlyMatch.overallMatch, 100);
+    assert.deepEqual(descriptionOnlyMatch.matchedProfileSkills, ['python', 'c++']);
+    assert.deepEqual(descriptionOnlyMatch.matchBasis, ['listed skills']);
+
+    const roleOnlyMatch = calculateJobMatch({
+        targetRole: 'Backend Engineer'
+    }, { title: 'Senior Backend Engineer', tags: [] });
+    assert.equal(roleOnlyMatch.overallMatch, 100);
+    assert.deepEqual(roleOnlyMatch.matchBasis, ['target role']);
+
+    const unavailableMatch = calculateJobMatch({}, normalized);
+    assert.equal(unavailableMatch.overallMatch, null);
+    assert.match(unavailableMatch.matchUnavailableReason, /technical skills, a target role, or a preferred location/i);
 
     let requestedUrl;
     const result = await fetchLiveJobs({
@@ -87,22 +110,36 @@ async function run() {
         error => error.code === 'JOB_PROVIDER_INVALID_RESPONSE' && error.status === 503
     );
 
-    const originalAiProvider = process.env.AI_PROVIDER;
-    const originalOpenRouterKey = process.env.OPENROUTER_API_KEY;
+    const originalConfiguration = Object.fromEntries([
+        'AI_PROVIDER',
+        'OPENROUTER_API_KEY',
+        'OPENROUTER_MODEL',
+        'CAREERHUB_AI_DATA_PROCESSING_APPROVED',
+        'CAREERHUB_AI_DATA_PROCESSING_PROVIDER'
+    ].map(name => [name, process.env[name]]));
     process.env.AI_PROVIDER = 'openrouter';
-    process.env.OPENROUTER_API_KEY = '';
     try {
         const aiService = require('./utils/aiService');
+        process.env.OPENROUTER_API_KEY = 'test-key-not-used';
+        process.env.OPENROUTER_MODEL = 'provider/example-paid';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_APPROVED = 'false';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_PROVIDER = '';
         assert.equal(aiService.getCareerAssistantStatus().configured, false);
+        process.env.CAREERHUB_AI_DATA_PROCESSING_APPROVED = 'true';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_PROVIDER = 'openrouter';
+        assert.equal(aiService.getCareerAssistantStatus().configured, true);
+        process.env.OPENROUTER_MODEL = 'provider/example:free';
+        assert.equal(aiService.getCareerAssistantStatus().configured, false);
+        process.env.OPENROUTER_API_KEY = '';
         await assert.rejects(
             aiService.chatCareerAssistant('Hello', [], {}),
             error => error.code === 'AI_PROVIDER_NOT_CONFIGURED' && error.status === 503
         );
     } finally {
-        if (originalAiProvider === undefined) delete process.env.AI_PROVIDER;
-        else process.env.AI_PROVIDER = originalAiProvider;
-        if (originalOpenRouterKey === undefined) delete process.env.OPENROUTER_API_KEY;
-        else process.env.OPENROUTER_API_KEY = originalOpenRouterKey;
+        for (const [name, value] of Object.entries(originalConfiguration)) {
+            if (value === undefined) delete process.env[name];
+            else process.env[name] = value;
+        }
     }
 
     console.log('Job provider tests passed: normalization, attribution, URL safety, matching, empty data, and failures.');

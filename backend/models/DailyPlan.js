@@ -21,7 +21,7 @@ const DailyPlanSchema = new mongoose.Schema({
     userId: { type: String, required: true },
     date: { type: String, required: true }, // Format: YYYY-MM-DD
     targetRole: { type: String, default: null },
-    generationSource: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated', null], default: null },
+    generationSource: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated', 'local', null], default: 'local' },
     generationModel: { type: String, default: null },
     fallbackUsed: { type: Boolean, default: false },
     completionPercentage: { type: Number, default: 0 },

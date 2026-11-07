@@ -35,7 +35,7 @@
     @media (max-width:680px) { .lc-grid { grid-template-columns:1fr; } .lc-row { align-items:flex-start; } }
   </style>
 </head>
-<body data-page-title="LeetCode Progress" data-page-subtitle="Verified external links and honest practice history">
+<body data-page-title="Coding Progress" data-page-subtitle="Your MongoDB-backed CareerHub practice">
   <div class="app-layout">
     <div id="sidebar-container"></div>
     <div class="main-wrapper">
@@ -75,6 +75,23 @@
             <div class="lc-stat"><strong id="topicCount">—</strong><span>Topics with enough practice evidence</span></div>
           </div>
           <p class="lc-muted">These figures come only from CareerHub's saved coding submissions. They are not LeetCode account statistics.</p>
+        </section>
+
+        <section class="lc-card">
+          <h2>CareerHub problem-set progress</h2>
+          <p class="lc-muted" id="localCatalogCount">Loading local problem library…</p>
+          <div class="lc-grid">
+            <div class="lc-stat"><strong id="easyProgress">—</strong><span>Easy solved</span></div>
+            <div class="lc-stat"><strong id="mediumProgress">—</strong><span>Medium solved</span></div>
+            <div class="lc-stat"><strong id="hardProgress">—</strong><span>Hard solved</span></div>
+          </div>
+          <div class="lc-grid" style="margin-top:.8rem">
+            <div class="lc-stat"><strong id="successRate">—</strong><span>Accepted submission rate</span></div>
+            <div class="lc-stat"><strong id="savedProblemCount">—</strong><span>Saved problems</span></div>
+            <div class="lc-stat"><strong id="dailyChallengeLink">—</strong><span>Daily challenge</span></div>
+          </div>
+          <div class="lc-list" id="topicProgressList" aria-live="polite"></div>
+          <a id="continueProblemLink" class="lc-link" href="/problems" hidden>Continue your last unsolved problem ↗</a>
         </section>
 
         <section class="lc-card">
@@ -169,19 +186,16 @@
           .filter(([, stats]) => stats.attempts >= 3)
           .map(([topic, stats]) => ({ topic, ...stats, rate: stats.accepted / stats.attempts }))
           .sort((left, right) => left.rate - right.rate);
-        const officialProblems = problems.filter(problem =>
-          problem.officialSource === 'LeetCode' &&
-          /^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(problem.officialUrl || '')
-        );
+        const practiceProblems = problems.filter(problem => problem._id || problem.id);
         $('recommendationContext').textContent = targetRole
-          ? `Target role: ${targetRole}. Links below are real LeetCode problems; recommendations are not based on synchronized LeetCode statistics.`
-          : 'Add a target role in your profile to contextualize future recommendations. Links below are verified official problem URLs.';
-        if (!officialProblems.length) {
-          list.innerHTML = '<div class="lc-muted" role="status">No verified LeetCode problem links are available in the local catalog.</div>';
+          ? `Target role: ${targetRole}. Recommendations use your CareerHub coding practice history.`
+          : 'Recommendations use your CareerHub coding practice history and are not external LeetCode statistics.';
+        if (!practiceProblems.length) {
+          list.innerHTML = '<div class="lc-muted" role="status">No problems are available in the local coding library.</div>';
           $('topicCount').textContent = String(evidencedTopics.length);
           return;
         }
-        const ordered = [...officialProblems].sort((a, b) => {
+        const ordered = [...practiceProblems].sort((a, b) => {
           const left = evidencedTopics.findIndex(item => item.topic === a.category && item.rate < 0.5);
           const right = evidencedTopics.findIndex(item => item.topic === b.category && item.rate < 0.5);
           return (left < 0 ? Number.MAX_SAFE_INTEGER : left) -
@@ -202,10 +216,8 @@
               : '');
           copy.append(title, details);
           const anchor = document.createElement('a');
-          anchor.href = problem.officialUrl;
-          anchor.target = '_blank';
-          anchor.rel = 'noopener noreferrer';
-          anchor.textContent = 'Open problem ↗';
+          anchor.href = `/problem?id=${encodeURIComponent(problem._id || problem.id)}`;
+          anchor.textContent = 'Practice ↗';
           row.append(copy, anchor);
           return row;
         }));
@@ -214,7 +226,7 @@
       function renderRecent(submissions, problems) {
         const list = $('recentSubmissions');
         const problemById = new Map(problems.map(problem => [String(problem._id || problem.id), problem]));
-        const recent = submissions.filter(item => item.status === 'accepted').slice(0, 8);
+        const recent = submissions.filter(item => item.status === 'accepted' && item.completed !== false).slice(0, 8);
         if (!recent.length) {
           list.innerHTML = '<div class="lc-muted" role="status">No accepted CareerHub coding submissions are saved yet.</div>';
           return;
@@ -263,6 +275,38 @@
           targetRole = profile.user?.targetRole || '';
           $('solvedCount').textContent = String(stats.totalSolved ?? 0);
           $('practiceCount').textContent = String(submissions.length);
+          $('localCatalogCount').textContent = `${stats.totalSolved || 0} solved · ${stats.totalAttempted || 0} attempted · ${stats.totalProblems || 0} problems`;
+          $('easyProgress').textContent = `${stats.difficulty?.easy?.solved || 0}/${stats.difficulty?.easy?.total || 0}`;
+          $('mediumProgress').textContent = `${stats.difficulty?.medium?.solved || 0}/${stats.difficulty?.medium?.total || 0}`;
+          $('hardProgress').textContent = `${stats.difficulty?.hard?.solved || 0}/${stats.difficulty?.hard?.total || 0}`;
+          $('successRate').textContent = `${stats.successRate || 0}%`;
+          $('savedProblemCount').textContent = String(stats.totalSaved || 0);
+          if (stats.dailyChallenge) {
+            const challenge = $('dailyChallengeLink');
+            challenge.replaceChildren();
+            const link = document.createElement('a');
+            link.href = `/problem?id=${encodeURIComponent(stats.dailyChallenge.id)}`;
+            link.textContent = stats.dailyChallenge.title;
+            link.className = 'lc-link';
+            challenge.append(link);
+          }
+          if (stats.continueProblem) {
+            const continueLink = $('continueProblemLink');
+            continueLink.href = `/problem?id=${encodeURIComponent(stats.continueProblem.id)}`;
+            continueLink.textContent = `Continue: ${stats.continueProblem.title} ↗`;
+            continueLink.hidden = false;
+          }
+          const topicRows = Object.entries(stats.topics || {}).sort((left, right) => left[0].localeCompare(right[0]));
+          $('topicProgressList').replaceChildren(...topicRows.map(([topic, progress]) => {
+            const row = document.createElement('article');
+            row.className = 'lc-row';
+            const label = document.createElement('strong');
+            label.textContent = topic.replace(/-/g, ' ');
+            const value = document.createElement('small');
+            value.textContent = `${progress.solved}/${progress.total} solved`;
+            row.append(label, value);
+            return row;
+          }));
           $('targetRoleContext').textContent = targetRole
             ? `Saved CareerHub practice for your ${targetRole} target role.`
             : 'CareerHub practice history is not connected to a saved target role yet.';

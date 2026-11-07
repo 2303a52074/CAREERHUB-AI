@@ -96,7 +96,10 @@
               Evaluate your resume with document text extraction and placement ATS scoring.
             </p>
             <p style="font-size:0.76rem;color:var(--text-muted);line-height:1.5;margin-bottom:1rem;">
-              Resume text and any supplied job description are sent to the configured AI service for analysis. CareerHub does not save the raw text; the resulting analysis is saved to your account. Avoid including information you do not want processed.
+              Resume extraction and ATS checks run locally on CareerHub. Resume text is not sent to Gemini. Advanced personalized AI analysis is available only when an approved paid/data-processing provider is explicitly configured. Saved reports are private to your account; raw resume text is not stored.
+            </p>
+            <p style="font-size:0.74rem;color:var(--text-muted);line-height:1.5;margin-bottom:1rem;">
+              Local score methodology: section coverage 30%, role-keyword coverage 30%, measurable achievement evidence 20%, detected contact details 10%, and extracted-text length 10%. This checks text only; it cannot assess visual layout or guarantee a third-party ATS result.
             </p>
 
             <div style="margin-bottom:1.25rem;">
@@ -154,7 +157,7 @@
             <div style="display:flex;align-items:center;gap:1.5rem;padding-bottom:1.5rem;border-bottom:1px solid var(--border-subtle);margin-bottom:1.5rem;">
               <div class="ats-circle">
                 <span style="font-size:2.2rem;font-weight:800;color:#fff;line-height:1;" id="reportScore">--</span>
-                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">AI SCORE ESTIMATE</span>
+                <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">LOCAL TEXT SCORE</span>
               </div>
               <div>
                 <h3 style="font-size:1.35rem;font-weight:700;color:#fff;margin-bottom:0.25rem;" id="reportVerdict">
@@ -327,7 +330,7 @@
 
       analysisInProgress = true;
       setAnalysisButtonsDisabled(true);
-      document.getElementById('resumeAnalysisStatus').textContent = 'Sending pasted resume text for analysis…';
+      document.getElementById('resumeAnalysisStatus').textContent = 'Analyzing extracted text locally…';
       button.disabled = true;
       button.textContent = 'Analyzing text...';
       try {
@@ -376,16 +379,20 @@
       document.getElementById('reportVerdict').innerText = score === null
         ? 'More resume text required'
         : score >= 80 ? 'Strong text match' : 'Improve role alignment';
-      const analysisSource = data.analysisMethod === 'openrouter'
-        ? 'AI-generated analysis'
-        : data.analysisMethod === 'rule-based' ? 'Rule-based text analysis' : null;
+      const analysisSource = data.analysisMethod === 'local'
+        ? 'Local text analysis'
+        : 'Previously saved external analysis';
       const summary = data.summary || 'Resume analysis complete.';
       const compatibility = Number.isFinite(data.atsCompatibility)
         ? ` ATS/readability compatibility estimate: ${data.atsCompatibility}/100.`
         : '';
-      document.getElementById('reportSummary').innerText = analysisSource
-        ? `${summary} Score is an AI estimate, not an ATS vendor score.${compatibility} Analysis method: ${analysisSource}. ${data.comparedWithJobDescription ? 'Compared with the supplied job description.' : 'No job description was supplied; this is a target-role analysis.'}`
-        : summary;
+      const advancedStatus = data.advancedAnalysisStatus === 'generated'
+        ? `Approved ${data.advancedAnalysisMethod || 'provider'} analysis was also generated.`
+        : data.advancedAnalysisStatus === 'failed'
+          ? 'Advanced AI analysis failed; the saved report contains local checks only.'
+          : data.advancedAnalysisReason || 'Advanced AI analysis is unavailable; local checks were used.';
+      document.getElementById('reportSummary').innerText =
+        `${summary} ATS compatibility is an estimate based on extracted text, not an ATS vendor score.${compatibility} Analysis method: ${analysisSource}. ${advancedStatus} ${data.comparedWithJobDescription ? 'Compared with the supplied job description.' : 'No job description was supplied; this is a target-role analysis.'}${data.advancedSummary ? ` Advanced provider summary: ${data.advancedSummary}` : ''}`;
 
       // Detected
       const det = data.matchedSkills || data.detectedSkills || [];

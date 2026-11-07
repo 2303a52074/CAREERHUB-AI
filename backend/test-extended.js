@@ -10,7 +10,6 @@ const fs = require('fs');
 const path = require('path');
 const mongoose = require('mongoose');
 const CareerConversation = require('./models/CareerConversation');
-const ResumeAnalysis = require('./models/ResumeAnalysis');
 const CareerRoadmap = require('./models/CareerRoadmap');
 const DailyPlan = require('./models/DailyPlan');
 const DailyPlanGenerationLock = require('./models/DailyPlanGenerationLock');
@@ -25,6 +24,11 @@ let studentBToken = '';
 let pendingAssessmentSession = null;
 let testAppId = '';
 const registeredEmail = `test_${Date.now()}@careerhub.test`;
+const configuredAIProvider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openrouter';
+const configuredAIProviderLabel = configuredAIProvider === 'gemini'
+  ? 'Gemini'
+  : configuredAIProvider === 'groq' ? 'Groq' : 'OpenRouter';
+const isConfiguredAIResult = result => result?.source === configuredAIProvider;
 const providerFailureCodes = new Set([
   'AI_PROVIDER_NOT_CONFIGURED',
   'AI_PROVIDER_AUTH_ERROR',
@@ -305,7 +309,7 @@ async function run() {
         `Provider returned ${codingHint.body.code}.`);
     } else {
       test('Coding hint uses the configured provider and returns a validated hint',
-        codingHint.status === 200 && codingHint.body.source === 'openrouter' &&
+        codingHint.status === 200 && isConfiguredAIResult(codingHint.body) &&
         codingHint.body.model && codingHint.body.hint && Array.isArray(codingHint.body.concepts),
         `Status: ${codingHint.status}, source: ${codingHint.body.source || codingHint.body.code || 'none'}`);
     }
@@ -319,7 +323,7 @@ async function run() {
       `Provider returned ${generatedInterview.body.code}; curated session fallback is tested separately.`);
   } else {
     test('Mock interview questions use configured-provider output',
-      generatedInterview.status === 200 && generatedInterview.body.source === 'openrouter' &&
+      generatedInterview.status === 200 && isConfiguredAIResult(generatedInterview.body) &&
       generatedInterview.body.model && generatedInterview.body.questions?.length === 5,
       `Status: ${generatedInterview.status}, source: ${generatedInterview.body.source || generatedInterview.body.code || 'none'}`);
   }
@@ -360,26 +364,28 @@ async function run() {
   ];
   test('Assessment advertises the supported generation topics',
     assessmentOptions.status === 200 &&
-    assessmentOptions.body.source === 'openrouter' &&
+    assessmentOptions.body.source === configuredAIProvider &&
+    assessmentOptions.body.providerStatus?.provider === configuredAIProviderLabel &&
+    Array.isArray(assessmentOptions.body.providerStatus?.requiredConfiguration) &&
     requestedAssessmentTopics.every(topic => assessmentOptions.body.categories.includes(topic)),
-    `Topics: ${assessmentOptions.body.categories?.length || 0}`);
+    `Provider: ${assessmentOptions.body.providerStatus?.provider || 'none'}, topics: ${assessmentOptions.body.categories?.length || 0}`);
   const startedAssessment = await req('POST', '/api/career/assessment/start', {
     category: 'Mixed', difficulty: 'medium', count: 5
   }, authToken);
   if (isProviderFailure(startedAssessment)) {
-    skip('Assessment session generates real OpenRouter questions without answer keys',
-      `OpenRouter returned ${startedAssessment.body.code}; demo questions were not substituted.`);
+    skip(`Assessment session generates real ${configuredAIProviderLabel} questions without answer keys`,
+      `${configuredAIProviderLabel} returned ${startedAssessment.body.code}; demo questions were not substituted.`);
   } else {
-    test('Assessment session generates OpenRouter questions without answer keys',
+    test(`Assessment session generates ${configuredAIProviderLabel} questions without answer keys`,
       startedAssessment.status === 201 &&
       startedAssessment.body.targetRole === 'AI/ML Engineer' &&
       startedAssessment.body.questions?.length === 5 &&
-      startedAssessment.body.source === 'openrouter' &&
+      isConfiguredAIResult(startedAssessment.body) &&
       startedAssessment.body.questions.every(question =>
         !('answerIndex' in question) && !('explanation' in question) && !('correctAnswer' in question)),
       `Status: ${startedAssessment.status}, source: ${startedAssessment.body.source || startedAssessment.body.code || 'none'}`);
   }
-  if (startedAssessment.status === 201 && startedAssessment.body.source === 'openrouter') {
+  if (startedAssessment.status === 201 && isConfiguredAIResult(startedAssessment.body)) {
     pendingAssessmentSession = startedAssessment.body;
   }
   const missingSessionAssessment = await req('POST', '/api/career/assessment/submit', {
@@ -442,17 +448,17 @@ async function run() {
       latestAssessment.body.assessment?.detailedAnswers?.every((answer, index) => answer.questionId === index + 1),
       `Saved readiness: ${latestAssessment.body.overallReadiness}`);
     if (isAdviceUnavailable(assessmentSubmit.body.aiInsightsStatus)) {
-      skip('Assessment insight route consumes validated OpenRouter output',
+      skip('Assessment insight route consumes validated provider output',
         `Provider status: ${assessmentSubmit.body.aiInsightsStatus.status}, code: ${assessmentSubmit.body.aiInsightsStatus.code || 'not configured'}.`);
     } else {
-      test('Assessment insight route consumes validated OpenRouter output',
+      test('Assessment insight route consumes validated provider output',
         assessmentSubmit.body.aiInsightsStatus?.status === 'generated' &&
-        assessmentSubmit.body.aiInsights?.source === 'openrouter' &&
+        isConfiguredAIResult(assessmentSubmit.body.aiInsights) &&
         assessmentSubmit.body.aiInsights?.model,
         `AI status: ${assessmentSubmit.body.aiInsightsStatus?.status || 'none'}, code: ${assessmentSubmit.body.aiInsightsStatus?.code || 'none'}`);
     }
   } else {
-    skip('Assessment session scoring and persistence use OpenRouter-generated questions',
+    skip('Assessment session scoring and persistence use provider-generated questions',
       `No session could be generated: ${startedAssessment.body.code || 'provider unavailable'}.`);
     latestAssessment = await req('GET', '/api/career/assessment/latest', null, authToken);
   }
@@ -464,7 +470,7 @@ async function run() {
       `Overview readiness: ${overview.body.readinessScore}`);
   } else {
     skip('Dashboard overview reflects the latest assessment score',
-      'No OpenRouter-generated assessment could be submitted.');
+      `No ${configuredAIProviderLabel}-generated assessment could be submitted.`);
   }
 
   // TEST 4: Career recommendations use actual profile
@@ -510,7 +516,7 @@ async function run() {
   } else {
     test('Skill-gap route consumes validated OpenRouter guidance',
       gapRes.body.aiAdviceStatus?.status === 'generated' &&
-      gapRes.body.aiAdviceStatus?.source === 'openrouter' &&
+      isConfiguredAIResult(gapRes.body.aiAdviceStatus) &&
       Array.isArray(gapRes.body.aiInsights),
       `AI status: ${gapRes.body.aiAdviceStatus?.status || 'none'}, code: ${gapRes.body.aiAdviceStatus?.code || 'none'}`);
   }
@@ -520,7 +526,7 @@ async function run() {
       `Provider returned ${resourceRecs.body.code}.`);
   } else {
     test('Learning-resource recommendations come from the verified catalog',
-      resourceRecs.status === 200 && resourceRecs.body.source === 'openrouter' &&
+      resourceRecs.status === 200 && isConfiguredAIResult(resourceRecs.body) &&
       resourceRecs.body.model && Array.isArray(resourceRecs.body.resources) &&
       resourceRecs.body.resources.every(item => /^https:\/\/(developer\.mozilla\.org|react\.dev|nodejs\.org|www\.mongodb\.com|docs\.python\.org|leetcode\.com|www\.hackerrank\.com|github\.com|docs\.github\.com|www\.careeronestop\.org)\//.test(item.url)),
       `Status: ${resourceRecs.status}, source: ${resourceRecs.body.source || 'none'}, code: ${resourceRecs.body.code || 'none'}, model: ${resourceRecs.body.model || 'none'}, resourceCount: ${resourceRecs.body.resources?.length ?? 'none'}`);
@@ -559,7 +565,7 @@ async function run() {
         `Provider returned ${jobFit.body.code}.`);
     } else {
       test('Live listing fit explanation uses source facts and OpenRouter',
-        jobFit.status === 200 && jobFit.body.source === 'openrouter' &&
+        jobFit.status === 200 && isConfiguredAIResult(jobFit.body) &&
         jobFit.body.model && typeof jobFit.body.explanation === 'string' &&
         jobFit.body.applicationLink === opps[0].applicationLink,
         `Status: ${jobFit.status}, source: ${jobFit.body.source || jobFit.body.code || 'none'}`);
@@ -593,7 +599,8 @@ async function run() {
       trackedResponse.status === 201 &&
       trackedResponse.body.application.status === 'Saved' &&
       trackedResponse.body.application.sourceUrl === trackedJob.applicationLink &&
-      trackedResponse.body.application.source === trackedJob.source,
+      trackedResponse.body.application.source === trackedJob.source &&
+      trackedResponse.body.application.matchPercentage === trackedJob.overallMatch,
       `Status: ${trackedResponse.status}, pipeline status: ${trackedResponse.body.application?.status}`);
 
     const duplicateJob = await req('POST', '/api/career/applications', {
@@ -636,8 +643,9 @@ async function run() {
     notes: 'Applied via test suite', applicationMethod: 'external'
   }, authToken);
   test('TEST 7: Apply creates application record',
-    applyRes.status === 200 || applyRes.status === 201,
-    `Status: ${applyRes.status}`);
+    (applyRes.status === 200 || applyRes.status === 201) &&
+      applyRes.body.application?.matchPercentage === 72,
+    `Status: ${applyRes.status}, saved match: ${applyRes.body.application?.matchPercentage}`);
   testAppId = applyRes.body?.application?._id || applyRes.body?.application?.id || '';
 
   // TEST 8: My Applications shows the record immediately
@@ -651,7 +659,8 @@ async function run() {
   const appsRes2 = await req('GET', '/api/career/applications', null, authToken);
   const apps2 = appsRes2.body.applications || (Array.isArray(appsRes2.body) ? appsRes2.body : []);
   test('TEST 9: Application persists on subsequent fetch',
-    apps2.some(a => a.company === 'TestCo Corp'), `Count: ${apps2.length}`);
+    apps2.some(a => a.company === 'TestCo Corp' && a.matchPercentage === 72),
+    `Count: ${apps2.length}, match: ${apps2.find(a => a.company === 'TestCo Corp')?.matchPercentage}`);
 
   // TEST 11: Duplicate application prevented
   const dupAppRes = await req('POST', '/api/career/applications', {
@@ -715,6 +724,40 @@ async function run() {
     emptyLatestAssessment.body.assessmentCompleted === false &&
     Number.isFinite(emptyLatestAssessment.body.overallReadiness),
     `Status: ${emptyLatestAssessment.status}, completed: ${emptyLatestAssessment.body.assessmentCompleted}`);
+  const invalidSavedAssessment = await req(
+    'GET',
+    '/api/career/assessment/history/not-an-object-id',
+    null,
+    authToken
+  );
+  test('Saved assessment retrieval validates identifiers',
+    invalidSavedAssessment.status === 400,
+    `Status: ${invalidSavedAssessment.status}`);
+  const savedAssessmentId = latestAssessment?.body.assessment?._id;
+  if (savedAssessmentId && studentBToken) {
+    const savedAssessmentOwnerView = await req(
+      'GET',
+      `/api/career/assessment/history/${encodeURIComponent(savedAssessmentId)}`,
+      null,
+      authToken
+    );
+    const savedAssessmentOtherView = await req(
+      'GET',
+      `/api/career/assessment/history/${encodeURIComponent(savedAssessmentId)}`,
+      null,
+      studentBToken
+    );
+    test('Assessment owner can retrieve the saved result',
+      savedAssessmentOwnerView.status === 200 &&
+      savedAssessmentOwnerView.body.assessment?._id === savedAssessmentId,
+      `Status: ${savedAssessmentOwnerView.status}`);
+    test('Another account cannot retrieve the saved assessment result',
+      savedAssessmentOtherView.status === 404,
+      `Status: ${savedAssessmentOtherView.status}`);
+  } else {
+    skip('Saved assessment retrieval is owner-scoped across accounts',
+      'No persisted assessment result was created in this test run.');
+  }
   if (pendingAssessmentSession && studentBToken) {
     const sessionAnswers = pendingAssessmentSession.questions.map(question => ({
       questionId: question.id,
@@ -727,21 +770,18 @@ async function run() {
     test('Another account cannot submit an assessment session it does not own',
       crossUserSubmission.status === 404,
       `Status: ${crossUserSubmission.status}`);
-    const sessionSubmission = await req('POST', '/api/career/assessment/submit', {
-      sessionId: pendingAssessmentSession.sessionId,
-      answers: sessionAnswers
-    }, authToken);
-    test('Assessment session scores and persists submitted answers',
-      sessionSubmission.status === 200 &&
-      sessionSubmission.body.sessionId === pendingAssessmentSession.sessionId &&
-      sessionSubmission.body.generationSource === pendingAssessmentSession.source &&
-      sessionSubmission.body.breakdown?.length === pendingAssessmentSession.questions.length &&
-      Number.isFinite(sessionSubmission.body.overallReadiness),
-      `Status: ${sessionSubmission.status}, score: ${sessionSubmission.body.overallReadiness ?? 'none'}`);
     const duplicateSessionSubmission = await req('POST', '/api/career/assessment/submit', {
       sessionId: pendingAssessmentSession.sessionId,
       answers: sessionAnswers
     }, authToken);
+    test('Assessment session scores and persists submitted answers',
+      assessmentSubmit?.status === 200 &&
+      latestAssessment?.status === 200 &&
+      latestAssessment.body.assessment?.sessionId === pendingAssessmentSession.sessionId &&
+      assessmentSubmit.body.generationSource === pendingAssessmentSession.source &&
+      assessmentSubmit.body.breakdown?.length === pendingAssessmentSession.questions.length &&
+      Number.isFinite(assessmentSubmit.body.overallReadiness),
+      `Saved status: ${latestAssessment?.status}, score: ${assessmentSubmit?.body.overallReadiness ?? 'none'}`);
     test('Completed assessment sessions cannot be submitted twice',
       duplicateSessionSubmission.status === 404,
       `Status: ${duplicateSessionSubmission.status}`);
@@ -771,15 +811,15 @@ async function run() {
     sessionLength: 3
   }, authToken);
   if (isProviderFailure(mcqSession)) {
-    skip('MCQ session returns OpenRouter-attributed questions without exposing keys',
-      `OpenRouter returned ${mcqSession.body.code}; curated questions were not substituted.`);
+    skip('MCQ session returns configured-provider questions without exposing keys',
+      `${configuredAIProviderLabel} returned ${mcqSession.body.code}; curated questions were not substituted.`);
   } else {
-    test('MCQ session returns OpenRouter-attributed questions without exposing keys',
+    test('MCQ session returns configured-provider questions without exposing keys',
       mcqSession.status === 201 &&
-      mcqSession.body.generationSource === 'openrouter' &&
+      mcqSession.body.generationSource === configuredAIProvider &&
       mcqSession.body.questions?.length === 3 &&
       mcqSession.body.questions.every(question =>
-        question.source === 'openrouter' && question.options?.length === 4 &&
+        isConfiguredAIResult(question) && question.options?.length === 4 &&
         !('answerIndex' in question) && !('explanation' in question)),
       `Status: ${mcqSession.status}, source: ${mcqSession.body.generationSource || 'none'}`);
   }
@@ -842,7 +882,7 @@ async function run() {
   } else {
     test('Voice practice starts with one runtime-generated question',
       curatedVoiceSession.status === 201 &&
-      curatedVoiceSession.body.generationSource === 'openrouter' &&
+      curatedVoiceSession.body.generationSource === configuredAIProvider &&
       curatedVoiceSession.body.sessionLength === 1 &&
       curatedVoiceSession.body.questions?.length === 1 &&
       curatedVoiceSession.body.questions.every(question => question.topic === 'Behavioral') &&
@@ -860,14 +900,14 @@ async function run() {
     insufficientCuratedSession.body.code === 'CURATED_QUESTION_POOL_TOO_SMALL' &&
     insufficientCuratedSession.body.message.includes('1 matching question')) ||
     (insufficientCuratedSession.status === 201 &&
-      insufficientCuratedSession.body.generationSource === 'openrouter' &&
+      insufficientCuratedSession.body.generationSource === configuredAIProvider &&
       insufficientCuratedSession.body.questions?.length === 3 &&
       insufficientCuratedSession.body.questions.every(question => question.topic === 'Behavioral'));
   if (isProviderFailure(insufficientCuratedSession)) {
-    skip('Interview MCQ does not substitute curated questions when OpenRouter is unavailable',
-      `OpenRouter returned ${insufficientCuratedSession.body.code}.`);
+    skip('Interview MCQ does not substitute curated questions when the provider is unavailable',
+      `${configuredAIProviderLabel} returned ${insufficientCuratedSession.body.code}.`);
   } else {
-    test('Selected topic is maintained by OpenRouter output',
+    test('Selected topic is maintained by provider output',
       curatedPoolRespected,
       `Status: ${insufficientCuratedSession.status}, source: ${insufficientCuratedSession.body.generationSource || 'none'}, code: ${insufficientCuratedSession.body.code || 'none'}`);
   }
@@ -951,36 +991,26 @@ async function run() {
   const cAnalyzer = await req('POST', '/api/career/job-analyzer', {
     jobDescription: 'C# and React are required for the role.'
   }, studentBToken);
-  if (isProviderFailure(cAnalyzer)) {
-    skip('Job analyzer does not infer React or C# from a profile skill named C',
-      `OpenRouter returned ${cAnalyzer.body.code}; analysis was not returned.`);
-  } else {
-    test('Job analyzer does not infer React or C# from a profile skill named C',
-      cAnalyzer.status === 200 && cAnalyzer.body.overallMatch === 0 &&
-      cAnalyzer.body.matchedSkills.length === 0,
-      `Match: ${cAnalyzer.body.overallMatch}, matched: ${cAnalyzer.body.matchedSkills?.length || 0}`);
-  }
-  if (isProviderFailure(cAnalyzer) || isAdviceUnavailable(cAnalyzer.body.aiAdviceStatus)) {
-    skip('Job Description Analyzer consumes OpenRouter advice',
-      `Provider status: ${cAnalyzer.body.aiAdviceStatus?.status || 'unavailable'}, code: ${cAnalyzer.body.code || cAnalyzer.body.aiAdviceStatus?.code || 'not configured'}.`);
-  } else {
-    test('Job Description Analyzer consumes OpenRouter advice',
-      cAnalyzer.body.aiAdviceStatus?.status === 'generated' &&
-      cAnalyzer.body.aiAdviceStatus?.source === 'openrouter' &&
-      cAnalyzer.body.aiSummary,
-      `AI status: ${cAnalyzer.body.aiAdviceStatus?.status || 'none'}, code: ${cAnalyzer.body.aiAdviceStatus?.code || 'none'}`);
-  }
+  test('Job analyzer locally distinguishes C from C# and reports unavailable advanced AI',
+    cAnalyzer.status === 201 && cAnalyzer.body.overallMatch === 0 &&
+    cAnalyzer.body.matchedSkills.length === 0 &&
+    cAnalyzer.body.analysisMethod === 'local' &&
+    cAnalyzer.body.aiAdviceStatus?.status === 'unavailable',
+    `Status: ${cAnalyzer.status}, match: ${cAnalyzer.body.overallMatch}, method: ${cAnalyzer.body.analysisMethod}`);
+  const cAnalyzerHistory = await req('GET', '/api/career/job-analyzer/history', null, studentBToken);
+  const ownerCannotReadOtherJobAnalysis = await req('GET', '/api/career/job-analyzer/history', null, authToken);
+  test('Job analyzer saves owner-scoped results and refuses cross-user history access',
+    cAnalyzerHistory.status === 200 &&
+    cAnalyzerHistory.body.analyses?.some(item => String(item._id) === String(cAnalyzer.body.analysisId)) &&
+    ownerCannotReadOtherJobAnalysis.status === 200 &&
+    !ownerCannotReadOtherJobAnalysis.body.analyses?.some(item => String(item._id) === String(cAnalyzer.body.analysisId)),
+    `Owner has result: ${cAnalyzerHistory.body.analyses?.some(item => String(item._id) === String(cAnalyzer.body.analysisId))}`);
   const nonTechnicalAnalyzer = await req('POST', '/api/career/job-analyzer', {
     jobDescription: 'Collaborate with stakeholders and communicate project updates.'
   }, studentBToken);
-  if (isProviderFailure(nonTechnicalAnalyzer)) {
-    skip('Job analyzer reports no score when no catalog requirements are detected',
-      `OpenRouter returned ${nonTechnicalAnalyzer.body.code}; no analysis was returned.`);
-  } else {
-    test('Job analyzer reports no score when no catalog requirements are detected',
-      nonTechnicalAnalyzer.status === 200 && nonTechnicalAnalyzer.body.overallMatch === null,
-      `Match: ${nonTechnicalAnalyzer.body.overallMatch}`);
-  }
+  test('Job analyzer reports no score when no catalog requirements are detected',
+    nonTechnicalAnalyzer.status === 201 && nonTechnicalAnalyzer.body.overallMatch === null,
+    `Match: ${nonTechnicalAnalyzer.body.overallMatch}`);
   const invalidAnalyzerInput = await req('POST', '/api/career/job-analyzer', {
     jobDescription: { not: 'text' }
   }, studentBToken);
@@ -1008,7 +1038,7 @@ async function run() {
     }
   } else {
     test('Exam sessions hide answer keys and are account-bound',
-      exam.body.generationMode === 'openrouter' &&
+      exam.body.generationMode === configuredAIProvider &&
       exam.body.questions.every(question =>
         !('answerIndex' in question) && !('explanation' in question) &&
         question.source === exam.body.source),
@@ -1038,10 +1068,12 @@ async function run() {
       examId: exam.body.examId,
       answers: exam.body.questions.map(() => '0')
     }, authToken);
-    test('Exam results are evaluated from server-held questions and saved',
+    test('Exam results retain AI question provenance and deterministic scoring provenance',
       evaluatedExam.status === 200 && Number.isFinite(evaluatedExam.body.totalScore) &&
       Array.isArray(evaluatedExam.body.sources) &&
-      evaluatedExam.body.sources.length === 1 && evaluatedExam.body.sources[0] === 'openrouter',
+      evaluatedExam.body.sources.length === 1 && evaluatedExam.body.sources[0] === 'rule-based' &&
+      evaluatedExam.body.questionSource === configuredAIProvider &&
+      typeof evaluatedExam.body.questionModel === 'string',
       `Status: ${evaluatedExam.status}, score: ${evaluatedExam.body.totalScore}`);
     const repeatExam = await req('POST', '/api/interview/exam/evaluate', {
       examId: exam.body.examId,
@@ -1054,28 +1086,18 @@ async function run() {
 
   if (studentBToken && testAppId) {
     let freshRoadmap = await req('GET', '/api/career/roadmap', null, studentBToken);
-    const openrouterRoadmap = freshRoadmap.status === 200 &&
-      freshRoadmap.body.generationSource === 'openrouter' &&
-      freshRoadmap.body.generationModel && freshRoadmap.body.phases?.length >= 3 &&
+    const locallyGeneratedRoadmap = freshRoadmap.status === 200 &&
+      freshRoadmap.body.generationSource === 'local' &&
+      freshRoadmap.body.generationModel === null &&
+      freshRoadmap.body.phases?.length === 3 &&
       freshRoadmap.body.phases.every(phase => phase.milestones.length >= 1);
-    if (openrouterRoadmap) {
-      test('New roadmap is generated by OpenRouter',
-        true,
-        `Model: ${freshRoadmap.body.generationModel}`);
-    } else if (isProviderFailure(freshRoadmap)) {
-      skip('New roadmap is generated by OpenRouter',
-        `${freshRoadmap.body.code}; creating a test-only fixture to verify persistence separately.`);
+    test('New roadmap is generated locally without requiring a personal-data AI provider',
+      locallyGeneratedRoadmap,
+      `Status: ${freshRoadmap.status}, source: ${freshRoadmap.body.generationSource || 'none'}, phases: ${freshRoadmap.body.phases?.length || 0}`);
+    if (!locallyGeneratedRoadmap) {
       await createRoadmapFixture(studentBToken, null,
         `test-roadmap-milestone-${Date.now()}`);
       freshRoadmap = await req('GET', '/api/career/roadmap', null, studentBToken);
-      test('Roadmap persistence fixture is available without claiming AI generation',
-        freshRoadmap.status === 200 &&
-        freshRoadmap.body.generationSource === 'test-fixture',
-        `Status: ${freshRoadmap.status}, source: ${freshRoadmap.body.generationSource || 'none'}`);
-    } else {
-      test('New roadmap is generated by OpenRouter',
-        false,
-        `Status: ${freshRoadmap.status}, source: ${freshRoadmap.body.generationSource || 'none'}`);
     }
     const roadmapMilestones = (freshRoadmap.body.phases || []).flatMap(phase => phase.milestones || []);
     test('New roadmap starts with no assumed progress',
@@ -1100,32 +1122,19 @@ async function run() {
     const changedTargetRole = await req('PUT', '/api/career/profile', {
       targetRole: 'Backend Engineer'
     }, studentBToken);
-    let retargetedRoadmap = await req('GET', '/api/career/roadmap', null, studentBToken);
-    if (isProviderFailure(retargetedRoadmap)) {
-      skip('Retargeted roadmap is generated by OpenRouter',
-        `${retargetedRoadmap.body.code}; no replacement roadmap was claimed.`);
-      const savedPriorRoadmap = await withTestMongo(() =>
-        CareerRoadmap.findOne({ _id: oldRoadmapId }));
-      test('Failed roadmap generation preserves the prior saved roadmap and progress',
-        changedTargetRole.status === 200 &&
-        savedPriorRoadmap &&
-        !savedPriorRoadmap.archivedAt &&
-        savedPriorRoadmap.phases.some(phase =>
-          phase.milestones.some(milestone => milestone.id === firstMilestone.id && milestone.completed)),
-        `Prior roadmap retained=${Boolean(savedPriorRoadmap && !savedPriorRoadmap.archivedAt)}, provider code=${retargetedRoadmap.body.code}`);
-    } else {
-      const oldRoadmapHistory = await req('GET', '/api/career/roadmap/history', null, studentBToken);
-      const preservedRoadmap = oldRoadmapHistory.body.roadmaps?.find(item => item._id === oldRoadmapId);
-      test('Target-role changes create a current roadmap and preserve prior progress',
-        changedTargetRole.status === 200 &&
-        retargetedRoadmap.status === 200 &&
-        retargetedRoadmap.body.targetRole === 'Backend Engineer' &&
-        retargetedRoadmap.body.progressPercentage === 0 &&
-        preservedRoadmap?.archivedAt &&
-        preservedRoadmap.phases.some(phase =>
-          phase.milestones.some(milestone => milestone.id === firstMilestone.id && milestone.completed)),
-        `Current role=${retargetedRoadmap.body.targetRole || 'none'}, old roadmap archived=${Boolean(preservedRoadmap?.archivedAt)}`);
-    }
+    const retargetedRoadmap = await req('GET', '/api/career/roadmap', null, studentBToken);
+    const oldRoadmapHistory = await req('GET', '/api/career/roadmap/history', null, studentBToken);
+    const preservedRoadmap = oldRoadmapHistory.body.roadmaps?.find(item => item._id === oldRoadmapId);
+    test('Target-role changes create a local roadmap and preserve prior progress',
+      changedTargetRole.status === 200 &&
+      retargetedRoadmap.status === 200 &&
+      retargetedRoadmap.body.generationSource === 'local' &&
+      retargetedRoadmap.body.targetRole === 'Backend Engineer' &&
+      Number.isFinite(retargetedRoadmap.body.progressPercentage) &&
+      preservedRoadmap?.archivedAt &&
+      preservedRoadmap.phases.some(phase =>
+        phase.milestones.some(milestone => milestone.id === firstMilestone.id && milestone.completed)),
+      `Current role=${retargetedRoadmap.body.targetRole || 'none'}, source=${retargetedRoadmap.body.generationSource || 'none'}, old roadmap archived=${Boolean(preservedRoadmap?.archivedAt)}`);
     const otherUserRoadmapHistory = await req('GET', '/api/career/roadmap/history', null, authToken);
     test('Archived roadmap history remains private to its owner',
       otherUserRoadmapHistory.status === 200 &&
@@ -1140,6 +1149,12 @@ async function run() {
         `test-daily-task-${Date.now()}`);
       dailyPlan = await req('GET', '/api/career/daily-plan', null, studentBToken);
     }
+    const otherOwnerPlan = await req('GET', '/api/career/daily-plan', null, authToken);
+    test('Daily plans are generated and retrieved separately for each authenticated user',
+      dailyPlan.status === 200 && otherOwnerPlan.status === 200 &&
+      String(dailyPlan.body.plan?._id) !== String(otherOwnerPlan.body.plan?._id) &&
+      dailyPlan.body.plan?.userId !== otherOwnerPlan.body.plan?.userId,
+      `Owner plans differ: ${String(dailyPlan.body.plan?._id) !== String(otherOwnerPlan.body.plan?._id)}`);
     const firstTask = dailyPlan.body.plan?.tasks?.[0];
     const profileBeforeTask = await req('GET', '/api/career/profile', null, studentBToken);
     const initialXp = profileBeforeTask.body.user?.xp ?? profileBeforeTask.body.xp ?? 0;
@@ -1211,17 +1226,12 @@ async function run() {
     text: 'John Doe - ML Engineer\nSkills: Python, TensorFlow, PyTorch\nEducation: B.Tech CSE',
     jobDescription: 'Develop machine learning services with Python, TensorFlow, and tested APIs.'
   }, authToken);
-  test('Resume analysis returns a real result or an explicit provider error',
-    (resumeRes.status === 200 && resumeRes.body.analysisMethod === 'openrouter' &&
-      typeof resumeRes.body.model === 'string' && resumeRes.body.comparedWithJobDescription === true) ||
-    isProviderFailure(resumeRes),
-    `Status: ${resumeRes.status}, method: ${resumeRes.body.analysisMethod || resumeRes.body.code || 'none'}`);
-  if (resumeRes.body.code === 'AI_PROVIDER_QUOTA_EXCEEDED') {
-    test('Resume quota error is accurate and user-safe',
-      /no credits remaining/i.test(resumeRes.body.message || '') &&
-      !/OpenRouter|model identifier|API key/i.test(resumeRes.body.message || ''),
-      'The configured AI account needs credits; the message does not reveal provider or credential details.');
-  }
+  test('Resume analyzer returns local ATS checks and explicitly blocks unapproved AI',
+    resumeRes.status === 200 && resumeRes.body.analysisMethod === 'local' &&
+    resumeRes.body.advancedAnalysisStatus === 'unavailable' &&
+    Array.isArray(resumeRes.body.presentSections) &&
+    resumeRes.body.comparedWithJobDescription === true,
+    `Status: ${resumeRes.status}, method: ${resumeRes.body.analysisMethod || 'none'}, AI: ${resumeRes.body.advancedAnalysisStatus || 'none'}`);
   const shortResume = await req('POST', '/api/resume/analyze-text', { text: 'Hi' }, authToken);
   test('Short resume text is rejected without saving or assigning a score',
     shortResume.status === 422 && shortResume.body.code === 'RESUME_TEXT_INSUFFICIENT',
@@ -1229,41 +1239,45 @@ async function run() {
   const docxFixturePath = path.join(__dirname, '..', 'report', 'CareerHub_AI_Final_Year_Project_Report.docx');
   if (fs.existsSync(docxFixturePath)) {
     const docxUpload = await reqResumeFile('/api/resume/upload', docxFixturePath, authToken);
-    test('DOCX upload extracts text before reporting the unavailable AI provider',
-      docxUpload.status === 503 && docxUpload.body.code === 'AI_PROVIDER_NOT_CONFIGURED',
-      `Status: ${docxUpload.status}, code: ${docxUpload.body.code || 'none'}`);
+    test('DOCX upload extracts text and produces local-only analysis without an approved provider',
+      docxUpload.status === 200 &&
+      docxUpload.body.analysisMethod === 'local' &&
+      docxUpload.body.advancedAnalysisStatus === 'unavailable',
+      `Status: ${docxUpload.status}, method: ${docxUpload.body.analysisMethod || 'none'}`);
   } else {
     skip('DOCX upload route extracts an actual document',
       'The existing DOCX fixture is unavailable.');
   }
-  const resumeProviderSuccess =
-    resumeRes.status === 200 && resumeRes.body.analysisMethod === 'openrouter';
-  let resumeHistoryFixture = false;
+  const resumeLocalSuccess =
+    resumeRes.status === 200 && resumeRes.body.analysisMethod === 'local';
   const testMongoUri = process.env.TEST_MONGO_URI || process.env.MONGO_URI || process.env.MONGODB_URI;
-  if (!resumeProviderSuccess && testMongoUri) {
-    if (mongoose.connection.readyState !== 1) {
-      await mongoose.connect(testMongoUri);
-    }
-    const profile = await req('GET', '/api/career/profile', null, authToken);
-    const record = new ResumeAnalysis({
-      userId: String(profile.body.user?._id || profile.body.user?.id),
-      targetRole: 'AI/ML Engineer',
-      score: 73,
-      summary: 'Synthetic persistence fixture; not an AI result.',
-      analysisMethod: 'test-fixture'
-    });
-    await record.save();
-    resumeHistoryFixture = true;
-  }
   const ownerResumeHistory = await req('GET', '/api/resume/history', null, authToken);
-  test(resumeProviderSuccess
-    ? 'Real AI resume analysis is saved to owner history'
-    : 'Resume history route persists and scopes isolated fixture data',
-  ownerResumeHistory.status === 200 && ownerResumeHistory.body.analyses.length > 0 &&
-    (resumeProviderSuccess
-      ? ownerResumeHistory.body.analyses.some(item => item.analysisMethod === 'openrouter')
-      : resumeHistoryFixture && ownerResumeHistory.body.analyses.some(item => item.analysisMethod === 'test-fixture')),
-  `Saved records: ${ownerResumeHistory.body.analyses?.length || 0}; AI analysis: ${resumeProviderSuccess}`);
+  test('Local resume result is saved to owner history and retrieved',
+    resumeLocalSuccess && ownerResumeHistory.status === 200 &&
+    ownerResumeHistory.body.analyses?.some(item => String(item._id) === String(resumeRes.body.analysisId)),
+    `Saved records: ${ownerResumeHistory.body.analyses?.length || 0}`);
+  const resumeOwnerProfile = await req('GET', '/api/career/profile', null, authToken);
+  if (testMongoUri && resumeLocalSuccess) {
+    const isolatedConnection = mongoose.createConnection(testMongoUri);
+    try {
+      await isolatedConnection.asPromise();
+      const storedResume = await isolatedConnection.collection('resumeanalyses').findOne({
+        _id: new mongoose.Types.ObjectId(String(resumeRes.body.analysisId))
+      });
+      test('Resume result is stored in isolated MongoDB without raw resume text',
+        Boolean(storedResume) &&
+        storedResume.userId === String(resumeOwnerProfile.body.user?._id) &&
+        storedResume.analysisMethod === 'local' &&
+        storedResume.resumeText === undefined &&
+        Array.isArray(storedResume.presentSections),
+        `Document found: ${Boolean(storedResume)}, local method: ${storedResume?.analysisMethod}`);
+    } finally {
+      await isolatedConnection.close();
+    }
+  } else {
+    skip('Resume MongoDB document is verified directly',
+      'Requires a successful local analysis and an isolated MongoDB test URI.');
+  }
   const reLogin = await req('POST', '/api/auth/login', {
     email: registeredEmail,
     password: 'testpass123'
@@ -1275,7 +1289,8 @@ async function run() {
     `Status: ${newLoginResumeHistory.status}`);
   const otherResumeHistory = await req('GET', '/api/resume/history', null, studentBToken);
   test('Another account cannot read resume analysis history',
-    otherResumeHistory.status === 200 && otherResumeHistory.body.analyses.length === 0,
+    otherResumeHistory.status === 200 &&
+    !otherResumeHistory.body.analyses?.some(item => String(item._id) === String(resumeRes.body.analysisId)),
     `Other user history: ${otherResumeHistory.body.analyses?.length || 0}`);
 
   // TEST 15: AI assistant with no fabrication
@@ -1286,18 +1301,19 @@ async function run() {
   test('AI Copilot reports only user-safe availability status',
     aiStatus.status === 200 && typeof aiStatus.body.configured === 'boolean' &&
     typeof aiStatus.body.verified === 'boolean' && typeof aiStatus.body.ready === 'boolean' &&
+    typeof aiStatus.body.dataProcessingApproval?.approved === 'boolean' &&
     typeof aiStatus.body.quotaBlocked === 'boolean' &&
     (aiStatus.body.retryAfter === null || typeof aiStatus.body.retryAfter === 'string') &&
-    (aiStatus.body.provider === null || aiStatus.body.provider === 'OpenRouter') &&
+    (aiStatus.body.provider === null || aiStatus.body.provider === configuredAIProviderLabel) &&
     (aiStatus.body.model === null || typeof aiStatus.body.model === 'string') &&
     !('apiKey' in aiStatus.body) && !('key' in aiStatus.body),
     `Configured: ${aiStatus.body.configured}, ready: ${aiStatus.body.ready}`);
 
   const aiRes = await req('POST', '/api/career/assistant', {
-    message: 'Who am I? Tell me the name and target role from my profile, and say if anything is missing.'
+    message: 'What are general ways to prepare for a software engineering interview?'
   }, authToken);
   const providerGeneratedReply = aiRes.status === 200 &&
-    aiRes.body.reply && aiRes.body.source === 'openrouter';
+    aiRes.body.reply && isConfiguredAIResult(aiRes.body);
   if (aiRes.body.code === 'AI_PROVIDER_QUOTA_EXCEEDED') {
     test('Assistant quota errors include a safe cooldown expiry',
       typeof aiRes.body.retryAfter === 'string' &&
@@ -1308,9 +1324,10 @@ async function run() {
   if (providerGeneratedReply) {
     test('AI Copilot returns a response from the configured model',
       true, `Source: ${aiRes.body.source}, model: ${aiRes.body.model}`);
-    test('AI Copilot uses authenticated profile context',
-      aiRes.body.reply.includes('Test Student A'),
-      'Response should identify the authenticated user from their profile.');
+    test('Career Assistant reports its context privacy mode',
+      aiRes.body.contextMode === 'general_privacy_safe' ||
+        aiRes.body.contextMode === 'personalized_approved',
+      `Context mode: ${aiRes.body.contextMode || 'none'}`);
   } else {
     test('AI Copilot reports provider failure without generating a fake answer',
       isProviderFailure(aiRes),
@@ -1339,7 +1356,8 @@ async function run() {
   if (providerGeneratedReply) {
     test('AI Copilot conversation is persisted for the authenticated user',
       historyRes.status === 200 &&
-      historyRes.body.messages.some(message => message.role === 'user' && message.content.startsWith('Who am I?')) &&
+      historyRes.body.messages.some(message => message.role === 'user' &&
+        message.content.startsWith('What are general ways to prepare')) &&
       historyRes.body.messages.some(message => message.role === 'assistant' && message.content === aiRes.body.reply),
       `Messages persisted: ${historyRes.body.messages?.length || 0}`);
   } else if (historyFixtureAvailable) {

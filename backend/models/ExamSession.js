@@ -37,6 +37,7 @@ const ExamSessionSchema = new mongoose.Schema({
     sessionLength: { type: Number, min: 1, max: 10, required: true },
     generationSource: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated', 'pending'], required: true },
     generationModel: { type: String, default: null },
+    contextMode: { type: String, enum: ['generic_privacy_safe', 'personalized'], default: 'personalized' },
     questions: { type: [ExamQuestionSchema], required: true },
     responses: { type: [InterviewResponseSchema], default: [] },
     expiresAt: { type: Date, required: true, index: { expires: 0 } },

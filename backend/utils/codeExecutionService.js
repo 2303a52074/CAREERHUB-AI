@@ -1,21 +1,19 @@
-const DEFAULT_TIMEOUT_MS = 15000;
-const REQUEST_TIMEOUT_MS = 5000;
-const POLL_INTERVAL_MS = 250;
+const { spawn } = require('child_process');
+const { randomUUID } = require('crypto');
+
 const MAX_SOURCE_LENGTH = 20000;
 const MAX_INPUT_LENGTH = 5000;
-const LANGUAGE_CACHE_MS = 30000;
+const MAX_CASES = 30;
+const MAX_DOCKER_OUTPUT = 1024 * 1024;
+const DOCKER_TIMEOUT_MS = 45000;
 const LANGUAGE_DEFINITIONS = [
-    { value: 'python', label: 'Python 3', editorLanguage: 'python', matches: /^Python(?:\s*\(3\.|\s+3\b)/i },
-    { value: 'javascript', label: 'JavaScript (Node.js)', editorLanguage: 'javascript', matches: /^JavaScript\b/i },
-    { value: 'java', label: 'Java', editorLanguage: 'java', matches: /^Java\s*(?:\(|$)/i },
-    { value: 'c', label: 'C', editorLanguage: 'c', matches: /^C\s*\(/i },
-    { value: 'cpp', label: 'C++', editorLanguage: 'cpp', matches: /^C\+\+\s*\(/i },
-    { value: 'csharp', label: 'C#', editorLanguage: 'csharp', matches: /^C#\s*\(/i },
-    { value: 'go', label: 'Go', editorLanguage: 'go', matches: /^Go\s*(?:\(|$)/i }
+    { value: 'python', label: 'Python 3', editorLanguage: 'python', starterCode: 'import sys\n\ndef solve(data):\n    # Parse the provided input and return the required result.\n    return None\n\nif __name__ == \"__main__\":\n    print(solve(sys.stdin.read()))\n' },
+    { value: 'java', label: 'Java 17', editorLanguage: 'java', starterCode: 'import java.io.*;\nimport java.nio.charset.StandardCharsets;\n\npublic class Main {\n    public static void main(String[] args) throws Exception {\n        String input = new String(System.in.readAllBytes(), StandardCharsets.UTF_8).trim();\n        // Parse the provided input and print the required result.\n        System.out.println(input);\n    }\n}\n' },
+    { value: 'cpp', label: 'C++17', editorLanguage: 'cpp', starterCode: '#include <iostream>\n#include <string>\nusing namespace std;\n\nint main() {\n    string input((istreambuf_iterator<char>(cin)), istreambuf_iterator<char>());\n    // Parse the provided input and print the required result.\n    cout << input << \"\\\\n\";\n    return 0;\n}\n' },
+    { value: 'javascript', label: 'JavaScript (Node.js)', editorLanguage: 'javascript', starterCode: 'const fs = require(\"fs\");\nconst input = fs.readFileSync(0, \"utf8\").trim();\n// Parse the provided input and print the required result.\nconsole.log(input);\n' }
 ];
-let cachedLanguages = null;
-let cachedLanguagesAt = 0;
-let cachedLanguagesKey = '';
+const LANGUAGE_VALUES = new Set(LANGUAGE_DEFINITIONS.map(item => item.value));
+let dockerStatusCache = { checkedAt: 0, available: false, message: 'Docker status has not been checked.' };
 
 function createCodeExecutionError(code, status, message) {
     const error = new Error(message);
@@ -24,397 +22,214 @@ function createCodeExecutionError(code, status, message) {
     return error;
 }
 
-function getRunnerConfig() {
-    const configuredUrl = process.env.CODE_EXECUTION_API_URL?.trim();
-    if (!configuredUrl) return null;
-
-    let baseUrl;
-    try {
-        baseUrl = new URL(configuredUrl);
-    } catch {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_CONFIG_INVALID',
-            503,
-            'The configured code execution service URL is invalid.'
-        );
-    }
-
-    const isLocalRunner = ['localhost', '127.0.0.1', '::1'].includes(baseUrl.hostname);
-    if (!isLocalRunner) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_CONFIG_INVALID',
-            503,
-            'Only a locally hosted Judge0 Community Edition runner is supported.'
-        );
-    }
-
-    if (baseUrl.username || baseUrl.password) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_CONFIG_INVALID',
-            503,
-            'Do not include credentials in the code execution service URL.'
-        );
-    }
-    const basePath = baseUrl.pathname.replace(/\/+$/, '').replace(/\/submissions$/i, '');
-    baseUrl.pathname = `${basePath || ''}/`;
-    baseUrl.search = '';
-    baseUrl.hash = '';
-    return {
-        baseUrl,
-        endpoint: new URL('submissions', baseUrl),
-        apiKey: process.env.CODE_EXECUTION_API_KEY?.trim() || '',
-        apiKeyHeader: process.env.CODE_EXECUTION_API_KEY_HEADER?.trim() || 'X-Auth-Token'
-    };
-}
-
-function isConfigured() {
-    try {
-        return Boolean(getRunnerConfig());
-    } catch {
-        return false;
-    }
-}
-
-function parseRunnerResponse(payload) {
-    if (!payload || typeof payload !== 'object' ||
-        !payload.status || !Number.isInteger(payload.status.id)) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_INVALID_RESPONSE',
-            502,
-            'The code execution service returned an invalid response.'
-        );
-    }
-    return payload;
-}
-
-function executionStatus(payload) {
-    const statuses = {
-        3: 'accepted',
-        4: 'wrong_answer',
-        5: 'time_limit',
-        6: 'compilation_error',
-        7: 'runtime_error',
-        8: 'runtime_error',
-        9: 'runtime_error',
-        10: 'runtime_error',
-        11: 'runtime_error',
-        12: 'runtime_error',
-        13: 'runner_error',
-        14: 'runner_error'
-    };
-    return statuses[payload.status.id] || 'runner_error';
-}
-
-function makeRequestHeaders(config) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (config.apiKey && !/^[A-Za-z0-9-]+$/.test(config.apiKeyHeader)) {
+function dockerImage() {
+    const image = process.env.CAREERHUB_RUNNER_IMAGE?.trim() || 'careerhub-code-runner:local';
+    if (!/^[a-zA-Z0-9][a-zA-Z0-9._/:@-]{0,180}$/.test(image)) {
         throw createCodeExecutionError('CODE_EXECUTION_CONFIG_INVALID', 503,
-            'The configured code execution API-key header name is invalid.');
+            'The configured local runner image name is invalid.');
     }
-    if (config.apiKey) headers[config.apiKeyHeader] = config.apiKey;
-    return headers;
+    return image;
 }
 
-async function fetchRunner(url, options) {
-    try {
-        return await fetch(url, {
-            ...options,
-            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS)
+function validateSource(sourceCode, stdin = '') {
+    if (typeof sourceCode !== 'string' || !sourceCode.trim() ||
+        Buffer.byteLength(sourceCode, 'utf8') > MAX_SOURCE_LENGTH) {
+        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 400,
+            `Source code must contain between 1 and ${MAX_SOURCE_LENGTH} characters.`);
+    }
+    if (typeof stdin !== 'string' || Buffer.byteLength(stdin, 'utf8') > MAX_INPUT_LENGTH) {
+        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 413,
+            `Standard input must be ${MAX_INPUT_LENGTH} bytes or fewer.`);
+    }
+}
+
+function validateLanguage(language) {
+    if (typeof language !== 'string' || !LANGUAGE_VALUES.has(language)) {
+        throw createCodeExecutionError('CODE_EXECUTION_LANGUAGE_UNSUPPORTED', 400,
+            'Choose Python, Java, C++, or JavaScript.');
+    }
+}
+
+function dockerArgs(image, containerName) {
+    const testRunId = process.env.CAREERHUB_RUNNER_TEST_RUN_ID;
+    if (testRunId && !/^[a-zA-Z0-9-]{1,64}$/.test(testRunId)) {
+        throw createCodeExecutionError('CODE_EXECUTION_CONFIG_INVALID', 503,
+            'The local runner test identifier is invalid.');
+    }
+    return [
+        'run', '--rm', '--interactive',
+        '--name', containerName,
+        ...(testRunId ? ['--label', `careerhub.test-run=${testRunId}`] : []),
+        ...runnerSecurityOptions(),
+        image
+    ];
+}
+
+function runnerSecurityOptions() {
+    return [
+        '--network=none',
+        '--cpus=0.5',
+        '--memory=256m',
+        '--memory-swap=256m',
+        '--pids-limit=64',
+        '--read-only',
+        '--tmpfs', '/tmp:rw,exec,nosuid,nodev,size=128m',
+        '--user=10001:10001',
+        '--security-opt=no-new-privileges',
+        '--cap-drop=ALL',
+        '--ulimit', 'cpu=8:8',
+        '--ulimit', 'fsize=1048576:1048576',
+        '--ulimit', 'nofile=64:64'
+    ];
+}
+
+function runDocker(request, { timeoutMs = DOCKER_TIMEOUT_MS } = {}) {
+    const image = dockerImage();
+    const containerName = `careerhub-run-${randomUUID()}`;
+    return new Promise((resolve, reject) => {
+        const child = spawn('docker', dockerArgs(image, containerName), {
+            shell: false,
+            windowsHide: true,
+            stdio: ['pipe', 'pipe', 'pipe']
         });
-    } catch (error) {
-        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_TIMEOUT',
-                504,
-                'The code execution service timed out. Please retry.'
-            );
-        }
-        if (error.code?.startsWith('CODE_')) throw error;
-        throw createCodeExecutionError('CODE_EXECUTION_UNAVAILABLE', 502,
-            'The code execution service could not be reached.');
-    }
-}
+        let stdout = '';
+        let stderr = '';
+        let outputSize = 0;
+        let settled = false;
+        const finish = (error, result) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            if (error) reject(error);
+            else resolve(result);
+        };
+        const timer = setTimeout(() => {
+            child.kill();
+            const cleanup = spawn('docker', ['kill', containerName], {
+                shell: false,
+                windowsHide: true,
+                stdio: 'ignore'
+            });
+            cleanup.on('error', () => {});
+            finish(createCodeExecutionError('CODE_EXECUTION_TIMEOUT', 504,
+                'The local isolated execution exceeded its time limit.'));
+        }, timeoutMs);
 
-async function assertRunnerResponse(response) {
-    if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_AUTH_ERROR',
-                502,
-                'The code execution service rejected its server credentials.'
-            );
-        }
-        if (response.status === 429) {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_RATE_LIMITED',
+        child.stdout.on('data', chunk => {
+            outputSize += chunk.length;
+            if (outputSize > MAX_DOCKER_OUTPUT) {
+                child.kill();
+                const cleanup = spawn('docker', ['kill', containerName], {
+                    shell: false,
+                    windowsHide: true,
+                    stdio: 'ignore'
+                });
+                cleanup.on('error', () => {});
+                finish(createCodeExecutionError('CODE_EXECUTION_OUTPUT_LIMIT', 502,
+                    'The local execution service returned too much output.'));
+                return;
+            }
+            stdout += chunk.toString('utf8');
+        });
+        child.stderr.on('data', chunk => {
+            if (stderr.length < 8192) stderr += chunk.toString('utf8').slice(0, 8192 - stderr.length);
+        });
+        child.on('error', error => {
+            finish(createCodeExecutionError(
+                'CODE_EXECUTION_DOCKER_UNAVAILABLE',
                 503,
-                'The code execution service is rate limited. Please retry later.'
-            );
-        }
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_UNAVAILABLE',
-            502,
-            'The code execution service returned an error.'
-        );
-    }
+                error.code === 'ENOENT'
+                    ? 'Docker CLI is not installed. Install Docker Desktop and build the CareerHub runner image.'
+                    : 'Could not start Docker. Verify Docker Desktop is running and accessible to the application.'
+            ));
+        });
+        child.on('close', code => {
+            if (settled) return;
+            if (code !== 0) {
+                if (/failed to connect to the docker (api|daemon)|cannot connect to the docker daemon/i.test(stderr)) {
+                    finish(createCodeExecutionError(
+                        'CODE_EXECUTION_DOCKER_UNAVAILABLE',
+                        503,
+                        'Docker is installed but its daemon is not running or accessible. Start Docker Desktop and retry.'
+                    ));
+                    return;
+                }
+                if (/unable to find image|pull access denied|no such image/i.test(stderr)) {
+                    finish(createCodeExecutionError(
+                        'CODE_EXECUTION_IMAGE_MISSING',
+                        503,
+                        'The local CareerHub runner image is not built. Build it using the Docker command in README.md.'
+                    ));
+                    return;
+                }
+                finish(createCodeExecutionError(
+                    'CODE_EXECUTION_RUNNER_UNAVAILABLE',
+                    503,
+                    'The local runner image is unavailable or failed to start. Build it using the documented Docker command.'
+                ));
+                return;
+            }
+            let result;
+            try {
+                result = JSON.parse(stdout);
+            } catch {
+                finish(createCodeExecutionError('CODE_EXECUTION_INVALID_RESPONSE', 502,
+                    'The local runner returned an invalid response.'));
+                return;
+            }
+            finish(null, result);
+        });
+        child.stdin.on('error', () => {});
+        child.stdin.end(JSON.stringify(request));
+    });
 }
 
-async function readRunnerJson(response) {
-    await assertRunnerResponse(response);
+async function checkDockerAvailability({ refresh = false } = {}) {
+    if (!refresh && Date.now() - dockerStatusCache.checkedAt < 5000) return dockerStatusCache;
     try {
-        return await response.json();
+        const result = await runDocker({ healthCheck: true }, { timeoutMs: 10000 });
+        dockerStatusCache = {
+            checkedAt: Date.now(),
+            available: result.status === 'ready',
+            message: result.status === 'ready'
+                ? `Docker is ready with image ${dockerImage()}.`
+                : result.message || 'The CareerHub runner image is not ready.'
+        };
     } catch (error) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_INVALID_RESPONSE',
-            502,
-            'The code execution service returned an invalid response.'
-        );
+        dockerStatusCache = { checkedAt: Date.now(), available: false, message: error.message };
     }
+    return dockerStatusCache;
+}
+
+function getAvailableLanguages() {
+    return LANGUAGE_DEFINITIONS.map(language => ({ ...language }));
 }
 
 function getLanguageStarterCode(language) {
-    const templates = {
-        python: `import json
-import sys
-
-def solution(*args):
-    # Read JSON arguments from stdin and return your result.
-    return None
-
-if __name__ == "__main__":
-    args = [json.loads(line) for line in sys.stdin if line.strip()]
-    print(json.dumps(solution(*args), separators=(",", ":")))`,
-        javascript: `function solution(...args) {
-    // Return your result for the supplied problem input.
-}`,
-        java: `import java.util.*;
-
-public class Main {
-    public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
-        // Read standard input and print the result.
-    }
-}`,
-        c: `#include <stdio.h>
-
-int main(void) {
-    // Read standard input and print the result.
-    return 0;
-}`,
-        cpp: `#include <iostream>
-using namespace std;
-
-int main() {
-    // Read standard input and print the result.
-    return 0;
-}`,
-        csharp: `using System;
-
-public class Program {
-    public static void Main() {
-        // Read standard input and print the result.
-    }
-}`,
-        go: `package main
-
-import "fmt"
-
-func main() {
-    // Read standard input and print the result.
-    fmt.Println()
-}`
-    };
-    return templates[language] || '';
-}
-
-async function getAvailableLanguages({ refresh = false } = {}) {
-    const config = getRunnerConfig();
-    if (!config) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_NOT_CONFIGURED',
-            503,
-            'Code execution is unavailable until an isolated Judge0-compatible service is configured.'
-        );
-    }
-    const cacheKey = `${config.baseUrl.href}|${config.apiKey}|${config.apiKeyHeader}`;
-    if (!refresh && cachedLanguages && cachedLanguagesKey === cacheKey &&
-        Date.now() - cachedLanguagesAt < LANGUAGE_CACHE_MS) {
-        return cachedLanguages;
-    }
-
-    const response = await fetchRunner(new URL('languages', config.baseUrl), {
-        method: 'GET',
-        headers: makeRequestHeaders(config)
-    });
-    const payload = await readRunnerJson(response);
-    if (!Array.isArray(payload)) {
-        throw createCodeExecutionError('CODE_EXECUTION_INVALID_RESPONSE', 502,
-            'The code execution service returned an invalid language list.');
-    }
-
-    const languages = LANGUAGE_DEFINITIONS.flatMap(definition => {
-        const providerLanguage = payload.find(language =>
-            Number.isInteger(language?.id) && typeof language.name === 'string' &&
-            definition.matches.test(language.name) &&
-            !language.is_archived);
-        return providerLanguage
-            ? [{
-                value: definition.value,
-                label: definition.label,
-                editorLanguage: definition.editorLanguage,
-                id: providerLanguage.id,
-                providerName: providerLanguage.name,
-                starterCode: getLanguageStarterCode(definition.value)
-            }]
-            : [];
-    });
-    if (!languages.some(language => language.value === 'javascript')) {
-        throw createCodeExecutionError('CODE_EXECUTION_LANGUAGE_UNAVAILABLE', 503,
-            'The configured runner does not offer a supported JavaScript runtime.');
-    }
-    cachedLanguages = languages;
-    cachedLanguagesAt = Date.now();
-    cachedLanguagesKey = cacheKey;
-    return languages;
-}
-
-async function getExecutionLanguage(value) {
-    if (typeof value !== 'string' ||
-        !LANGUAGE_DEFINITIONS.some(language => language.value === value)) {
-        throw createCodeExecutionError('CODE_EXECUTION_LANGUAGE_UNSUPPORTED', 400,
-            'Choose one of the supported programming languages.');
-    }
-    const languages = await getAvailableLanguages();
-    const language = languages.find(item => item.value === value);
-    if (!language) {
-        throw createCodeExecutionError('CODE_EXECUTION_LANGUAGE_UNAVAILABLE', 422,
-            'The selected language is not available on the configured execution service.');
-    }
-    return language;
-}
-
-async function waitForCompletion(config, initialPayload) {
-    let payload;
-    if (initialPayload?.status && Number.isInteger(initialPayload.status.id)) {
-        payload = parseRunnerResponse(initialPayload);
-    } else if (typeof initialPayload?.token === 'string' && initialPayload.token.length > 0) {
-        payload = {
-            ...initialPayload,
-            status: { id: 1, description: 'In Queue' }
-        };
-    } else {
-        throw createCodeExecutionError('CODE_EXECUTION_INVALID_RESPONSE', 502,
-            'The code execution service returned neither a submission status nor a token.');
-    }
-    const deadline = Date.now() + DEFAULT_TIMEOUT_MS;
-    while (payload.status.id === 1 || payload.status.id === 2) {
-        if (!payload.token) {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_INVALID_RESPONSE',
-                502,
-                'The code execution service did not return a submission token.'
-            );
-        }
-        if (Date.now() >= deadline) {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_TIMEOUT',
-                504,
-                'Code execution exceeded the allowed time. Please retry.'
-            );
-        }
-        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
-        const url = new URL(`${config.endpoint.href.replace(/\/$/, '')}/${encodeURIComponent(payload.token)}`);
-        url.searchParams.set('base64_encoded', 'false');
-        const response = await fetchRunner(url, {
-            method: 'GET',
-            headers: makeRequestHeaders(config)
-        });
-        payload = parseRunnerResponse(await readRunnerJson(response));
-    }
-    return payload;
-}
-
-async function executeSource(sourceCode, {
-    language = 'javascript',
-    stdin = '',
-    expectedOutput,
-    timeLimit = 2,
-    memoryLimit = 256
-} = {}) {
-    if (typeof sourceCode !== 'string' || !sourceCode.trim() || sourceCode.length > MAX_SOURCE_LENGTH) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_INVALID_INPUT',
-            400,
-            `Source code must contain between 1 and ${MAX_SOURCE_LENGTH} characters.`
-        );
-    }
-    if (typeof stdin !== 'string' || stdin.length > MAX_INPUT_LENGTH) {
-        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 413,
-            `Standard input must be ${MAX_INPUT_LENGTH} characters or fewer.`);
-    }
-    const config = getRunnerConfig();
-    if (!config) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_NOT_CONFIGURED',
-            503,
-            'Code execution is unavailable until an isolated Judge0-compatible service is configured.'
-        );
-    }
-    const selectedLanguage = await getExecutionLanguage(language);
-    const url = new URL(config.endpoint);
-    url.searchParams.set('base64_encoded', 'false');
-    const body = {
-        language_id: selectedLanguage.id,
-        source_code: sourceCode,
-        cpu_time_limit: Math.max(1, Math.min(Number(timeLimit) || 2, 5)),
-        memory_limit: Math.max(16, Math.min(Number(memoryLimit) || 256, 512)) * 1024
-    };
-    if (stdin) body.stdin = stdin;
-    if (typeof expectedOutput === 'string') body.expected_output = expectedOutput;
-    const response = await fetchRunner(url, {
-        method: 'POST',
-        headers: makeRequestHeaders(config),
-        body: JSON.stringify(body)
-    });
-    const initialPayload = await readRunnerJson(response);
-    const payload = await waitForCompletion(config, initialPayload);
-    const description = String(payload.status.description || '');
-    const status = /memory limit/i.test(description)
-        ? 'memory_limit'
-        : executionStatus(payload);
-    return {
-        status,
-        statusDescription: description,
-        stdout: typeof payload.stdout === 'string' ? payload.stdout.slice(0, 10000) : '',
-        stderr: typeof payload.stderr === 'string' ? payload.stderr.slice(0, 4000) : '',
-        compileOutput: typeof payload.compile_output === 'string' ? payload.compile_output.slice(0, 4000) : '',
-        time: typeof payload.time === 'string' ? payload.time : null,
-        memory: Number.isFinite(payload.memory) ? payload.memory : null
-    };
-}
-
-async function executeJavaScript(sourceCode, options = {}) {
-    return executeSource(sourceCode, { ...options, language: 'javascript' });
+    return LANGUAGE_DEFINITIONS.find(item => item.value === language)?.starterCode || '';
 }
 
 function parseInputArguments(rawInput) {
     if (typeof rawInput !== 'string' || !rawInput.trim()) return [];
     try {
-        const parsed = JSON.parse(rawInput);
-        return Array.isArray(parsed) ? [parsed] : [parsed];
+        return JSON.parse(`[${rawInput}]`);
     } catch {
         try {
-            const parsedArguments = JSON.parse(`[${rawInput}]`);
-            if (!Array.isArray(parsedArguments)) throw new Error('Expected an argument list.');
-            return parsedArguments;
+            const parsed = JSON.parse(rawInput);
+            return Array.isArray(parsed) ? parsed : [parsed];
         } catch {
-            throw createCodeExecutionError(
-                'CODE_EXECUTION_INVALID_INPUT',
-                400,
-                'Sample input is not valid JSON argument data.'
-            );
+            throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 400,
+                'Sample input must be valid JSON or JSON argument data.');
         }
     }
+}
+
+function argumentsToStdin(args) {
+    if (!Array.isArray(args)) {
+        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 400,
+            'Problem input must be valid JSON argument data.');
+    }
+    return args.map(value => JSON.stringify(value)).join('\n');
 }
 
 function makeFunctionCallSource(code, args) {
@@ -427,93 +242,169 @@ process.stdout.write(JSON.stringify(__careerhubFunction(...__careerhubArgs)) + '
 `;
 }
 
-function argumentsToStdin(args) {
-    if (!Array.isArray(args)) {
-        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 400,
-            'Problem input must be valid JSON argument data.');
+function valuesEqual(actual, expected) {
+    if (actual === expected) return true;
+    if (Array.isArray(actual) && Array.isArray(expected)) {
+        return actual.length === expected.length && actual.every((value, index) => valuesEqual(value, expected[index]));
     }
-    return args.map(value => JSON.stringify(value)).join('\n');
+    if (actual && expected && typeof actual === 'object' && typeof expected === 'object') {
+        const actualKeys = Object.keys(actual).sort();
+        const expectedKeys = Object.keys(expected).sort();
+        return actualKeys.length === expectedKeys.length &&
+            actualKeys.every((key, index) => key === expectedKeys[index] && valuesEqual(actual[key], expected[key]));
+    }
+    return false;
 }
 
 function outputMatches(actualOutput, expectedOutput) {
     const actual = String(actualOutput || '').trim().split(/\r?\n/).pop() || '';
     try {
-        return JSON.stringify(JSON.parse(actual)) === JSON.stringify(JSON.parse(expectedOutput));
+        return valuesEqual(JSON.parse(actual), JSON.parse(expectedOutput));
     } catch {
         return actual === String(expectedOutput).trim();
     }
 }
 
-async function executeProblemTestCases(code, testCases, {
+function mapStatus(status) {
+    if (status === 'completed') return 'accepted';
+    if (['wrong_answer', 'time_limit', 'memory_limit', 'compilation_error', 'runtime_error', 'internal_error'].includes(status)) {
+        return status === 'internal_error' ? 'runner_error' : status;
+    }
+    return 'runner_error';
+}
+
+async function executeBatch(sourceCode, {
     language = 'javascript',
-    timeLimit,
-    memoryLimit
+    cases,
+    timeLimit = 2,
+    memoryLimit = 256
+} = {}) {
+    validateSource(sourceCode);
+    validateLanguage(language);
+    if (!Array.isArray(cases) || cases.length < 1 || cases.length > MAX_CASES ||
+        cases.some(item => !item || typeof item.stdin !== 'string' ||
+            Buffer.byteLength(item.stdin, 'utf8') > MAX_INPUT_LENGTH)) {
+        throw createCodeExecutionError('CODE_EXECUTION_INVALID_INPUT', 400,
+            `Provide between 1 and ${MAX_CASES} test cases with valid input.`);
+    }
+    const boundedTimeLimit = Math.min(5, Math.max(0.25, Number(timeLimit) || 2));
+    const boundedMemoryLimit = Math.min(256, Math.max(32, Number(memoryLimit) || 256));
+    const response = await runDocker({
+        language,
+        source: sourceCode,
+        cases,
+        timeLimit: boundedTimeLimit,
+        memoryLimit: boundedMemoryLimit
+    });
+    const status = mapStatus(response.status);
+    if (response.status === 'internal_error') {
+        throw createCodeExecutionError('CODE_EXECUTION_INTERNAL_ERROR', 503,
+            'The isolated runner rejected the request. Check the local runner configuration.');
+    }
+    return { ...response, status };
+}
+
+async function executeSource(sourceCode, {
+    language = 'javascript',
+    stdin = '',
+    expectedOutput,
+    timeLimit = 2,
+    memoryLimit = 256
+} = {}) {
+    validateSource(sourceCode, stdin);
+    const execution = await executeBatch(sourceCode, {
+        language,
+        cases: [{ stdin }],
+        timeLimit,
+        memoryLimit
+    });
+    const result = execution.results?.[0] || {};
+    const matchesExpected = typeof expectedOutput !== 'string' || outputMatches(result.stdout, expectedOutput);
+    const status = execution.status === 'accepted' && !matchesExpected ? 'wrong_answer' : execution.status;
+    return {
+        status,
+        statusDescription: status === 'accepted' ? 'Completed' : status.replace(/_/g, ' '),
+        stdout: result.stdout || '',
+        stderr: result.stderr || execution.message || '',
+        compileOutput: execution.status === 'compilation_error' ? execution.message : '',
+        time: result.runtimeMs ?? execution.runtimeMs ?? null,
+        memory: null
+    };
+}
+
+async function executeJavaScript(sourceCode, options = {}) {
+    return executeSource(sourceCode, { ...options, language: 'javascript' });
+}
+
+async function executeProblemTestCases(sourceCode, testCases, {
+    language = 'javascript',
+    timeLimit = 2,
+    memoryLimit = 256,
+    includeHidden = true
 } = {}) {
     if (!Array.isArray(testCases) || testCases.length === 0) {
-        throw createCodeExecutionError(
-            'CODE_EXECUTION_TESTS_UNAVAILABLE',
-            422,
-            'This problem has no test cases available for execution.'
-        );
+        throw createCodeExecutionError('CODE_EXECUTION_TESTS_UNAVAILABLE', 422,
+            'This problem has no test cases available for execution.');
     }
-    const results = [];
+    const selected = testCases
+        .filter(testCase => includeHidden || !testCase.isHidden)
+        .slice(0, MAX_CASES);
+    if (!selected.length) {
+        throw createCodeExecutionError('CODE_EXECUTION_TESTS_UNAVAILABLE', 422,
+            'No public sample tests are available for this problem.');
+    }
+    const cases = selected.map(testCase => ({
+        stdin: typeof testCase.stdin === 'string'
+            ? testCase.stdin
+            : argumentsToStdin(parseInputArguments(testCase.input))
+    }));
     const startedAt = Date.now();
-    let status = 'accepted';
-    for (let index = 0; index < testCases.length; index++) {
-        const testCase = testCases[index];
-        const args = parseInputArguments(testCase.input);
-        const execution = language === 'javascript'
-            ? await executeJavaScript(
-                makeFunctionCallSource(code, args),
-                { expectedOutput: testCase.expectedOutput, timeLimit, memoryLimit }
-            )
-            : await executeSource(code, {
-                language,
-                stdin: argumentsToStdin(args),
-                expectedOutput: testCase.expectedOutput,
-                timeLimit,
-                memoryLimit
-            });
+    const execution = await executeBatch(sourceCode, {
+        language,
+        cases,
+        timeLimit,
+        memoryLimit
+    });
+    const results = selected.map((testCase, index) => {
+        const actual = execution.results?.[index] || {};
         const passed = execution.status === 'accepted' &&
-            outputMatches(execution.stdout, testCase.expectedOutput);
-        const result = {
+            outputMatches(actual.stdout, testCase.expectedOutput);
+        return {
             testCaseId: index,
             passed,
-            status: execution.status,
+            status: execution.status === 'accepted' && !passed ? 'wrong_answer' : execution.status,
             ...(testCase.isHidden ? {} : {
-                actualOutput: execution.stdout.trim(),
+                actualOutput: String(actual.stdout || '').trim(),
                 expectedOutput: testCase.expectedOutput
             }),
-            ...(!testCase.isHidden && !passed && execution.stderr
-                ? { error: execution.stderr.trim() }
-                : {}),
-            ...(!testCase.isHidden && !passed && execution.compileOutput
-                ? { error: execution.compileOutput.trim() }
+            ...(!testCase.isHidden && actual.stderr
+                ? { error: actual.stderr.trim() }
                 : {})
         };
-        results.push(result);
-        if (!passed && status === 'accepted') {
-            status = execution.status === 'accepted' ? 'wrong_answer' : execution.status;
-        }
-    }
-    const allPassed = results.every(result => result.passed);
+    });
+    const allPassed = results.length === selected.length && results.every(result => result.passed);
+    const failure = results.find(result => !result.passed);
     return {
         allPassed,
-        status: allPassed ? 'accepted' : status,
+        status: allPassed ? 'accepted' : (failure?.status || execution.status),
         results,
-        executionTime: Date.now() - startedAt
+        executionTime: Date.now() - startedAt,
+        runtime: execution.runtimeMs ?? null,
+        memory: null
     };
 }
 
 module.exports = {
     argumentsToStdin,
+    checkDockerAvailability,
     executeJavaScript,
     executeSource,
+    executeProblemTestCases,
     getAvailableLanguages,
     getLanguageStarterCode,
-    executeProblemTestCases,
-    isConfigured,
+    isConfigured: () => dockerStatusCache.available,
     makeFunctionCallSource,
     outputMatches,
-    parseInputArguments
+    parseInputArguments,
+    runnerSecurityOptions
 };

@@ -233,7 +233,7 @@
             <div class="message-bubble message-ai">
               <div class="msg-avatar msg-ai-avatar">🤖</div>
               <div class="msg-content">
-                Your conversation is saved to your account. Ask about your profile, career guidance, interviews, system design, coding plans, or resume feedback.
+                Checking provider availability and privacy requirements…
               </div>
             </div>
           </div>
@@ -263,11 +263,13 @@
     let quotaRetryAt = 0;
     let quotaCountdownTimer = null;
     let requestInProgress = false;
+    let assistantProviderReady = false;
+    let assistantMode = 'unavailable';
     let assistantPrimaryModel = 'DeepSeek';
     let assistantFallbackConfigured = false;
 
     function updateSendAvailability() {
-      sendButton.disabled = requestInProgress || quotaRetryAt > Date.now();
+      sendButton.disabled = requestInProgress || !assistantProviderReady || quotaRetryAt > Date.now();
       messagesArea?.querySelectorAll('[data-retry-message]').forEach(button => {
         button.disabled = requestInProgress || quotaRetryAt > Date.now();
       });
@@ -347,6 +349,10 @@
     }
 
     async function handleSendMessage(msgText, isRetry = false) {
+      if (!assistantProviderReady) {
+        providerStatus.textContent = 'Career Assistant is disconnected. Connect an approved paid/data-processing AI provider to enable personalized chat.';
+        return;
+      }
       const message = (msgText || chatInput.value).trim();
       if (!message || requestInProgress || quotaRetryAt > Date.now()) return;
       if (!token) {
@@ -354,8 +360,9 @@
         return;
       }
 
+      let userBubble = null;
       if (!isRetry) {
-        appendMessage('user', message);
+        userBubble = appendMessage('user', message);
         chatInput.value = '';
       }
       const typingBubble = document.createElement('div');
@@ -387,6 +394,17 @@
             appendMessage('assistant', 'Your sign-in has expired. Sign in again to continue.');
             window.showToast('Authentication required. Please sign in again.', 'error');
           } else {
+            if (data.code === 'AI_PERSONAL_CONTEXT_NOT_SUPPORTED') {
+              userBubble?.remove();
+              chatInput.value = message;
+              providerStatus.textContent = data.message ||
+                'Free AI mode accepts general career questions only and does not receive profile or prior chat context.';
+              return;
+            }
+            if (data.code === 'AI_PROVIDER_NOT_CONFIGURED') {
+              providerStatus.textContent = 'Career Assistant is disconnected. Connect an approved paid/data-processing AI provider to enable personalized chat.';
+              return;
+            }
             if (data.code === 'AI_PROVIDER_QUOTA_EXCEEDED') applyQuotaCooldown(data.retryAfter);
             else providerStatus.textContent = data.fallbackAttempted
               ? 'Both configured models could not generate a usable response.'
@@ -394,11 +412,7 @@
             const safeMessage = typeof data.message === 'string' && data.message.trim()
               ? data.message
               : 'Career Assistant is temporarily unavailable. Please try again.';
-            if (data.code === 'AI_PROVIDER_NOT_CONFIGURED' || res.status === 401) {
-              appendMessage('assistant', safeMessage);
-            } else {
-              appendRetryableError(safeMessage, message);
-            }
+            appendRetryableError(safeMessage, message);
             window.showToast(safeMessage, 'error');
           }
           return;
@@ -409,11 +423,15 @@
           return;
         }
         const modelLabel = typeof data.model === 'string' ? data.model : 'OpenRouter';
-        const resultLabel = data.fallbackUsed
+        const resultLabel = data.contextMode === 'local_profile'
+          ? 'Answered locally from your saved profile; nothing was sent to Gemini.'
+          : data.fallbackUsed
           ? `Response generated successfully with backup model ${modelLabel}.`
           : `Response generated successfully with ${modelLabel}.`;
         appendMessage('assistant', data.reply, resultLabel);
-        providerStatus.textContent = data.fallbackUsed
+        providerStatus.textContent = data.contextMode === 'local_profile'
+          ? 'Answered locally from your saved profile.'
+          : data.fallbackUsed
           ? 'Primary model was unavailable; the backup generated this response.'
           : 'Ready to help';
       } catch (err) {
@@ -481,23 +499,49 @@
         }
         if (providerResponse.ok) {
           const provider = await providerResponse.json();
+          assistantMode = provider.assistantMode || 'unavailable';
+          assistantProviderReady = provider.configured === true &&
+            provider.quotaBlocked !== true;
           assistantPrimaryModel = provider.model || 'DeepSeek';
           assistantFallbackConfigured = Boolean(provider.fallbackConfigured);
           if (provider.quotaBlocked) {
             applyQuotaCooldown(provider.retryAfter);
+          } else if (provider.assistantMode === 'general_privacy_safe') {
+            providerStatus.textContent = `General career AI is ready with ${assistantPrimaryModel}. Your profile and saved chat history are not sent; don't include personal, identifying, confidential, resume, or code details.`;
+            providerStatus.style.color = 'var(--text-cyan)';
+            updateSendAvailability();
           } else {
+            const geminiConfigurationMessages = {
+              missing_api_key: 'Gemini is selected, but GEMINI_API_KEY is missing from backend configuration.',
+              missing_model: 'Gemini is selected, but GEMINI_MODEL is missing from backend configuration.',
+              unsupported_feature: 'Gemini does not support this assistant workflow.',
+              privacy_restricted: 'Copilot has not sent your message. Gemini is not approved for personal conversation, profile, or history data; configure an approved paid/data-processing provider.',
+              feature_not_enabled: 'Gemini general Career Assistant is not enabled in GEMINI_PRIMARY_FEATURES.'
+            };
             status.textContent = provider.configured
               ? `Generating with ${assistantPrimaryModel} when you send a message.` +
                 (assistantFallbackConfigured ? ' A configured backup is available if the primary fails.' : '')
-              : 'AI assistant is not configured.';
+              : provider.provider === 'Gemini' && geminiConfigurationMessages[provider.geminiConfigurationIssue]
+                ? geminiConfigurationMessages[provider.geminiConfigurationIssue]
+                : provider.dataProcessingApproval?.approved !== true
+                  ? 'Copilot is not connected. Personal messages, profile context, and conversation history require an explicitly approved paid/data-processing provider. Configure a paid OpenRouter or Groq provider and verify its data terms before enabling it.'
+                  : 'AI assistant is not configured. Check the backend provider settings.';
             status.style.color = provider.configured ? 'var(--text-cyan)' : '#fbbf24';
+            updateSendAvailability();
           }
+        } else {
+          assistantProviderReady = false;
+          updateSendAvailability();
         }
         if (historyResponse.ok) {
           const history = await historyResponse.json();
           messagesArea.replaceChildren();
           if (!history.messages.length) {
-            appendMessage('assistant', 'Your account profile is available for personalized guidance. Conversations are saved only to this account.');
+            if (assistantProviderReady) {
+              appendMessage('assistant', assistantMode === 'general_privacy_safe'
+                ? 'Ask general career questions for a Gemini response. Personal profile questions are answered locally from your saved profile; your profile and chat history are never sent to free Gemini.'
+                : 'Your account conversation history is private to this account and is sent only to the approved provider shown above.');
+            }
           } else {
             history.messages.forEach(message => appendMessage(message.role === 'user' ? 'user' : 'assistant', message.content));
           }

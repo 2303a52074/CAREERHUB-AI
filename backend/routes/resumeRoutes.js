@@ -4,7 +4,8 @@ const path = require('path');
 const authMiddleware = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const ResumeAnalysis = require('../models/ResumeAnalysis');
-const { analyzeResume } = require('../utils/aiService');
+const { analyzeResume, getApprovedDataProcessingStatus } = require('../utils/aiService');
+const { analyzeResumeLocally } = require('../utils/localCareerAnalysis');
 const { resolveTargetRole, targetRoleRequiredResponse } = require('../utils/roleResolution');
 const { providerErrorMessage } = require('../utils/providerErrors');
 const { extractResumeText } = require('../utils/resumePdf');
@@ -56,6 +57,12 @@ async function performResumeAnalysis(
     jobDescription = '',
     feature = 'resume_analysis'
 ) {
+    if (typeof text !== 'string' || text.trim().length < 30) {
+        const error = new Error('Provide at least 30 characters of resume text.');
+        error.code = 'RESUME_TEXT_INSUFFICIENT';
+        error.status = 422;
+        throw error;
+    }
     const user = userId ? await User.findById(userId) : null;
     const resolvedRole = resolveTargetRole(targetRole, user).role;
     if (!resolvedRole) {
@@ -64,7 +71,36 @@ async function performResumeAnalysis(
         error.status = 409;
         throw error;
     }
-    const analysis = await analyzeResume(text, resolvedRole, user || {}, jobDescription, feature);
+    let analysis = analyzeResumeLocally(text, resolvedRole, jobDescription);
+    const approval = getApprovedDataProcessingStatus(feature);
+    let advancedAnalysisStatus = approval.approved ? 'pending' : 'unavailable';
+    let advancedAnalysisReason = approval.reason;
+    if (approval.approved) {
+        try {
+            const advanced = await analyzeResume(text, resolvedRole, user || {}, jobDescription, feature);
+            analysis = {
+                ...analysis,
+                ...advanced,
+                score: analysis.score,
+                atsCompatibility: analysis.atsCompatibility,
+                summary: analysis.summary,
+                atsReadabilityIssues: analysis.atsReadabilityIssues,
+                presentSections: analysis.presentSections,
+                missingSections: analysis.missingSections,
+                measurableAchievements: analysis.measurableAchievements,
+                analysisMethod: 'local',
+                advancedAnalysisMethod: advanced.analysisMethod,
+                advancedSummary: advanced.summary
+            };
+            advancedAnalysisStatus = 'generated';
+            advancedAnalysisReason = null;
+        } catch (error) {
+            if (!error.code?.startsWith('AI_')) throw error;
+            console.warn('Approved advanced resume analysis unavailable:', error.code);
+            advancedAnalysisStatus = 'failed';
+            advancedAnalysisReason = 'Advanced analysis failed. The saved report contains local checks only.';
+        }
+    }
 
     if (userId && Number.isFinite(analysis.score)) {
         await User.findByIdAndUpdate(userId, { resumeScore: analysis.score });
@@ -86,8 +122,14 @@ async function performResumeAnalysis(
         atsReadabilityIssues: analysis.atsReadabilityIssues,
         recommendations: analysis.recommendations,
         prioritizedEdits: analysis.prioritizedEdits,
+        presentSections: analysis.presentSections,
+        missingSections: analysis.missingSections,
+        measurableAchievements: analysis.measurableAchievements,
         analysisMethod: analysis.analysisMethod,
         model: analysis.model || null,
+        advancedAnalysisStatus,
+        advancedAnalysisMethod: analysis.advancedAnalysisMethod || null,
+        advancedSummary: analysis.advancedSummary || null,
         comparedWithJobDescription: Boolean(jobDescription)
     });
     await savedAnalysis.save();
@@ -113,9 +155,14 @@ async function performResumeAnalysis(
         atsReadabilityIssues: analysis.atsReadabilityIssues,
         recommendations: analysis.recommendations,
         prioritizedEdits: analysis.prioritizedEdits,
+        presentSections: analysis.presentSections,
+        missingSections: analysis.missingSections,
+        measurableAchievements: analysis.measurableAchievements,
         suggestedJobs,
         analysisMethod: analysis.analysisMethod,
         model: analysis.model || null,
+        advancedAnalysisStatus,
+        advancedAnalysisReason,
         comparedWithJobDescription: Boolean(jobDescription),
         analysisStatus: analysis.analysisStatus,
         analysisId: savedAnalysis._id,

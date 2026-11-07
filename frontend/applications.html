@@ -302,7 +302,9 @@
             <div style="font-size:0.8rem;color:#fff;">${escapeHtml(app.location || 'Not specified')}</div>
             <div style="font-size:0.75rem;color:var(--text-muted);">${app.salaryOrStipend ? escapeHtml(app.salaryOrStipend) : 'Salary not listed'}</div>
           </td>
-          <td style="color:#00d2ff;font-weight:700;">${app.matchPercentage == null ? 'Not calculated' : `${app.matchPercentage}%`}</td>
+          <td style="color:#00d2ff;font-weight:700;">${app.matchPercentage == null
+            ? '<a href="/profile" title="Add skills, a target role, or preferred location to calculate this score">Complete profile to calculate</a>'
+            : `${app.matchPercentage}%`}</td>
           <td>${app.interviewDate ? new Date(app.interviewDate).toLocaleDateString() : '—'}</td>
           <td>
             <button onclick="deleteApp('${app._id || app.id}')" style="background:transparent;border:none;color:#f87171;cursor:pointer;padding:0.3rem;" title="Delete" aria-label="Delete application">

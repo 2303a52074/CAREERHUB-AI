@@ -1,8 +1,9 @@
 require('./utils/loadEnv')();
 const mongoose = require('mongoose');
 const CodingProblem = require('./models/CodingProblem');
-const { codingProblems, seedPromise } = require('./utils/inMemoryDB');
+const { seedPromise } = require('./utils/inMemoryDB');
 const seedCodingProblems = require('./utils/seedCodingProblems');
+const codingProblemLibrary = require('./utils/codingProblemLibrary');
 
 async function seed() {
     const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
@@ -15,10 +16,10 @@ async function seed() {
     try {
         await mongoose.connect(mongoUri);
         await seedPromise;
-        await seedCodingProblems(CodingProblem, codingProblems);
-        console.log(`Curated coding problem seed is ready (${codingProblems.length} definitions).`);
+        await seedCodingProblems(CodingProblem, codingProblemLibrary);
+        console.log(`Coding problem library is ready (${codingProblemLibrary.length} definitions).`);
     } catch (error) {
-        console.error('Seeding failed:', error.name || 'UnknownError');
+        console.error('Seeding failed:', error.message || error.name || 'UnknownError');
         if (error.code) console.error('Database error code:', error.code);
         process.exitCode = 1;
     } finally {

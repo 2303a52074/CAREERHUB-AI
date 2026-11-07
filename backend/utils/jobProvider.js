@@ -101,36 +101,40 @@ async function fetchLiveJobs({ fetchImpl = fetch, timeoutMs = 12000 } = {}) {
 }
 
 function calculateJobMatch(profile, job) {
-    const normalize = value => String(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+    const normalize = value => String(value).toLowerCase()
+        .replace(/[^a-z0-9+#.]+/g, ' ').replace(/\s+/g, ' ').trim();
     const containsTerm = (text, term) => {
-        const normalizedText = ` ${normalize(text)} `;
-        const normalizedTerm = ` ${normalize(term)} `;
-        return normalizedTerm.length > 2 && normalizedText.includes(normalizedTerm);
+        const normalizedTerm = normalize(term);
+        if (normalizedTerm.length < 2) return false;
+        const escapedTerm = normalizedTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(^|[^a-z0-9+#])${escapedTerm}(?=$|[^a-z0-9+#])`, 'i')
+            .test(String(text || ''));
     };
     const profileSkills = Array.isArray(profile?.technicalSkills)
         ? profile.technicalSkills.map(skill => String(skill).trim().toLowerCase()).filter(Boolean)
         : [];
-    const jobTags = [...(job.tags || []), ...(job.sourceJobTypes || [])]
-        .map(tag => String(tag).trim().toLowerCase()).filter(Boolean);
-    const title = String(job.title || '').toLowerCase();
-    const matchedSkills = profileSkills.filter(skill =>
-        jobTags.some(tag => normalize(tag) === normalize(skill) || containsTerm(tag, skill)) ||
-        containsTerm(title, skill)
+    const jobTags = (job.tags || []).map(tag => String(tag).trim().toLowerCase()).filter(Boolean);
+    const title = String(job.title || '');
+    const listingText = [title, job.description, ...jobTags].filter(Boolean).join(' ');
+    const matchedProfileSkills = profileSkills.filter(skill => containsTerm(listingText, skill));
+    const matchedSkills = jobTags.filter(tag =>
+        profileSkills.some(skill => containsTerm(tag, skill) || containsTerm(skill, tag))
     );
     const requiredDimensions = [];
 
-    if (profileSkills.length > 0 && jobTags.length > 0) {
+    if (profileSkills.length > 0 && listingText.trim()) {
         requiredDimensions.push({
             weight: 0.6,
-            score: Math.round((new Set(matchedSkills).size / profileSkills.length) * 100)
+            score: Math.round((new Set(matchedProfileSkills).size / profileSkills.length) * 100)
         });
     }
 
     const targetRole = String(profile?.targetRole || profile?.preferredRoles?.[0] || '').trim().toLowerCase();
     if (targetRole && title) {
-        const roleTerms = targetRole.split(/[^a-z0-9+#.]+/).filter(term => term.length > 2);
+        const roleTerms = normalize(targetRole).split(/\s+/)
+            .filter(term => term.length > 2 || /[+#.]/.test(term));
         if (roleTerms.length) {
-            const matchedTerms = roleTerms.filter(term => title.includes(term));
+            const matchedTerms = roleTerms.filter(term => containsTerm(title, term));
             requiredDimensions.push({
                 weight: 0.3,
                 score: Math.round((matchedTerms.length / roleTerms.length) * 100)
@@ -153,15 +157,21 @@ function calculateJobMatch(profile, job) {
     const overallMatch = totalWeight
         ? Math.round(requiredDimensions.reduce((sum, dimension) => sum + dimension.score * dimension.weight, 0) / totalWeight)
         : null;
-    const matchedTags = jobTags.filter(tag =>
-        profileSkills.some(skill => normalize(skill) === normalize(tag) || containsTerm(tag, skill))
-    );
     const allJobTags = [...new Set(jobTags)];
+    const matchBasis = [];
+    if (profileSkills.length > 0 && listingText.trim()) matchBasis.push('listed skills');
+    if (targetRole && title) matchBasis.push('target role');
+    if (preferredLocations.length > 0 && job.location) matchBasis.push('preferred location');
 
     return {
         overallMatch,
-        matchedSkills: matchedTags,
-        missingSkills: allJobTags.filter(tag => !matchedTags.includes(tag))
+        matchedSkills,
+        matchedProfileSkills,
+        missingSkills: allJobTags.filter(tag => !matchedSkills.includes(tag)),
+        matchBasis,
+        matchUnavailableReason: overallMatch === null
+            ? 'Add technical skills, a target role, or a preferred location to your profile to calculate a match score.'
+            : null
     };
 }
 

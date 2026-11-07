@@ -13,6 +13,7 @@ const dailyPlans = [];
 const dailyPlanGenerationLocks = [];
 const careerConversations = [];
 const resumeAnalyses = [];
+const jobDescriptionAnalyses = [];
 const skillGapAnalyses = [];
 const examSessions = [];
 const additionalCodingProblems = require('./additionalCodingProblems');
@@ -445,6 +446,7 @@ module.exports = {
     dailyPlanGenerationLocks,
     careerConversations,
     resumeAnalyses,
+    jobDescriptionAnalyses,
     skillGapAnalyses,
     examSessions,
     wrapModel,

@@ -17,7 +17,13 @@ const ResumeAnalysisSchema = new mongoose.Schema({
     atsReadabilityIssues: { type: [String], default: [] },
     recommendations: { type: [String], default: [] },
     prioritizedEdits: { type: [String], default: [] },
+    presentSections: { type: [String], default: [] },
+    missingSections: { type: [String], default: [] },
+    measurableAchievements: { type: [String], default: [] },
     analysisMethod: { type: String, default: 'not_run' },
+    advancedAnalysisStatus: { type: String, enum: ['unavailable', 'pending', 'generated', 'failed'], default: 'unavailable' },
+    advancedAnalysisMethod: { type: String, default: null },
+    advancedSummary: { type: String, default: null },
     model: { type: String, default: null },
     comparedWithJobDescription: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now }

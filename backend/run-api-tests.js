@@ -27,6 +27,8 @@ function startServer(mongoUri) {
             MONGO_URI: mongoUri,
             MONGODB_URI: '',
             OPENROUTER_API_KEY: '',
+            CAREERHUB_AI_DATA_PROCESSING_APPROVED: 'false',
+            CAREERHUB_AI_DATA_PROCESSING_PROVIDER: '',
             JWT_SECRET: process.env.JWT_SECRET || crypto.randomBytes(32).toString('hex'),
             NODE_ENV: 'test'
         },

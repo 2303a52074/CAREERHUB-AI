@@ -7,6 +7,9 @@ const InterviewSchema = new mongoose.Schema({
     difficulty: { type: String, enum: ['easy', 'medium', 'hard'], default: 'medium' },
     company: { type: String, maxlength: 120 },
     interviewType: { type: String, maxlength: 40 },
+    generationSource: { type: String, enum: ['openrouter', 'gemini', 'groq', 'curated', 'unknown'], default: 'unknown' },
+    generationModel: { type: String, maxlength: 120 },
+    contextMode: { type: String, enum: ['generic_privacy_safe', 'personalized'], default: 'personalized' },
     totalScore: { type: Number, min: 0, max: 100 },
     xpEarned: Number,                  // for level system
     answers: [{                         // detailed answer tracking for skill analytics

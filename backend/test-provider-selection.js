@@ -18,6 +18,17 @@ const geminiConversation = new mongoose.models.CareerConversation({
     }]
 });
 assert.equal(geminiConversation.validateSync(), undefined);
+const localConversation = new mongoose.models.CareerConversation({
+    userId: 'local-profile-test',
+    messages: [{
+        role: 'assistant',
+        content: 'Answered from the saved profile',
+        source: 'local',
+        model: 'CareerHub profile',
+        fallbackUsed: false
+    }]
+});
+assert.equal(localConversation.validateSync(), undefined);
 
 const originalFetch = global.fetch;
 const originalConsoleInfo = console.info;
@@ -37,6 +48,8 @@ const originalEnvironment = Object.fromEntries([
     'GEMINI_PRIMARY_FEATURES',
     'GEMINI_QUALIFICATION_MODE',
     'OPENROUTER_ROLLBACK_FEATURES',
+    'CAREERHUB_AI_DATA_PROCESSING_APPROVED',
+    'CAREERHUB_AI_DATA_PROCESSING_PROVIDER',
     'NODE_ENV',
     ...[
         'OPENROUTER_FALLBACK_ASSISTANT_MODEL',
@@ -64,6 +77,8 @@ async function run() {
         process.env.GEMINI_QUALIFICATION_MODE = '';
         process.env.OPENROUTER_ROLLBACK_FEATURES = '';
         process.env.GROQ_FALLBACK_FEATURES = '';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_APPROVED = 'false';
+        delete process.env.CAREERHUB_AI_DATA_PROCESSING_PROVIDER;
         for (const key of Object.keys(originalEnvironment)) {
             if (key.startsWith('OPENROUTER_FALLBACK_')) delete process.env[key];
         }
@@ -141,25 +156,40 @@ async function run() {
         assert.ok(mongoose.models.CareerConversation.schema.path('messages.0.source').enumValues.includes('groq'));
 
         process.env.GEMINI_API_KEY = 'gemini-test-only-key';
+        delete process.env.GEMINI_MODEL;
+        process.env.AI_PROVIDER = 'gemini';
+        process.env.GEMINI_PRIMARY_FEATURES = '';
+        assert.equal(aiService.getGeminiConfiguration('assessment_question_generation').model, 'gemini-3.1-flash-lite');
+        assert.equal(
+            aiService.getGeminiConfiguration('assessment_question_generation').configurationIssue,
+            'feature_not_enabled'
+        );
         process.env.GEMINI_MODEL = 'gemini-test-model';
         process.env.GEMINI_PRIMARY_FEATURES = [
             'assessment_question_generation',
             'technical_interview_generation',
             'behavioral_interview_generation',
-            'interview_evaluation',
-            'job_analyzer',
-            'skill_gap_guidance',
-            'career_roadmap',
-            'daily_plan',
-            'coding_hint',
-            'career_assistant'
+            'video_interview_generation',
+            'coding_hint'
         ].join(',');
         process.env.AI_PROVIDER = 'gemini';
         console.info = (label, serialized) => {
             if (label === 'Gemini request metrics:') geminiProviderMetrics.push(JSON.parse(serialized));
             if (label === 'OpenRouter request metrics:') providerMetrics.push(JSON.parse(serialized));
         };
-        assert.equal(aiService.getGeminiConfiguration('career_assistant').primaryConfigured, true);
+        assert.equal(aiService.getCareerAssistantStatus().configured, false);
+        assert.equal(
+            aiService.getGeminiConfiguration('career_assistant').configurationIssue,
+            'privacy_restricted'
+        );
+        assert.equal(
+            aiService.getCareerAssistantStatus().assistantMode,
+            'unavailable'
+        );
+        assert.equal(
+            aiService.getGeminiConfiguration('interview_evaluation').configurationIssue,
+            'privacy_restricted'
+        );
         assert.equal(aiService.getGeminiConfiguration('resume_analysis').primaryEnabled, false);
         assert.equal(aiService.getGeminiConfiguration('pdf_resume_analysis').primaryEnabled, false);
         assert.equal(aiService.getGeminiConfiguration('docx_resume_analysis').primaryEnabled, false);
@@ -167,13 +197,8 @@ async function run() {
             'assessment_question_generation',
             'technical_interview_generation',
             'behavioral_interview_generation',
-            'interview_evaluation',
-            'job_analyzer',
-            'skill_gap_guidance',
-            'career_roadmap',
-            'daily_plan',
-            'coding_hint',
-            'career_assistant'
+            'video_interview_generation',
+            'coding_hint'
         ];
         const geminiHosts = [];
         global.fetch = async (input, init) => {
@@ -221,12 +246,150 @@ async function run() {
         assert.equal(geminiProviderMetrics.length, geminiFeatures.length);
         assert.equal(JSON.stringify(geminiProviderMetrics).includes('Gemini direct-provider selection test.'), false);
         assert.equal(JSON.stringify(geminiProviderMetrics).includes('gemini-test-only-key'), false);
+        const privacySafePrompts = [];
+        global.fetch = async (input, init) => {
+            const body = JSON.parse(init.body);
+            const prompt = body.contents.flatMap(item => item.parts.map(part => part.text)).join('\n');
+            privacySafePrompts.push(prompt);
+            const instruction = body.systemInstruction?.parts?.[0]?.text || '';
+            const text = instruction.includes('multiple-choice career assessment questions')
+                ? JSON.stringify({
+                    questions: [{
+                        question: 'Which data structure supports average constant-time key lookup?',
+                        options: ['Hash table', 'Linked list', 'Stack', 'Queue'],
+                        answerIndex: 0,
+                        explanation: 'Hash tables provide average constant-time lookup.',
+                        topic: 'Data structures and algorithms',
+                        difficulty: 'medium'
+                    }]
+                })
+                : instruction.includes('interview question writer')
+                    ? JSON.stringify({
+                        questions: [{
+                            question: 'How would you design a reliable service?',
+                            skill: 'System design',
+                            hint: 'Discuss availability and failure handling.'
+                        }]
+                    })
+                    : JSON.stringify({
+                        hint: 'Track values as you scan the input once.',
+                        concepts: ['Hash set'],
+                        complexityConsiderations: 'Consider the memory used by stored values.'
+                    });
+            return new Response(JSON.stringify({
+                modelVersion: 'gemini-test-model',
+                candidates: [{ content: { parts: [{ text }] }, finishReason: 'STOP' }]
+            }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        };
+        const safeAssessment = await aiService.generateMcqQuestions({
+            role: 'Private Candidate Role',
+            topic: 'Data structures and algorithms',
+            difficulty: 'medium',
+            count: 1,
+            profile: {
+                name: 'Private Candidate Name',
+                technicalSkills: ['Private Skill'],
+                interests: ['Private Interest']
+            }
+        });
+        const safeInterview = await aiService.generateInterviewQuestions({
+            role: 'Private Candidate Role',
+            company: 'Private Company',
+            difficulty: 'medium',
+            type: 'Technical',
+            count: 1,
+            profile: {
+                name: 'Private Candidate Name',
+                technicalSkills: ['Private Skill'],
+                projects: [{ title: 'Private Project' }]
+            }
+        });
+        const safeCodingHint = await aiService.generateCodingHint({
+            title: 'Find duplicate values',
+            description: 'Given an array of integers, return the values appearing more than once.'
+        });
+        assert.equal(safeAssessment.contextMode, 'generic_privacy_safe');
+        assert.equal(safeInterview.contextMode, 'generic_privacy_safe');
+        assert.equal(safeCodingHint.contextMode, 'generic_privacy_safe');
+        for (const prompt of privacySafePrompts) {
+            assert.doesNotMatch(prompt, /Private Candidate|Private Company|Private Skill|Private Interest|Private Project/);
+        }
+        const requestCountBeforePrivacyBlock = providerRequests + geminiHosts.length;
+        await assert.rejects(
+            aiService.chatCareerAssistant(
+                'who am i',
+                [],
+                { name: 'Private Candidate Name', email: 'private@example.test' },
+                {}
+            ),
+            error => error.code === 'AI_PROVIDER_NOT_CONFIGURED' &&
+                error.providerDiagnostics?.configurationIssue === 'feature_not_enabled'
+        );
+        assert.equal(providerRequests + geminiHosts.length, requestCountBeforePrivacyBlock);
+        process.env.GEMINI_PRIMARY_FEATURES += ',career_assistant_general';
+        const generalStatus = aiService.getCareerAssistantStatus();
+        assert.equal(generalStatus.configured, true);
+        assert.equal(generalStatus.assistantMode, 'general_privacy_safe');
+        const promptCountBeforeGeneralChat = privacySafePrompts.length;
+        const generalChat = await aiService.chatCareerAssistant(
+            'How can I prepare for a system design interview?',
+            [{ role: 'user', content: 'Private saved conversation content' }],
+            { name: 'Private Candidate Name', email: 'private@example.test' },
+            { privateContext: 'Private saved profile data' }
+        );
+        assert.equal(generalChat.contextMode, 'general_privacy_safe');
+        assert.equal(generalChat.source, 'gemini');
+        assert.equal(privacySafePrompts.length, promptCountBeforeGeneralChat + 1);
+        assert.match(privacySafePrompts.at(-1), /How can I prepare for a system design interview/);
+        assert.doesNotMatch(privacySafePrompts.at(-1), /Private Candidate|private@example|Private saved/);
+        const generalProviderRequestCount = geminiHosts.length;
+        const localProfileAnswer = await aiService.chatCareerAssistant(
+            'Who am I? Tell me my saved skills.',
+            [{ role: 'user', content: 'Private saved conversation content' }],
+            {
+                name: 'Private Candidate Name',
+                email: 'private@example.test',
+                targetRole: 'Backend Engineer',
+                technicalSkills: ['Node.js', 'MongoDB']
+            },
+            { privateContext: 'Private saved profile data' }
+        );
+        assert.equal(localProfileAnswer.contextMode, 'local_profile');
+        assert.equal(localProfileAnswer.source, 'local');
+        assert.match(localProfileAnswer.reply, /Private Candidate Name/);
+        assert.match(localProfileAnswer.reply, /Backend Engineer/);
+        assert.match(localProfileAnswer.reply, /Node\.js, MongoDB/);
+        assert.doesNotMatch(localProfileAnswer.reply, /private@example\.test|Private saved conversation content/);
+        assert.equal(geminiHosts.length, generalProviderRequestCount);
+        global.fetch = async () => new Response(JSON.stringify({
+            error: {
+                code: 404,
+                status: 'NOT_FOUND',
+                message: 'This model is no longer available to new users.',
+                details: [{ reason: 'MODEL_ACCESS_RESTRICTED', domain: 'googleapis.com' }]
+            }
+        }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+        await assert.rejects(
+            aiService.completeWithAI([{ role: 'user', content: 'Model access diagnostic test.' }], {
+                feature: 'assessment_question_generation',
+                maxAttempts: 1
+            }),
+            error => error.code === 'AI_MODEL_INVALID' &&
+                error.providerDiagnostics?.httpStatus === 404 &&
+                error.providerDiagnostics?.googleCode === 404 &&
+                error.providerDiagnostics?.googleStatus === 'NOT_FOUND' &&
+                error.providerDiagnostics?.googleReasons?.includes('MODEL_ACCESS_RESTRICTED') &&
+                error.providerDiagnostics?.googleMessage === 'This model is no longer available to new users.' &&
+                !JSON.stringify(error.providerDiagnostics).includes('gemini-test-only-key')
+        );
         await assert.rejects(
             aiService.completeWithAI([{ role: 'user', content: 'private resume text is blocked' }], {
                 feature: 'resume_analysis',
                 maxAttempts: 1
             }),
-            error => error.code === 'AI_PROVIDER_NOT_CONFIGURED' && error.provider === 'Gemini'
+            error => error.code === 'AI_PROVIDER_NOT_CONFIGURED' &&
+                error.provider === 'Gemini' &&
+                error.providerDiagnostics?.configurationIssue === 'privacy_restricted'
         );
         assert.equal(geminiHosts.length, geminiFeatures.length);
 
@@ -237,7 +400,7 @@ async function run() {
         };
         await assert.rejects(
             aiService.completeWithAI([{ role: 'user', content: 'Gemini failure must not silently route.' }], {
-                feature: 'career_assistant',
+                feature: 'assessment_question_generation',
                 maxAttempts: 1
             }),
             error => error.code === 'AI_PROVIDER_UNAVAILABLE' &&
@@ -248,7 +411,7 @@ async function run() {
 
         process.env.GROQ_API_KEY = 'groq-test-only-key';
         process.env.GROQ_MODEL = 'test/groq-model';
-        process.env.GROQ_FALLBACK_FEATURES = 'career_assistant';
+        process.env.GROQ_FALLBACK_FEATURES = 'assessment_question_generation';
         const geminiGroqHosts = [];
         global.fetch = async input => {
             const host = new URL(input).hostname;
@@ -264,7 +427,7 @@ async function run() {
         const geminiGroqFallback = await aiService.completeWithAI(
             [{ role: 'user', content: 'qualified Groq fallback test' }],
             {
-                feature: 'career_assistant',
+                feature: 'assessment_question_generation',
                 maxAttempts: 1,
                 validateResponse: text => assert.equal(JSON.parse(text).ok, true)
             }
@@ -322,7 +485,7 @@ async function run() {
         };
         await assert.rejects(
             aiService.completeWithAI([{ role: 'user', content: 'invalid Gemini schema test' }], {
-                feature: 'career_assistant',
+                feature: 'assessment_question_generation',
                 maxAttempts: 1,
                 validateResponse: text => {
                     if (JSON.parse(text).ok !== true) {
@@ -356,7 +519,7 @@ async function run() {
             };
             await assert.rejects(
                 aiService.completeWithAI([{ role: 'user', content: 'Gemini safe error mapping test' }], {
-                    feature: 'career_assistant',
+                    feature: 'assessment_question_generation',
                     maxAttempts: 1
                 }),
                 error => error.code === code && error.provider === 'Gemini'
@@ -371,7 +534,7 @@ async function run() {
         };
         await assert.rejects(
             aiService.completeWithAI([{ role: 'user', content: 'Gemini timeout handling test' }], {
-                feature: 'career_assistant',
+                feature: 'assessment_question_generation',
                 maxAttempts: 1
             }),
             error => error.code === 'AI_PROVIDER_TIMEOUT' &&
@@ -388,7 +551,7 @@ async function run() {
         };
         await assert.rejects(
             aiService.completeWithAI([{ role: 'user', content: 'missing Gemini key' }], {
-                feature: 'career_assistant',
+                feature: 'assessment_question_generation',
                 maxAttempts: 1
             }),
             error => error.code === 'AI_PROVIDER_NOT_CONFIGURED' && error.provider === 'Gemini'
@@ -512,6 +675,10 @@ async function run() {
                 choices: [{ message: { content: 'A response grounded in saved career context.' } }]
             }), { status: 200 });
         };
+        process.env.AI_PROVIDER = 'openrouter';
+        process.env.OPENROUTER_MODEL = 'deepseek/test-model';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_APPROVED = 'true';
+        process.env.CAREERHUB_AI_DATA_PROCESSING_PROVIDER = 'openrouter';
         const contextualAssistant = await aiService.chatCareerAssistant(
             'What should I practice next?',
             [{ role: 'assistant', content: 'Prior provider answer.' }],

@@ -338,13 +338,20 @@
         $('mcqWorkspace').classList.toggle('hidden', state.mode !== 'mcq');
         $('spokenWorkspace').classList.toggle('hidden', state.mode === 'mcq');
         $('pauseSession').classList.toggle('hidden', state.mode === 'mcq');
-        const generatedByAI = data.generationSource === 'openrouter';
+        $('cameraToggle').classList.toggle('hidden', state.mode !== 'video');
+        $('videoPlaceholder').textContent = state.mode === 'voice'
+          ? 'Audio-only practice. Your microphone is requested for this session; recording remains optional and local.'
+          : 'Camera preview starts only after you start a Video Interview. Or practice with the text response field.';
+        const generatedByAI = ['gemini', 'openrouter', 'groq'].includes(data.generationSource);
         $('sessionSource').textContent = generatedByAI
-          ? 'Questions generated for this session'
+          ? data.contextMode === 'generic_privacy_safe'
+            ? 'General AI-generated questions · profile data was not sent'
+            : 'Questions generated for this session'
           : 'Curated practice · not AI-generated';
         if (generatedByAI) {
           $('providerStatus').dataset.state = 'ready';
-          $('providerStatus').textContent = 'AI Interview Coach ready';
+          $('providerStatus').textContent = data.privacyNotice ||
+            `${data.generationSource} generated the questions for this session.`;
         } else {
           $('providerStatus').dataset.state = 'unavailable';
           $('providerStatus').textContent = 'AI generation unavailable for this session. Curated practice is active.';
@@ -370,7 +377,7 @@
             mode: data.mode || state.mode,
             sessionLength: data.sessionLength || Number($('lengthSelect').value)
           });
-          if (state.mode === 'video') await requestCamera();
+          if (['video', 'voice'].includes(state.mode)) await requestMedia();
           $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (error) {
           setBanner($('setupError'), error.message, 'error');
@@ -378,25 +385,56 @@
           button.disabled = false;
         }
       }
-      async function requestCamera() {
-        if (state.mode !== 'video') return;
+      async function requestMedia() {
+        if (!['video', 'voice'].includes(state.mode)) return;
+        const needsVideo = state.mode === 'video';
+        let timeoutId;
+        let permissionTimedOut = false;
         try {
-          state.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          $('cameraPreview').srcObject = state.stream;
-          $('cameraPreview').classList.remove('hidden');
-          $('videoPlaceholder').classList.add('hidden');
-          $('cameraToggle').disabled = false;
+          if (!navigator.mediaDevices?.getUserMedia) {
+            throw Object.assign(new Error('Media capture is unavailable in this browser.'), { name: 'NotSupportedError' });
+          }
+          const mediaRequest = navigator.mediaDevices.getUserMedia({
+            video: needsVideo,
+            audio: true
+          });
+          mediaRequest.then(stream => {
+            if (permissionTimedOut) stream.getTracks().forEach(track => track.stop());
+          }).catch(() => {});
+          const permissionTimeout = new Promise((resolve, reject) => {
+            timeoutId = setTimeout(() => {
+              permissionTimedOut = true;
+              reject(Object.assign(new Error('The permission prompt did not finish in time.'), { name: 'TimeoutError' }));
+            }, 12000);
+          });
+          state.stream = await Promise.race([mediaRequest, permissionTimeout]);
+          if (needsVideo) {
+            $('cameraPreview').srcObject = state.stream;
+            $('cameraPreview').classList.remove('hidden');
+            $('videoPlaceholder').classList.add('hidden');
+          }
+          $('cameraToggle').disabled = !needsVideo;
           $('microphoneToggle').disabled = false;
           $('cameraToggle').textContent = 'Turn camera off';
           $('microphoneToggle').textContent = 'Mute microphone';
           $('recordToggle').disabled = !window.MediaRecorder;
           $('recordConsentWrap').classList.remove('hidden');
-          setBanner($('cameraStatus'), 'Camera and microphone are active in this tab. Nothing is recorded unless you separately consent and start local recording.', 'success');
+          setBanner($('cameraStatus'),
+            `${needsVideo ? 'Camera and microphone' : 'Microphone'} are active in this tab. Nothing is recorded unless you separately consent and start local recording.`,
+            'success');
         } catch (error) {
           $('cameraPreview').classList.add('hidden');
           $('videoPlaceholder').classList.remove('hidden');
           $('recordConsentWrap').classList.add('hidden');
-          setBanner($('cameraStatus'), `Camera/microphone permission is unavailable (${error.name || 'permission denied'}). Continue with the text response option.`, 'error');
+          $('cameraToggle').disabled = true;
+          $('microphoneToggle').disabled = true;
+          $('recordToggle').disabled = true;
+          const reason = error.name === 'TimeoutError'
+            ? 'The browser permission prompt timed out.'
+            : `Permission is unavailable (${error.name || 'permission denied'}).`;
+          setBanner($('cameraStatus'), `${reason} Continue with the text response option.`, 'error');
+        } finally {
+          clearTimeout(timeoutId);
         }
       }
       async function startPractice() {
@@ -424,7 +462,7 @@
             })
           });
           showWorkspace(data);
-          if (state.mode === 'video') await requestCamera();
+          if (['video', 'voice'].includes(state.mode)) await requestMedia();
           $('workspace').scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch (error) {
           setBanner($('setupError'), error.message, 'error');
@@ -510,9 +548,7 @@
           state.evaluated = true;
           updateProgress();
         } catch (error) {
-          const message = error.code?.startsWith('AI_')
-            ? 'AI evaluation is temporarily unavailable. Your answer was not scored. Please try again.'
-            : `${error.message} Your answer was not scored.`;
+          const message = `${error.message} Your answer was not scored. You can retry without re-entering it.`;
           setBanner($('workspaceError'), message, 'error');
         } finally {
           $('evaluateSpoken').disabled = false;
@@ -661,14 +697,12 @@
           loadHistory();
         }
         try {
-          const status = await api('/api/career/assistant/status');
+          const status = await api('/api/interview/status');
           const ready = status.ready === true;
           $('providerStatus').dataset.state = ready ? 'ready' : 'unavailable';
           $('providerStatus').textContent = ready
-            ? 'AI Interview Coach ready'
-            : status.configured
-              ? 'AI availability has not yet been confirmed. It is checked again when you start a session.'
-              : 'AI temporarily unavailable. Curated questions are clearly labeled.';
+            ? status.privacyNotice
+            : 'AI question generation is unavailable. Check provider configuration; do not assume questions are AI-generated.';
         } catch (_) {
           $('providerStatus').dataset.state = 'unavailable';
           $('providerStatus').textContent = 'AI availability could not be checked.';

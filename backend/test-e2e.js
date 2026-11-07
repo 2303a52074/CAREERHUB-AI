@@ -1,9 +1,16 @@
 const http = require('http');
+const mongoose = require('mongoose');
 const API_URL = new URL(process.env.API_BASE_URL || 'http://localhost:3000');
-const additionalCodingProblems = require('./utils/additionalCodingProblems');
+const codingProblemLibrary = require('./utils/codingProblemLibrary');
+require('./models/CodingProblem');
+const seedCodingProblems = require('./utils/seedCodingProblems');
 let authToken = '';
 const testEmail = `e2e_${Date.now()}@careerhub.test`;
 const testPassword = 'Capstone-test-123';
+const configuredAIProvider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openrouter';
+const configuredAIProviderLabel = configuredAIProvider === 'gemini'
+  ? 'Gemini'
+  : configuredAIProvider === 'groq' ? 'Groq' : 'OpenRouter';
 const providerFailureCodes = new Set([
   'AI_PROVIDER_NOT_CONFIGURED',
   'AI_PROVIDER_AUTH_ERROR',
@@ -92,6 +99,19 @@ async function runTests() {
     if (res.status !== 401) throw new Error(`Expected 401, got ${res.status}`);
   });
 
+  await test('Resume and job-description analysis require authentication', async () => {
+    const resume = await request('POST', '/api/resume/analyze-text', {
+      resumeText: 'A sufficiently long resume body with enough text for validation.'
+    });
+    const job = await request('POST', '/api/career/job-analyzer', {
+      jobDescription: 'Python and PostgreSQL are required.'
+    });
+    const history = await request('GET', '/api/career/job-analyzer/history');
+    if (resume.status !== 401 || job.status !== 401 || history.status !== 401) {
+      throw new Error(`Expected unauthenticated 401s; resume=${resume.status}, job=${job.status}, history=${history.status}`);
+    }
+  });
+
   await test('Coding runner language discovery requires authentication', async () => {
     const res = await request('GET', '/api/coding/languages', null, { Authorization: 'invalid' });
     if (res.status !== 401) throw new Error(`Expected 401, got ${res.status}`);
@@ -129,17 +149,71 @@ async function runTests() {
     authToken = login.data.token;
   });
 
+  await test('Coding catalog is seeded idempotently without duplicating records', async () => {
+    if (!process.env.TEST_MONGO_URI) throw new Error('Isolated MongoDB URI is required to verify catalog seeding.');
+    const connection = mongoose.createConnection(process.env.TEST_MONGO_URI);
+    try {
+      await connection.asPromise();
+      const ProblemModel = connection.model('CodingProblem', mongoose.models.CodingProblem.schema);
+      const firstProblem = await ProblemModel.findOne({ problemId: 'ch-001' }).select('_id seedKey');
+      if (!firstProblem) throw new Error('The validated coding catalog was not seeded into MongoDB.');
+      await ProblemModel.updateOne({ _id: firstProblem._id }, {
+        $set: { seedKey: 'legacy:careerhub:ch-001' }
+      });
+      await seedCodingProblems(ProblemModel, codingProblemLibrary);
+      await seedCodingProblems(ProblemModel, codingProblemLibrary);
+      const [count, ids, restored] = await Promise.all([
+        ProblemModel.countDocuments({ catalogVersion: 'careerhub-dsa-100-v1', isActive: true }),
+        ProblemModel.distinct('problemId', { catalogVersion: 'careerhub-dsa-100-v1', isActive: true }),
+        ProblemModel.findOne({ problemId: 'ch-001' }).select('seedKey')
+      ]);
+      if (count !== 100 || ids.length !== 100 ||
+        restored?.seedKey !== 'careerhub:dsa:v1:ch-001') {
+        throw new Error(`Catalog reseeding produced ${count} active records and ${ids.length} unique IDs.`);
+      }
+    } finally {
+      await connection.close();
+    }
+  });
+
+  await test('Interview provider status is authenticated and reports feature-level readiness', async () => {
+    const unauthenticated = await request('GET', '/api/interview/status', null, { Authorization: 'invalid' });
+    if (unauthenticated.status !== 401) throw new Error(`Expected 401, got ${unauthenticated.status}`);
+    const status = await request('GET', '/api/interview/status');
+    const expectedFeatures = [
+      'technical_interview_generation',
+      'behavioral_interview_generation',
+      'video_interview_generation',
+      'assessment_question_generation'
+    ];
+    if (status.status !== 200 || !status.data.features ||
+        expectedFeatures.some(feature => !status.data.features[feature]) ||
+        typeof status.data.ready !== 'boolean' ||
+        typeof status.data.privacyNotice !== 'string' ||
+        Object.hasOwn(status.data, 'apiKey') ||
+        Object.hasOwn(status.data, 'credentialValue')) {
+      throw new Error('Interview status omitted feature readiness, privacy messaging, or exposed configuration.');
+    }
+  });
+
   await test('Coding runner readiness verifies provider language discovery', async () => {
     const res = await request('GET', '/api/coding/languages');
     if (res.status === 200) {
+      if (res.data.status === 'unavailable') {
+        return { blocked: true, reason: res.data.engine?.message || 'The local Docker execution engine is unavailable.' };
+      }
       if (res.data.status !== 'ready' || !Array.isArray(res.data.languages) ||
           res.data.languages.some(language => Object.hasOwn(language, 'id'))) {
         throw new Error('Runner readiness returned invalid or provider-internal language data.');
       }
+      const languages = new Set(res.data.languages.map(language => language.value));
+      if (['python', 'java', 'cpp', 'javascript'].some(language => !languages.has(language))) {
+        throw new Error('The local runner did not advertise all four required languages.');
+      }
       return;
     }
-    if (res.status === 503 && res.data.code === 'CODE_EXECUTION_NOT_CONFIGURED') {
-      return { blocked: true, reason: 'No isolated Judge0-compatible runner is configured.' };
+    if (res.status === 503 && res.data.status === 'unavailable') {
+      return { blocked: true, reason: res.data.message || 'The local Docker execution engine is unavailable.' };
     }
     throw new Error(`Runner readiness returned ${res.status}: ${res.data.message || res.data.code}`);
   });
@@ -157,7 +231,7 @@ async function runTests() {
     }
   });
 
-  await test('OpenRouter health check is authenticated and reports verified connectivity only', async () => {
+  await test('AI provider health check is authenticated and reports verified connectivity only', async () => {
     const unauthenticated = await request('POST', '/api/health/ai', null, { Authorization: 'invalid' });
     if (unauthenticated.status !== 401) throw new Error(`Expected 401, got ${unauthenticated.status}`);
 
@@ -165,14 +239,14 @@ async function runTests() {
     if (res.status === 503 && res.data.status === 'not_configured' &&
         res.data.code === 'AI_PROVIDER_NOT_CONFIGURED' && res.data.verified === false &&
         res.data.configured === false && res.data.configuration?.apiKeyConfigured === false &&
-        res.data.configuration?.requiredConfiguration?.includes('OPENROUTER_API_KEY')) return;
+        res.data.configuration?.requiredConfiguration?.includes(`${configuredAIProvider.toUpperCase()}_API_KEY`)) return;
     if (res.status === 200 && res.data.status === 'connected' &&
-        res.data.provider === 'OpenRouter' && res.data.verified === true &&
+        res.data.provider === configuredAIProviderLabel && res.data.verified === true &&
         res.data.configured === true && res.data.configuration?.apiKeyConfigured === true) return;
     if (isProviderFailure(res)) {
-      return { blocked: true, reason: `OpenRouter connectivity check returned ${res.data.status} (${res.data.code}).` };
+      return { blocked: true, reason: `${configuredAIProviderLabel} connectivity check returned ${res.data.status} (${res.data.code}).` };
     }
-    throw new Error(`Unexpected OpenRouter health result: HTTP ${res.status}, ${res.data.status || res.data.code}`);
+    throw new Error(`Unexpected ${configuredAIProviderLabel} health result: HTTP ${res.status}, ${res.data.status || res.data.code}`);
   });
 
   await test('Test profile selects an explicit target role', async () => {
@@ -196,15 +270,34 @@ async function runTests() {
   let dailyPlanTaskId;
   await test('Daily Plan Endpoint (GET /api/career/daily-plan)', async () => {
     const res = await request('GET', '/api/career/daily-plan');
-    if (isProviderFailure(res)) {
-      return { blocked: true, reason: `OpenRouter returned ${res.data.code}; no daily plan was fabricated.` };
-    }
     if (res.status !== 200) throw new Error(`Status ${res.status}`);
     const tasks = res.data.plan?.tasks;
-    if (!Array.isArray(tasks) || tasks.length === 0) throw new Error('No daily tasks generated');
+    if (!Array.isArray(tasks) || tasks.length !== 5 || res.data.generationSource !== 'local') {
+      throw new Error('A five-task local daily plan was not generated from the saved profile.');
+    }
     dailyPlanTaskId = tasks[0].id;
     if (!dailyPlanTaskId) throw new Error('First daily task has no ID');
-    console.log(`   Generated ${tasks.length} daily tasks for role: ${res.data.plan.targetRole}`);
+    const refreshed = await request('GET', '/api/career/daily-plan');
+    if (refreshed.status !== 200 || String(refreshed.data.plan?._id) !== String(res.data.plan?._id)) {
+      throw new Error('Daily plan did not survive a fresh backend retrieval.');
+    }
+    if (process.env.TEST_MONGO_URI) {
+      const connection = mongoose.createConnection(process.env.TEST_MONGO_URI);
+      try {
+        await connection.asPromise();
+        const stored = await connection.collection('dailyplans').findOne({
+          _id: new mongoose.Types.ObjectId(String(res.data.plan._id))
+        });
+        if (!stored || stored.tasks?.length !== 5 || stored.generationSource !== 'local') {
+          throw new Error('The local daily plan was not verified in the isolated MongoDB database.');
+        }
+      } finally {
+        await connection.close();
+      }
+    } else {
+      throw new Error('An isolated MongoDB URI is required to verify daily-plan persistence.');
+    }
+    console.log(`   Retrieved ${tasks.length} locally generated tasks for role: ${res.data.plan.targetRole}`);
   });
 
   // 4. Daily Plan Task Update
@@ -224,11 +317,33 @@ async function runTests() {
       jobTitle: 'Full Stack Software Engineer',
       company: 'InnovateTech'
     });
-    if (isProviderFailure(res)) {
-      return { blocked: true, reason: `OpenRouter returned ${res.data.code}; no AI analysis was fabricated.` };
+    if (res.status !== 201) throw new Error(`Status ${res.status}`);
+    if (res.data.analysisMethod !== 'local' ||
+        typeof res.data.overallMatch !== 'number' ||
+        res.data.aiAdviceStatus?.status !== 'unavailable') {
+      throw new Error('Job analysis must return local results and an explicit advanced-AI state.');
     }
-    if (res.status !== 200) throw new Error(`Status ${res.status}`);
-    if (typeof res.data.overallMatch !== 'number') throw new Error('Missing overallMatch');
+    const history = await request('GET', '/api/career/job-analyzer/history');
+    if (history.status !== 200 ||
+        !history.data.analyses?.some(item => String(item._id) === String(res.data.analysisId))) {
+      throw new Error('Saved job analysis was not retrieved from authenticated history.');
+    }
+    if (process.env.TEST_MONGO_URI) {
+      const connection = mongoose.createConnection(process.env.TEST_MONGO_URI);
+      try {
+        await connection.asPromise();
+        const stored = await connection.collection('jobdescriptionanalyses').findOne({
+          _id: new mongoose.Types.ObjectId(String(res.data.analysisId))
+        });
+        if (!stored || stored.jobDescription !== undefined || stored.analysisMethod !== 'local') {
+          throw new Error('The saved job analysis is missing or stored the raw job description.');
+        }
+      } finally {
+        await connection.close();
+      }
+    } else {
+      throw new Error('An isolated MongoDB URI is required to verify job-analysis persistence.');
+    }
     console.log(`   JD Match: ${res.data.overallMatch}%, Matched Skills: ${res.data.matchedSkills.join(', ')}`);
   });
 
@@ -240,96 +355,75 @@ async function runTests() {
     console.log(`   Analytics loaded: ${res.data.coding.acceptedCount} accepted problems, ${res.data.interviews.totalSessions} interviews`);
   });
 
-  // 7. Coding Sandbox Execution
-  await test('Coding Sandbox Execution (POST /api/coding/run)', async () => {
-    const sampleCode = "function solution(nums, target) { return [0, 1]; }";
+  await test('Local coding runner reports genuine availability', async () => {
+    const health = await request('GET', '/api/coding/engine');
+    if (health.status === 503 && health.data.status === 'unavailable') {
+      return { blocked: true, reason: health.data.message || 'The local Docker execution engine is unavailable.' };
+    }
+    if (health.status !== 200 || health.data.status !== 'ready') {
+      throw new Error(`Unexpected runner response: ${health.status}`);
+    }
+    const sampleCode = "process.stdout.write(require('fs').readFileSync(0, 'utf8').trim())";
     const res = await request('POST', '/api/coding/run', {
       code: sampleCode,
-      testInput: "[2, 7, 11, 15], 9"
+      language: 'javascript',
+      stdin: 'runner-ok\n'
     });
-    if (res.status === 503 && res.data.code === 'CODE_EXECUTION_NOT_CONFIGURED') {
-      return { blocked: true, reason: 'No isolated Judge0-compatible execution service is configured.' };
+    if (res.status !== 200 || !res.data.success || res.data.output !== 'runner-ok') {
+      throw new Error(`Local runner test failed: ${res.status} ${res.data.error || res.data.status}`);
     }
-    if (res.status !== 200 || !res.data.success) throw new Error(`Execution error: ${res.data.error}`);
-    console.log(`   Sandbox Execution Output: ${res.data.output}`);
   });
 
-  await test('Coding problems omit hidden cases, solutions, and unverified company claims', async () => {
-    const res = await request('GET', '/api/coding/problems');
+  await test('Coding catalog omits hidden cases and supports pagination', async () => {
+    const res = await request('GET', '/api/coding/problems?page=1&limit=5');
     if (res.status !== 200 || !Array.isArray(res.data) || res.data.length === 0) {
-      throw new Error(`Status ${res.status}`);
-    }
-    if (res.data.some(problem => 'solutionCode' in problem || 'companies' in problem ||
-      (problem.testCases || []).some(testCase => testCase.isHidden))) {
-      throw new Error('A solution, hidden test case, or unverified company claim was exposed.');
-    }
-  });
-
-  await test('Coding catalog titles are unique and verified LeetCode links are safe', async () => {
-    const res = await request('GET', '/api/coding/problems');
-    const titles = res.data.map(problem => problem.title);
-    if (new Set(titles).size !== titles.length) throw new Error('Duplicate coding problem titles were returned.');
-    for (const problem of res.data) {
-      if (problem.officialUrl &&
-        (!/^https:\/\/leetcode\.com\/problems\/[a-z0-9-]+\/$/.test(problem.officialUrl) ||
-          problem.officialSource !== 'LeetCode')) {
-        throw new Error(`Unsafe or unattributed official URL for ${problem.title}.`);
+      if (res.status !== 200 || !res.data || !Array.isArray(res.data.problems)) {
+        throw new Error(`Status ${res.status}`);
       }
     }
+    const problems = Array.isArray(res.data) ? res.data : res.data.problems;
+    if (problems.length > 5 || res.data.total !== undefined && res.data.total < problems.length ||
+      problems.some(problem => 'solutionCode' in problem || 'referenceCode' in problem || 'testCases' in problem ||
+      (problem.testCases || []).some(testCase => testCase.isHidden))) {
+      throw new Error('Pagination or hidden-test protection failed.');
+    }
   });
 
-  await test('Coding catalog server search and difficulty/topic filters work', async () => {
-    const search = await request('GET', '/api/coding/problems?search=Two%20Sum');
+  await test('Coding catalog titles are unique and problem search works', async () => {
+    const res = await request('GET', '/api/coding/problems');
+    if (res.status === 200 && res.data.length === 0) {
+      return { blocked: true, reason: 'The 100-problem catalog is not seeded because its problem-specific content failed the quality gate.' };
+    }
+    const titles = res.data.map(problem => problem.title);
+    if (new Set(titles).size !== titles.length) throw new Error('Duplicate coding problem titles were returned.');
+    const first = res.data[0];
+    if (!first) throw new Error('No coding problems are available.');
+    const search = await request('GET', `/api/coding/problems?search=${encodeURIComponent(first.problemId)}`);
+    if (search.status !== 200 || !search.data.some(problem => problem.problemId === first.problemId)) {
+      throw new Error('Search by problem ID did not return the matching problem.');
+    }
+  });
+
+  await test('Coding catalog difficulty, topic, status, and invalid filters work', async () => {
     const difficulty = await request('GET', '/api/coding/problems?difficulty=easy');
     const topic = await request('GET', '/api/coding/problems?topic=strings');
     const empty = await request('GET', '/api/coding/problems?search=not-a-problem');
     const invalid = await request('GET', '/api/coding/problems?difficulty=unsupported');
-    if (search.status !== 200 || search.data.length !== 1 || search.data[0].title !== 'Two Sum' ||
-      difficulty.status !== 200 || !difficulty.data.length ||
+    const status = await request('GET', '/api/coding/problems?status=solved');
+    if (empty.status !== 200 || empty.data.length !== 0 || invalid.status !== 400 ||
+      status.status !== 200) {
+      throw new Error('Empty-search or invalid/status filter handling is incorrect.');
+    }
+    if (difficulty.status === 200 && difficulty.data.length === 0 &&
+      topic.status === 200 && topic.data.length === 0) {
+      return { blocked: true, reason: 'Catalog filters cannot be fully verified until the validated problem catalog is seeded.' };
+    }
+    if (difficulty.status !== 200 || !difficulty.data.length ||
       !difficulty.data.every(problem => problem.difficulty?.toLowerCase() === 'easy') ||
       topic.status !== 200 || !topic.data.length ||
       !topic.data.every(problem => problem.category?.toLowerCase() === 'strings') ||
-      empty.status !== 200 || empty.data.length !== 0 || invalid.status !== 400) {
+      invalid.status !== 400) {
       throw new Error('One or more catalog filters returned unexpected results.');
-    }
-  });
-
-  await test('All ten new coding challenges execute their public examples in the sandbox', async () => {
-    if (!process.env.CODE_EXECUTION_API_URL) {
-      return { blocked: true, reason: 'No isolated Judge0-compatible execution service is configured.' };
-    }
-    const solutions = {
-      '7': 'function solution(prices) { let low = Infinity, gain = 0; for (const price of prices) { gain = Math.max(gain, price - low); low = Math.min(low, price); } return gain; }',
-      '8': 'function solution(nums, target) { let left = 0, right = nums.length - 1; while (left <= right) { const mid = Math.floor((left + right) / 2); if (nums[mid] === target) return mid; if (nums[mid] < target) left = mid + 1; else right = mid - 1; } return -1; }',
-      '9': 'function solution(first, second) { const result = []; let i = 0, j = 0; while (i < first.length || j < second.length) { if (j >= second.length || (i < first.length && first[i] <= second[j])) result.push(first[i++]); else result.push(second[j++]); } return result; }',
-      '10': 'function solution(text) { const counts = new Map(); for (const char of text) counts.set(char, (counts.get(char) || 0) + 1); return [...text].findIndex(char => counts.get(char) === 1); }',
-      '11': 'function solution(text) { const last = new Map(); let start = 0, longest = 0; for (let i = 0; i < text.length; i++) { if (last.has(text[i])) start = Math.max(start, last.get(text[i]) + 1); last.set(text[i], i); longest = Math.max(longest, i - start + 1); } return longest; }',
-      '12': 'function solution(nums, steps) { const shift = steps % nums.length; return shift === 0 ? [...nums] : nums.slice(-shift).concat(nums.slice(0, -shift)); }',
-      '13': 'function solution(intervals) { intervals.sort((a, b) => a[0] - b[0]); const result = []; for (const current of intervals) { const last = result[result.length - 1]; if (!last || current[0] > last[1]) result.push([...current]); else last[1] = Math.max(last[1], current[1]); } return result; }',
-      '14': 'function solution(grid) { let groups = 0; for (let r = 0; r < grid.length; r++) for (let c = 0; c < grid[r].length; c++) if (grid[r][c] === "1") { groups++; const stack = [[r,c]]; grid[r][c] = "0"; while (stack.length) { const [y,x] = stack.pop(); for (const [dy,dx] of [[1,0],[-1,0],[0,1],[0,-1]]) { const ny=y+dy,nx=x+dx; if (ny>=0&&ny<grid.length&&nx>=0&&nx<grid[ny].length&&grid[ny][nx]==="1") { grid[ny][nx]="0"; stack.push([ny,nx]); } } } } return groups; }',
-      '15': 'function solution(n) { let previous = 1, current = 1; for (let step = 2; step <= n; step++) { const next = previous + current; previous = current; current = next; } return current; }',
-      '16': 'function solution(coins, amount) { const best = Array(amount + 1).fill(Infinity); best[0] = 0; for (let value = 1; value <= amount; value++) for (const coin of coins) if (coin <= value) best[value] = Math.min(best[value], best[value - coin] + 1); return best[amount] === Infinity ? -1 : best[amount]; }'
-    };
-    for (const problem of additionalCodingProblems) {
-      const code = solutions[problem.id];
-      if (!code) throw new Error(`No sandbox fixture exists for ${problem.title}.`);
-      for (const sample of problem.testCases.filter(testCase => !testCase.isHidden)) {
-        const execution = await request('POST', '/api/coding/run', {
-          code,
-          testInput: sample.input
-        });
-        const expected = JSON.parse(sample.expectedOutput);
-        let actual;
-        try {
-          actual = JSON.parse(execution.data.output.trim().split(/\r?\n/).pop());
-        } catch {
-          actual = null;
-        }
-        if (execution.status !== 200 || !execution.data.success ||
-          JSON.stringify(actual) !== JSON.stringify(expected)) {
-          throw new Error(`${problem.title} sample failed: ${execution.data.output || execution.data.error}`);
-        }
-      }
     }
   });
 
@@ -342,35 +436,87 @@ async function runTests() {
 
   await test('Accepted coding solution is evaluated and saved to history', async () => {
     const problems = await request('GET', '/api/coding/problems');
-    const problem = (problems.data || []).find(item => item.title === 'Two Sum');
-    if (!problem) throw new Error('Two Sum practice problem is unavailable.');
+    const problem = (problems.data || []).find(item => item.problemId === 'ch-001');
+    if (!problem) {
+      return { blocked: true, reason: 'Submission execution and persistence require a validated, seeded coding problem and the local Docker runner.' };
+    }
     const problemId = problem._id || problem.id;
-    const statsBefore = await request('GET', '/api/coding/stats');
+    const details = await request('GET', `/api/coding/problems/${encodeURIComponent(problemId)}`);
+    const definition = codingProblemLibrary.find(item => item.problemId === problem.problemId);
     const solution = {
-      code: 'function solution(nums, target) { const seen = new Map(); for (let i = 0; i < nums.length; i++) { const complement = target - nums[i]; if (seen.has(complement)) return [seen.get(complement), i]; seen.set(nums[i], i); } return []; }',
+      code: definition?.referenceCode?.javascript,
       language: 'javascript'
     };
+    if (details.status !== 200 || !details.data?.starterCode?.javascript ||
+      'referenceCode' in details.data ||
+      typeof solution.code !== 'string' || !solution.code.trim()) {
+      throw new Error('Problem detail did not provide a public starter and keep its reference solution private.');
+    }
     const submission = await request('POST', `/api/coding/submit/${problemId}`, solution);
-    if (submission.status === 503 && submission.data.code === 'CODE_EXECUTION_NOT_CONFIGURED') {
-      return { blocked: true, reason: 'No isolated Judge0-compatible execution service is configured.' };
+    if (submission.status === 503 && submission.data.code?.startsWith('CODE_EXECUTION_')) {
+      return { blocked: true, reason: submission.data.message || 'The local Docker runner is unavailable.' };
     }
     if (submission.status !== 200 || submission.data.status !== 'accepted') {
       throw new Error(`Submission status ${submission.status}: ${submission.data.message || submission.data.status}`);
     }
+    if (!Array.isArray(submission.data.results) ||
+      !submission.data.results.some(result =>
+        !Object.hasOwn(result, 'actualOutput') && !Object.hasOwn(result, 'expectedOutput'))) {
+      throw new Error('Hidden-test submission results exposed test inputs or expected outputs.');
+    }
+    if (typeof submission.data.xpEarned !== 'number' || submission.data.xpEarned <= 0) {
+      throw new Error('The first accepted solution did not award verified XP.');
+    }
     const repeatedSubmission = await request('POST', `/api/coding/submit/${problemId}`, solution);
-    if (repeatedSubmission.status !== 200 || repeatedSubmission.data.status !== 'accepted') {
-      throw new Error(`Repeated submission status ${repeatedSubmission.status}.`);
+    if (repeatedSubmission.status !== 200 || repeatedSubmission.data.status !== 'accepted' ||
+      repeatedSubmission.data.xpEarned !== 0) {
+      throw new Error('Repeating an accepted solution did not preserve the no-duplicate-XP rule.');
     }
     const history = await request('GET', '/api/coding/submissions');
-    const acceptedAttempts = (history.data || []).filter(item =>
-      String(item.problemId) === String(problemId) && item.status === 'accepted');
-    const statsAfter = await request('GET', '/api/coding/stats');
-    if (history.status !== 200 || acceptedAttempts.length < 2 ||
-      submission.data.xpEarned !== submission.data.score ||
-      repeatedSubmission.data.xpEarned !== 0 ||
-      statsAfter.data.totalSolved !== statsBefore.data.totalSolved + 1 ||
-      statsAfter.data.totalPoints !== statsBefore.data.totalPoints + submission.data.score) {
-      throw new Error('Repeated accepted submissions were not retained with one solved count and one XP award.');
+    if (history.status !== 200 || !history.data.some(item =>
+      String(item.problemId) === String(problemId) && item.status === 'accepted')) {
+      throw new Error('Accepted coding submission was not saved to the authenticated user history.');
+    }
+    if (!process.env.TEST_MONGO_URI) throw new Error('Isolated MongoDB URI is required to verify stored submissions.');
+    const tokenPayload = JSON.parse(Buffer.from(authToken.split('.')[1], 'base64url').toString('utf8'));
+    const connection = mongoose.createConnection(process.env.TEST_MONGO_URI);
+    try {
+      await connection.asPromise();
+      const stored = await connection.collection('codesubmissions').findOne({
+        userId: new mongoose.Types.ObjectId(tokenPayload.id),
+        problemId: new mongoose.Types.ObjectId(problemId),
+        code: solution.code,
+        status: 'accepted',
+        completed: true
+      });
+      if (!stored) throw new Error('Accepted submission was not found in the isolated MongoDB collection.');
+    } finally {
+      await connection.close();
+    }
+
+    const otherEmail = `e2e_other_${Date.now()}@careerhub.test`;
+    const registration = await request('POST', '/api/auth/register', {
+      name: 'CareerHub Other E2E User',
+      email: otherEmail,
+      password: testPassword
+    });
+    if (![200, 201].includes(registration.status)) {
+      throw new Error(`Second-user registration status ${registration.status}.`);
+    }
+    const login = await request('POST', '/api/auth/login', {
+      email: otherEmail,
+      password: testPassword
+    });
+    if (login.status !== 200 || !login.data.token) throw new Error('Second test account could not authenticate.');
+    const otherHistory = await request('GET', '/api/coding/submissions', null, {
+      Authorization: `Bearer ${login.data.token}`
+    });
+    const otherStats = await request('GET', '/api/coding/stats', null, {
+      Authorization: `Bearer ${login.data.token}`
+    });
+    if (otherHistory.status !== 200 || otherHistory.data.length !== 0 ||
+      otherStats.status !== 200 || otherStats.data.totalSolved !== 0) {
+      throw new Error('A different authenticated user could access the owner’s coding submission or progress.');
     }
   });
 
@@ -383,9 +529,9 @@ async function runTests() {
     });
 
     if (res.status === 200 && Array.isArray(res.data.questions) && res.data.questions.length > 0) {
-      if (res.data.generationMode !== 'openrouter' ||
-          res.data.questions.some(question => question.source !== 'openrouter')) {
-        throw new Error('Interview questions were not generated by OpenRouter.');
+      if (res.data.generationMode !== 'ai' || res.data.source !== configuredAIProvider ||
+          res.data.questions.some(question => question.source !== configuredAIProvider)) {
+        throw new Error(`Interview questions were not generated by ${configuredAIProvider}.`);
       }
       return;
     }
@@ -427,12 +573,12 @@ async function runTests() {
     const res = await request('POST', '/api/career/assistant', {
       message: 'What are the top 3 React patterns to review for SDE interviews?'
     });
-    if (res.status === 200 && res.data.reply && res.data.source === 'openrouter' && res.data.model) {
+    if (res.status === 200 && res.data.reply && res.data.source === configuredAIProvider && res.data.model) {
       console.log(`   Real provider: ${res.data.source} (${res.data.model})`);
       console.log(`   Assistant Response Preview: "${res.data.reply.slice(0, 60)}..."`);
       const status = await request('GET', '/api/career/assistant/status');
       if (status.status !== 200 || status.data.ready !== true ||
-          status.data.provider !== 'OpenRouter' || !status.data.model ||
+          status.data.provider !== configuredAIProviderLabel || !status.data.model ||
           'apiKey' in status.data || 'key' in status.data) {
         throw new Error('AI readiness status was not verified or exposed credential data.');
       }

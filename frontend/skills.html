@@ -242,7 +242,8 @@
             aiStatus.textContent = 'No missing benchmark skills need additional AI guidance for this role.';
           } else {
             aiStatus.textContent = data.aiAdviceStatus?.status === 'unavailable'
-              ? 'AI guidance could not be generated. The calculated skill gaps below are still available.'
+              ? data.aiAdviceStatus.message ||
+                'AI guidance could not be generated. The calculated skill gaps below are still available.'
               : 'Personalized AI guidance is temporarily unavailable. Skill gaps below are calculated from your profile.';
           }
           document.getElementById('skillGapSavedState').textContent = data.generatedAt

@@ -1,4 +1,5 @@
 const messages = {
+    AI_PERSONAL_CONTEXT_NOT_SUPPORTED: 'Free AI mode handles general career questions only. It does not use your profile or chat history; remove personal details and ask a general question.',
     AI_PROVIDER_NOT_CONFIGURED: 'The configured AI provider is not ready. Check its backend-only environment settings and restart the backend.',
     AI_PROVIDER_QUOTA_EXCEEDED: 'The AI provider quota is exhausted. Wait for quota to reset or configure an explicitly qualified provider.',
     AI_PROVIDER_AUTH_ERROR: 'The AI provider rejected the server credentials. Check the backend-only API key setting.',
@@ -15,6 +16,31 @@ const messages = {
 
 function providerErrorMessage(code, feature = 'AI request', error = null) {
     if (code === 'AI_ANSWER_REQUIRED') return messages[code];
+    if (code === 'AI_PERSONAL_CONTEXT_NOT_SUPPORTED') return error?.userMessage || messages[code];
+    const configurationIssue = error?.providerDiagnostics?.configurationIssue;
+    if (code === 'AI_PROVIDER_NOT_CONFIGURED' && error?.provider === 'Gemini') {
+        const configurationMessages = {
+            missing_api_key: 'GEMINI_API_KEY is missing from backend environment configuration.',
+            missing_model: 'GEMINI_MODEL is missing from backend environment configuration.',
+            unsupported_feature: 'This workflow is not supported by the Gemini adapter.',
+            privacy_restricted: 'This request was not sent: Gemini unpaid-tier privacy rules do not allow personal or user-specific content. Configure an approved paid/data-processing provider for this workflow.',
+            feature_not_enabled: 'This workflow is not listed in GEMINI_PRIMARY_FEATURES yet.'
+        };
+        if (configurationMessages[configurationIssue]) {
+            return `${feature}: ${configurationMessages[configurationIssue]}`;
+        }
+    }
+    const providerDiagnostics = error?.providerDiagnostics;
+    if (error?.provider === 'Gemini' && providerDiagnostics?.googleMessage) {
+        const status = providerDiagnostics.googleStatus
+            ? ` (${providerDiagnostics.googleStatus})`
+            : '';
+        const reason = Array.isArray(providerDiagnostics.googleReasons) &&
+            providerDiagnostics.googleReasons.length
+            ? ` Reason: ${providerDiagnostics.googleReasons.join(', ')}.`
+            : '';
+        return `${feature}: Gemini returned HTTP ${providerDiagnostics.httpStatus}${status}: ${providerDiagnostics.googleMessage}${reason}`;
+    }
     if (error?.fallbackAttempted) {
         return `${feature}: Configured AI providers did not return a usable response. No result was saved; retry later.`;
     }

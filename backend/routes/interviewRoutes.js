@@ -6,7 +6,10 @@ const User = require('../models/User');
 const {
     generateMcqQuestions,
     generateInterviewQuestions,
-    evaluateAnswer
+    evaluateAnswer,
+    getGeminiConfiguration,
+    getGroqConfiguration,
+    getOpenRouterConfiguration
 } = require('../utils/aiService');
 const { providerErrorMessage } = require('../utils/providerErrors');
 const { resolveTargetRole, targetRoleRequiredResponse } = require('../utils/roleResolution');
@@ -14,11 +17,61 @@ const { resolveTargetRole, targetRoleRequiredResponse } = require('../utils/role
 const router = express.Router();
 const INTERVIEW_TOPICS = ['Mixed', 'Frontend', 'Backend', 'Data Structures', 'System Design', 'Behavioral', 'Technical'];
 const SUPPORTED_AI_PROVIDERS = new Set(['openrouter', 'gemini', 'groq']);
+const GENERATION_FEATURES = [
+    'technical_interview_generation',
+    'behavioral_interview_generation',
+    'video_interview_generation',
+    'assessment_question_generation'
+];
+
+function getFeatureProviderStatus(feature) {
+    const provider = process.env.AI_PROVIDER?.trim().toLowerCase() || 'openrouter';
+    if (provider === 'gemini') {
+        const configuration = getGeminiConfiguration(feature);
+        return {
+            provider: 'gemini',
+            model: configuration.model,
+            configured: configuration.primaryConfigured,
+            reason: configuration.configurationIssue,
+            contextMode: configuration.primaryEnabled ? 'generic_privacy_safe' : null
+        };
+    }
+    const groq = getGroqConfiguration(feature);
+    if (groq.primaryEnabled) {
+        return {
+            provider: 'groq',
+            model: groq.model,
+            configured: groq.primaryConfigured,
+            reason: groq.primaryConfigured ? null : 'provider_configuration_missing',
+            contextMode: 'personalized'
+        };
+    }
+    const openrouter = getOpenRouterConfiguration(feature);
+    return {
+        provider: openrouter.providerSupported ? 'openrouter' : null,
+        model: openrouter.model,
+        configured: openrouter.providerSupported && openrouter.apiKeyConfigured,
+        reason: !openrouter.providerSupported || !openrouter.apiKeyConfigured
+            ? 'provider_configuration_missing'
+            : null,
+        contextMode: 'personalized'
+    };
+}
 
 function safePublicQuestion(question) {
     const { answerIndex, explanation, ...publicQuestion } = question;
     return publicQuestion;
 }
+
+router.get('/status', authMiddleware, (req, res) => {
+    const features = Object.fromEntries(GENERATION_FEATURES.map(feature =>
+        [feature, getFeatureProviderStatus(feature)]));
+    res.json({
+        ready: Object.values(features).some(feature => feature.configured),
+        features,
+        privacyNotice: 'Gemini question generation uses only the selected interview type, topic, difficulty, and question count. Candidate profile, role, company, history, and answers are not sent.'
+    });
+});
 
 async function persistInterviewResult(userId, session, answers, totalScore) {
     const record = new Interview({
@@ -27,6 +80,9 @@ async function persistInterviewResult(userId, session, answers, totalScore) {
         difficulty: session.difficulty,
         company: session.company,
         interviewType: session.mode === 'mcq' ? 'MCQ Practice' : session.topic,
+        generationSource: session.generationSource,
+        generationModel: session.generationModel,
+        contextMode: session.contextMode || 'personalized',
         totalScore,
         answers,
         date: new Date()
@@ -82,6 +138,7 @@ async function createSession({ userId, requestedRole, difficulty, topic, mode, s
             sessionLength,
             generationSource: 'pending',
             generationModel: null,
+            contextMode: 'generic_privacy_safe',
             questions: [],
             expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000)
         });
@@ -114,6 +171,7 @@ async function createSession({ userId, requestedRole, difficulty, topic, mode, s
             questions = generated.questions.map(question => ({ ...question, topic }));
             session.generationSource = source;
             session.generationModel = model;
+            session.contextMode = generated.contextMode || 'personalized';
             session.questions = questions;
             await session.save();
             return { session, questions, role, source, model };
@@ -133,6 +191,9 @@ async function createSession({ userId, requestedRole, difficulty, topic, mode, s
         sessionLength,
         generationSource: source,
         generationModel: model,
+        contextMode: mode === 'mcq' && source === 'gemini'
+            ? 'generic_privacy_safe'
+            : 'personalized',
         questions,
         expiresAt: new Date(Date.now() + 2 * 60 * 60 * 1000)
     });
@@ -261,6 +322,7 @@ router.post('/generate', authMiddleware, async (req, res) => {
             generationMode: 'ai',
             source: generated.source,
             model: generated.model,
+            contextMode: generated.contextMode || 'personalized',
             sources
         });
     } catch (error) {
@@ -337,6 +399,10 @@ router.post('/session/start', authMiddleware, async (req, res) => {
             sessionLength,
             generationSource: generated.source,
             generationModel: generated.model,
+            contextMode: generated.session.contextMode,
+            ...(generated.session.contextMode === 'generic_privacy_safe'
+                ? { privacyNotice: 'Gemini receives only the selected interview type, topic, difficulty, and question count—not your role, company, profile, history, or answers. Questions are general practice.' }
+                : {}),
             questions: generated.questions.map(safePublicQuestion),
             expiresAt: generated.session.expiresAt
         });
@@ -388,6 +454,7 @@ router.post('/session/:sessionId/retry-question', authMiddleware, async (req, re
         }
         session.generationSource = generated.source;
         session.generationModel = generated.model;
+        session.contextMode = generated.contextMode || 'personalized';
         session.questions = generated.questions.map(question => ({ ...question, topic: session.topic }));
         await session.save();
         res.json({
@@ -399,6 +466,10 @@ router.post('/session/:sessionId/retry-question', authMiddleware, async (req, re
             sessionLength: session.sessionLength,
             generationSource: session.generationSource,
             generationModel: session.generationModel,
+            contextMode: session.contextMode,
+            ...(session.contextMode === 'generic_privacy_safe'
+                ? { privacyNotice: 'Gemini receives only the selected interview type and difficulty—not your role, company, profile, or history. Questions are general practice.' }
+                : {}),
             questions: session.questions.map(safePublicQuestion)
         });
     } catch (error) {

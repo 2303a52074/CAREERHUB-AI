@@ -15,8 +15,9 @@ const codingRoutes = require('./routes/codingRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const careerRoutes = require('./routes/careerRoutes');
 const CodingProblem = require('./models/CodingProblem');
-const { codingProblems, seedPromise } = require('./utils/inMemoryDB');
+const { seedPromise } = require('./utils/inMemoryDB');
 const seedCodingProblems = require('./utils/seedCodingProblems');
+const codingProblemLibrary = require('./utils/codingProblemLibrary');
 const authMiddleware = require('./middleware/authMiddleware');
 const {
     verifyAIProviderConnectivity,
@@ -82,8 +83,14 @@ app.post('/api/health/ai', authMiddleware, async (req, res) => {
             optionalConfiguration: configuration.optionalConfiguration
         },
         code: result.code,
+        ...(result.providerDiagnostics
+            ? { providerDiagnostics: result.providerDiagnostics }
+            : {}),
         message: result.code
-            ? providerErrorMessage(result.code, `${result.provider} connectivity check`)
+            ? providerErrorMessage(result.code, `${result.provider} connectivity check`, {
+                provider: result.provider,
+                providerDiagnostics: result.providerDiagnostics
+            })
             : `${result.provider} generated and returned a valid connectivity response.`
     });
 });
@@ -108,10 +115,10 @@ if (mongoUri) {
         .then(async () => {
             console.log("✅ MongoDB Connected successfully");
             await seedPromise;
-            await seedCodingProblems(CodingProblem, codingProblems);
-            console.log(`✅ Curated coding problem seed is ready (${codingProblems.length} definitions).`);
+            await seedCodingProblems(CodingProblem, codingProblemLibrary);
+            console.log(`✅ Coding problem library is ready (${codingProblemLibrary.length} definitions).`);
         })
-        .catch(err => console.error('⚠️ MongoDB initialization failed:', err.message));
+        .catch(err => console.error('⚠️ MongoDB initialization or coding catalog seeding failed:', err.message));
 } else {
     console.warn('MongoDB is not configured. Persistent API operations are disabled.');
 }
@@ -147,6 +154,7 @@ const pageRoutes = [
     { route: '/register', file: 'register.html' },
     { route: '/admin', file: 'admin.html' },
     { route: '/problems', file: 'problems.html' },
+    { route: '/problem', file: 'problem.html' },
     { route: '/editor', file: 'editor.html' },
     { route: '/profile', file: 'profile.html' },
     { route: '/recommendations', file: 'recommendations.html' }

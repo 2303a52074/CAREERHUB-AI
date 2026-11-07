@@ -20,6 +20,7 @@ const CareerAssessmentSessionSchema = new mongoose.Schema({
     questions: { type: [AssessmentQuestionSchema], required: true },
     source: { type: String, enum: ['gemini', 'openrouter', 'groq', 'curated'], required: true },
     model: { type: String, default: null, maxlength: 120 },
+    contextMode: { type: String, enum: ['generic_privacy_safe', 'personalized'], default: 'personalized' },
     fallbackUsed: { type: Boolean, default: false },
     status: { type: String, enum: ['active', 'completed'], default: 'active' },
     createdAt: { type: Date, default: Date.now, expires: 60 * 60 * 24 }

@@ -5,7 +5,7 @@ const MessageSchema = new mongoose.Schema({
     role: { type: String, enum: ['user', 'assistant'], required: true },
     content: { type: String, required: true },
     timestamp: { type: Date, default: Date.now },
-    source: { type: String, enum: ['openrouter', 'groq', 'gemini'], default: null },
+    source: { type: String, enum: ['openrouter', 'groq', 'gemini', 'local'], default: null },
     model: { type: String, default: null },
     fallbackUsed: { type: Boolean, default: false }
 }, { _id: false });
